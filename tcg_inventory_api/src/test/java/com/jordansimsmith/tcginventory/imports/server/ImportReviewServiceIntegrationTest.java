@@ -2,7 +2,11 @@ package com.jordansimsmith.tcginventory.imports.server;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -13,12 +17,14 @@ import com.jordansimsmith.service.BadRequestException;
 import com.jordansimsmith.service.ConflictException;
 import com.jordansimsmith.service.NotFoundException;
 import com.jordansimsmith.service.RequestContext;
+import com.jordansimsmith.tcginventory.imports.client.DeleteImportRequest;
 import com.jordansimsmith.tcginventory.imports.client.DeleteImportRowRequest;
 import com.jordansimsmith.tcginventory.imports.client.GetImportRequest;
 import com.jordansimsmith.tcginventory.imports.client.ImportRow;
 import com.jordansimsmith.tcginventory.imports.client.UpdateImportRowRequest;
 import com.jordansimsmith.tcginventory.inventory.client.Condition;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeAll;
@@ -28,11 +34,16 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
+import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
+import software.amazon.awssdk.services.dynamodb.model.BatchWriteItemRequest;
+import software.amazon.awssdk.services.dynamodb.model.ConditionalCheckFailedException;
+import software.amazon.awssdk.services.dynamodb.model.PutRequest;
 import software.amazon.awssdk.services.dynamodb.model.TransactionCanceledException;
+import software.amazon.awssdk.services.dynamodb.model.WriteRequest;
 
 @Testcontainers
 class ImportReviewServiceIntegrationTest {
@@ -47,6 +58,7 @@ class ImportReviewServiceIntegrationTest {
   private ImportMutationRepository importMutationRepository;
   private UpdateImportRowService updateImportRowService;
   private DeleteImportRowService deleteImportRowService;
+  private DeleteImportService deleteImportService;
 
   @BeforeAll
   static void setUpBeforeClass() {
@@ -70,6 +82,7 @@ class ImportReviewServiceIntegrationTest {
         new UpdateImportRowService(importReadRepository, importMutationRepository);
     deleteImportRowService =
         new DeleteImportRowService(importReadRepository, importMutationRepository);
+    deleteImportService = new DeleteImportService(importReadRepository, importMutationRepository);
   }
 
   @Test
@@ -368,6 +381,235 @@ class ImportReviewServiceIntegrationTest {
                 deleteImportRowService.deleteImportRow(
                     new RequestContext("alice"), new DeleteImportRowRequest("import-1", 4))))
         .isEqualTo("{}");
+  }
+
+  @Test
+  void deleteImportRemovesParentAndEveryRowButKeepsOtherRecordsAndPhotoObjects() throws Exception {
+    var parent = importItem("alice", "import-1", "review");
+    importTable.putItem(parent);
+    importRowTable.putItem(importRow("alice", "import-1", 1));
+    importRowTable.putItem(importRow("alice", "import-1", 2));
+    importTable.putItem(importItem("bob", "import-1", "review"));
+    dynamoDbClient.putItem(
+        request ->
+            request
+                .tableName(TABLE_NAME)
+                .item(
+                    Map.of(
+                        "pk", AttributeValue.fromS("USER#alice#IMPORT_OPERATIONS"),
+                        "sk", AttributeValue.fromS("CREATE#import-operation"),
+                        "import_id", AttributeValue.fromS("import-1"))));
+
+    assertThat(
+            deleteImportService.deleteImport(
+                new RequestContext("alice"), new DeleteImportRequest("import-1")))
+        .isNotNull();
+
+    assertThat(importReadRepository.getImport("alice", "import-1")).isNull();
+    assertThat(importReadRepository.findRows("alice", "import-1")).isEmpty();
+    assertThat(importReadRepository.getImport("bob", "import-1")).isNotNull();
+    assertThat(
+            dynamoDbClient.getItem(
+                request ->
+                    request
+                        .tableName(TABLE_NAME)
+                        .key(
+                            Map.of(
+                                "pk", AttributeValue.fromS("USER#alice#IMPORT_OPERATIONS"),
+                                "sk", AttributeValue.fromS("CREATE#import-operation")))))
+        .isNotNull();
+  }
+
+  @Test
+  void deleteImportCleansUpRowsAcrossQueryPages() throws Exception {
+    importTable.putItem(importItem("alice", "import-1", "review"));
+    putLargeRows("alice", "import-1", 1100);
+
+    deleteImportService.deleteImport(
+        new RequestContext("alice"), new DeleteImportRequest("import-1"));
+
+    assertThat(importReadRepository.findRows("alice", "import-1")).isEmpty();
+    assertThat(importReadRepository.getImport("alice", "import-1")).isNull();
+  }
+
+  @Test
+  void deleteImportAllowsAnEmptyImportAndReturnsEmptyJson() throws Exception {
+    importTable.putItem(importItem("alice", "empty", "review"));
+    var objectMapper = new ObjectMapper();
+
+    assertThat(objectMapper.writeValueAsString(new DeleteImportRequest("empty")))
+        .isEqualTo("{\"import_id\":\"empty\"}");
+    assertThat(
+            objectMapper.writeValueAsString(
+                deleteImportService.deleteImport(
+                    new RequestContext("alice"), new DeleteImportRequest("empty"))))
+        .isEqualTo("{}");
+    assertThat(importReadRepository.getImport("alice", "empty")).isNull();
+  }
+
+  @Test
+  void deleteImportValidatesBeforeReadsAndUsesAuthenticatedUserAndExactId() throws Exception {
+    var readRepository = mock(ImportReadRepository.class);
+    var mutationRepository = mock(ImportMutationRepository.class);
+    var service = new DeleteImportService(readRepository, mutationRepository);
+    assertThatThrownBy(
+            () -> service.deleteImport(new RequestContext("alice"), new DeleteImportRequest(" ")))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("import_id is required");
+    verifyNoInteractions(readRepository, mutationRepository);
+
+    when(readRepository.getImport("alice", "opaque/id"))
+        .thenReturn(importItem("alice", "opaque/id", "review"));
+    when(readRepository.findRows("alice", "opaque/id")).thenReturn(List.of());
+    service.deleteImport(new RequestContext("alice"), new DeleteImportRequest("opaque/id"));
+    verify(readRepository).getImport("alice", "opaque/id");
+    verify(mutationRepository).deleteImport("alice", "opaque/id");
+    verify(mutationRepository).deleteRows(List.of());
+  }
+
+  @Test
+  void deleteImportRequiresExistingReviewImport() {
+    var readRepository = mock(ImportReadRepository.class);
+    var mutationRepository = mock(ImportMutationRepository.class);
+    var service = new DeleteImportService(readRepository, mutationRepository);
+    when(readRepository.getImport("alice", "missing")).thenReturn(null);
+    assertThatThrownBy(
+            () ->
+                service.deleteImport(
+                    new RequestContext("alice"), new DeleteImportRequest("missing")))
+        .isInstanceOf(NotFoundException.class)
+        .hasMessage("Not Found");
+    when(readRepository.getImport("alice", "active"))
+        .thenReturn(importItem("alice", "active", "appraising"));
+    assertThatThrownBy(
+            () ->
+                service.deleteImport(
+                    new RequestContext("alice"), new DeleteImportRequest("active")))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("import is not in a deletable status");
+    verifyNoInteractions(mutationRepository);
+  }
+
+  @Test
+  void deleteImportConditionalDeleteRejectsParentTransitionBeforeRowCleanup() {
+    importTable.putItem(importItem("alice", "import-1", "review"));
+    importRowTable.putItem(importRow("alice", "import-1", 1));
+    var mutationRepository =
+        new ImportMutationRepository(dynamoDbClient, TABLE_NAME) {
+          @Override
+          public void deleteImport(String user, String importId) {
+            var parent =
+                importTable.getItem(
+                    Key.builder()
+                        .partitionValue("USER#alice")
+                        .sortValue("IMPORT#import-1")
+                        .build());
+            parent.setStatus("appraising");
+            importTable.putItem(parent);
+            super.deleteImport(user, importId);
+          }
+        };
+    var service = new DeleteImportService(importReadRepository, mutationRepository);
+
+    assertThatThrownBy(
+            () ->
+                service.deleteImport(
+                    new RequestContext("alice"), new DeleteImportRequest("import-1")))
+        .isInstanceOf(ConditionalCheckFailedException.class);
+    assertThat(importReadRepository.getImport("alice", "import-1").getStatus())
+        .isEqualTo("appraising");
+    assertThat(importReadRepository.getRow("alice", "import-1", 1)).isNotNull();
+  }
+
+  @Test
+  void deleteImportQueryFailureLeavesRowsAfterParentDeletion() {
+    importTable.putItem(importItem("alice", "import-1", "review"));
+    importRowTable.putItem(importRow("alice", "import-1", 1));
+    var failure = new IllegalStateException("row query failed");
+    var readRepository = mock(ImportReadRepository.class);
+    when(readRepository.getImport("alice", "import-1"))
+        .thenReturn(importItem("alice", "import-1", "review"));
+    when(readRepository.findRows("alice", "import-1")).thenThrow(failure);
+    var service = new DeleteImportService(readRepository, importMutationRepository);
+
+    assertThatThrownBy(
+            () ->
+                service.deleteImport(
+                    new RequestContext("alice"), new DeleteImportRequest("import-1")))
+        .isSameAs(failure);
+    assertThat(importReadRepository.getImport("alice", "import-1")).isNull();
+    assertThat(importReadRepository.getRow("alice", "import-1", 1)).isNotNull();
+  }
+
+  @Test
+  void deleteImportCleanupFailureLeavesCompletedDeletesAndOrphanedRows() {
+    importTable.putItem(importItem("alice", "import-1", "review"));
+    importRowTable.putItem(importRow("alice", "import-1", 1));
+    importRowTable.putItem(importRow("alice", "import-1", 2));
+    var failure = new IllegalStateException("row cleanup failed");
+    var mutationRepository =
+        new ImportMutationRepository(dynamoDbClient, TABLE_NAME) {
+          @Override
+          public void deleteRows(List<ImportRowItem> rows) {
+            super.deleteRows(rows.subList(0, 1));
+            throw failure;
+          }
+        };
+    var service = new DeleteImportService(importReadRepository, mutationRepository);
+
+    assertThatThrownBy(
+            () ->
+                service.deleteImport(
+                    new RequestContext("alice"), new DeleteImportRequest("import-1")))
+        .isSameAs(failure);
+    assertThat(importReadRepository.getImport("alice", "import-1")).isNull();
+    assertThat(importReadRepository.findRows("alice", "import-1")).hasSize(1);
+    assertThatThrownBy(
+            () ->
+                new GetImportService(importReadRepository)
+                    .getImport(new RequestContext("alice"), new GetImportRequest("import-1")))
+        .isInstanceOf(NotFoundException.class);
+  }
+
+  @Test
+  void deleteImportFailureStopsBeforeReadingRows() {
+    var readRepository = mock(ImportReadRepository.class);
+    var mutationRepository = mock(ImportMutationRepository.class);
+    var failure = new IllegalStateException("delete failed");
+    when(readRepository.getImport("alice", "import-1"))
+        .thenReturn(importItem("alice", "import-1", "review"));
+    doThrow(failure).when(mutationRepository).deleteImport("alice", "import-1");
+    var service = new DeleteImportService(readRepository, mutationRepository);
+
+    assertThatThrownBy(
+            () ->
+                service.deleteImport(
+                    new RequestContext("alice"), new DeleteImportRequest("import-1")))
+        .isSameAs(failure);
+    verify(readRepository, never()).findRows("alice", "import-1");
+    verify(mutationRepository, never()).deleteRows(anyList());
+  }
+
+  private void putLargeRows(String user, String importId, int count) {
+    for (int first = 1; first <= count; first += 25) {
+      var requests = new ArrayList<WriteRequest>();
+      for (int position = first; position <= Math.min(first + 24, count); position++) {
+        var item =
+            Map.of(
+                ImportRowItem.PK,
+                AttributeValue.fromS(ImportRowItem.formatPk(user, importId)),
+                ImportRowItem.SK,
+                AttributeValue.fromS(ImportRowItem.formatSk(position)),
+                ImportRowItem.POSITION,
+                AttributeValue.fromN(Integer.toString(position)),
+                "padding",
+                AttributeValue.fromS("x".repeat(1000)));
+        requests.add(
+            WriteRequest.builder().putRequest(PutRequest.builder().item(item).build()).build());
+      }
+      dynamoDbClient.batchWriteItem(
+          BatchWriteItemRequest.builder().requestItems(Map.of(TABLE_NAME, requests)).build());
+    }
   }
 
   private static ImportItem importItem(String user, String importId, String status) {

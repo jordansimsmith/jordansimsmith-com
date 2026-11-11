@@ -10,7 +10,9 @@ import com.jordansimsmith.queue.FakeQueueClient;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobMessage;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
+import com.jordansimsmith.tcginventory.imports.api.DeleteImportHandler;
 import com.jordansimsmith.tcginventory.imports.api.DeleteImportRowHandler;
+import com.jordansimsmith.tcginventory.imports.api.FindImportsHandler;
 import com.jordansimsmith.tcginventory.imports.api.GetImportHandler;
 import com.jordansimsmith.tcginventory.imports.api.UpdateImportRowHandler;
 import com.jordansimsmith.time.FakeClock;
@@ -45,6 +47,7 @@ public class ImportsHandlerIntegrationTest {
 
   private CreateImportHandler createImportHandler;
   private GetImportHandler getImportHandler;
+  private FindImportsHandler findImportsHandler;
   private DeleteImportHandler deleteImportHandler;
   private UpdateImportRowHandler updateImportRowHandler;
   private DeleteImportRowHandler deleteImportRowHandler;
@@ -80,6 +83,7 @@ public class ImportsHandlerIntegrationTest {
 
     createImportHandler = new CreateImportHandler(factory);
     getImportHandler = new GetImportHandler(factory);
+    findImportsHandler = new FindImportsHandler(factory);
     deleteImportHandler = new DeleteImportHandler(factory);
     updateImportRowHandler = new UpdateImportRowHandler(factory);
     deleteImportRowHandler = new DeleteImportRowHandler(factory);
@@ -373,111 +377,17 @@ public class ImportsHandlerIntegrationTest {
     // assert
     assertThat(response.getStatusCode()).isEqualTo(204);
 
-    var deletedImport =
-        importTable.getItem(
-            Key.builder()
-                .partitionValue(ImportItem.formatPk("jordan"))
-                .sortValue(ImportItem.formatSk(importId))
-                .build());
-    assertThat(deletedImport).isNull();
-
-    var rowQuery =
-        QueryConditional.sortBeginsWith(
-            Key.builder()
-                .partitionValue(ImportRowItem.formatPk("jordan", importId))
-                .sortValue(ImportRowItem.ROW_PREFIX)
-                .build());
-    var rows =
-        importRowTable
-            .query(QueryEnhancedRequest.builder().queryConditional(rowQuery).build())
-            .stream()
-            .flatMap(page -> page.items().stream())
-            .toList();
-    assertThat(rows).isEmpty();
-  }
-
-  @Test
-  void orphanedRowsShouldNotExposeDeletedImport() {
-    // arrange
-    var importId = createReviewImportWithRow("jordan");
-    var factory =
-        TcgInventoryTestFactory.create(
-            dynamoDbContainer.getEndpoint(), TcgInventoryTestFactory.UNUSED_S3_ENDPOINT);
-    var repository = new ImportsRepository(factory.dynamoDbClient(), jobTable);
-
-    // act
-    repository.deleteReviewImport("jordan", importId);
-
-    // assert
-    assertThat(
-            importRowTable.getItem(
-                Key.builder()
-                    .partitionValue(ImportRowItem.formatPk("jordan", importId))
-                    .sortValue(ImportRowItem.formatSk(1))
-                    .build()))
-        .isNotNull();
     assertThat(
             getImportHandler
                 .handleRequest(
                     buildEventWithPathParam("jordan", Map.of("import_id", importId)), null)
                 .getStatusCode())
         .isEqualTo(404);
-  }
-
-  @Test
-  void deleteImportShouldReturn409WhenAppraising() throws Exception {
-    // arrange
-    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    var createResponse =
-        createImportHandler.handleRequest(
-            buildCreateEvent("jordan", buildSingleCardCsv(), "test.csv"), null);
-    var importId = objectMapper.readTree(createResponse.getBody()).get("import_id").asText();
-
-    // act (import is still in appraising status from creation)
-    var response =
-        deleteImportHandler.handleRequest(
-            buildEventWithPathParam("jordan", Map.of("import_id", importId)), null);
-
-    // assert
-    assertThat(response.getStatusCode()).isEqualTo(409);
-  }
-
-  @Test
-  void deleteImportShouldReturn409AfterConfirm() throws Exception {
-    // arrange
-    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    var createResponse =
-        createImportHandler.handleRequest(
-            buildCreateEvent("jordan", buildSingleCardCsv(), "test.csv"), null);
-    var importId = objectMapper.readTree(createResponse.getBody()).get("import_id").asText();
-
-    var importItem =
-        importTable.getItem(
-            Key.builder()
-                .partitionValue(ImportItem.formatPk("jordan"))
-                .sortValue(ImportItem.formatSk(importId))
-                .build());
-    importItem.setStatus("confirmed");
-    importTable.putItem(importItem);
-
-    // act
-    var response =
-        deleteImportHandler.handleRequest(
-            buildEventWithPathParam("jordan", Map.of("import_id", importId)), null);
-
-    // assert
-    assertThat(response.getStatusCode()).isEqualTo(409);
-  }
-
-  @Test
-  void deleteImportShouldReturn404ForUnknown() {
-    // act
-    var response =
-        deleteImportHandler.handleRequest(
-            buildEventWithPathParam("jordan", Map.of("import_id", "nonexistent")), null);
-
-    // assert
-    assertThat(response.getStatusCode()).isEqualTo(404);
+    assertThat(
+            findImportsHandler
+                .handleRequest(buildEventWithPathParam("jordan", Map.of()), null)
+                .getBody())
+        .doesNotContain(importId);
   }
 
   private String buildSingleCardCsv() {

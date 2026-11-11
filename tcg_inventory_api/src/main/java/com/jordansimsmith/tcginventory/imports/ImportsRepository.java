@@ -10,7 +10,6 @@ import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.ConditionCheck;
-import software.amazon.awssdk.services.dynamodb.model.DeleteItemRequest;
 import software.amazon.awssdk.services.dynamodb.model.Put;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItem;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItemsRequest;
@@ -151,23 +150,6 @@ public class ImportsRepository {
                             .build())
                     .build(),
                 mutation)
-            .build());
-  }
-
-  public void deleteReviewImport(String user, String importId) {
-    dynamoDbClient.deleteItem(
-        DeleteItemRequest.builder()
-            .tableName(TcgInventoryTable.TABLE_NAME)
-            .key(
-                Map.of(
-                    "pk",
-                    AttributeValue.builder().s(ImportItem.formatPk(user)).build(),
-                    "sk",
-                    AttributeValue.builder().s(ImportItem.formatSk(importId)).build()))
-            .conditionExpression("attribute_exists(pk) AND #status = :review")
-            .expressionAttributeNames(Map.of("#status", "status"))
-            .expressionAttributeValues(
-                Map.of(":review", AttributeValue.builder().s("review").build()))
             .build());
   }
 

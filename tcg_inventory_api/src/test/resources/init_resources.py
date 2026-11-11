@@ -231,7 +231,7 @@ lambdas = {
         "zip_file": "get-import-handler_deploy.jar",
     },
     "delete_import": {
-        "handler": "com.jordansimsmith.tcginventory.imports.DeleteImportHandler",
+        "handler": "com.jordansimsmith.tcginventory.imports.api.DeleteImportHandler",
         "zip_file": "delete-import-handler_deploy.jar",
     },
     "confirm_import": {

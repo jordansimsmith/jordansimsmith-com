@@ -14,6 +14,24 @@ import java.util.Map;
 public class FakeImportService implements ImportService {
   private final Map<UserImport, GetImportResponse> imports = new HashMap<>();
 
+  @Override
+  public DeleteImportResponse deleteImport(RequestContext ctx, DeleteImportRequest request)
+      throws ServiceException {
+    if (request.importId() == null || request.importId().isBlank()) {
+      throw new BadRequestException("import_id is required");
+    }
+    var key = new UserImport(ctx.user(), request.importId());
+    var importDetail = imports.get(key);
+    if (importDetail == null) {
+      throw new NotFoundException("Not Found");
+    }
+    if (importDetail.status() != ImportStatus.REVIEW) {
+      throw new ConflictException("import is not in a deletable status");
+    }
+    imports.remove(key);
+    return new DeleteImportResponse();
+  }
+
   public void seedImport(String user, GetImportResponse importDetail) {
     imports.put(new UserImport(user, importDetail.importId()), importDetail);
   }

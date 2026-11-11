@@ -1,10 +1,12 @@
 package com.jordansimsmith.tcginventory.imports.server;
 
+import java.util.List;
 import java.util.Map;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.ConditionCheck;
 import software.amazon.awssdk.services.dynamodb.model.Delete;
+import software.amazon.awssdk.services.dynamodb.model.DeleteItemRequest;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItem;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItemsRequest;
 import software.amazon.awssdk.services.dynamodb.model.Update;
@@ -104,5 +106,35 @@ public class ImportMutationRepository {
                             .build())
                     .build())
             .build());
+  }
+
+  public void deleteImport(String user, String importId) {
+    dynamoDbClient.deleteItem(
+        DeleteItemRequest.builder()
+            .tableName(tableName)
+            .key(
+                Map.of(
+                    ImportItem.PK,
+                    AttributeValue.builder().s(ImportItem.formatPk(user)).build(),
+                    ImportItem.SK,
+                    AttributeValue.builder().s(ImportItem.formatSk(importId)).build()))
+            .conditionExpression("attribute_exists(pk) AND #status = :review")
+            .expressionAttributeNames(Map.of("#status", ImportItem.STATUS))
+            .expressionAttributeValues(
+                Map.of(":review", AttributeValue.builder().s("review").build()))
+            .build());
+  }
+
+  public void deleteRows(List<ImportRowItem> rows) {
+    for (var row : rows) {
+      dynamoDbClient.deleteItem(
+          DeleteItemRequest.builder()
+              .tableName(tableName)
+              .key(
+                  Map.of(
+                      ImportRowItem.PK, AttributeValue.builder().s(row.getPk()).build(),
+                      ImportRowItem.SK, AttributeValue.builder().s(row.getSk()).build()))
+              .build());
+    }
   }
 }
