@@ -72,24 +72,6 @@ public class ImportsRepository {
             .build());
   }
 
-  public void updateRowCondition(String user, String importId, int position, String condition) {
-    mutateReviewRow(
-        user,
-        importId,
-        TransactWriteItem.builder()
-            .update(
-                Update.builder()
-                    .tableName(TcgInventoryTable.TABLE_NAME)
-                    .key(rowKey(user, importId, position))
-                    .updateExpression("SET #condition = :condition")
-                    .conditionExpression("attribute_exists(pk)")
-                    .expressionAttributeNames(Map.of("#condition", ImportRowItem.CONDITION))
-                    .expressionAttributeValues(
-                        Map.of(":condition", AttributeValue.builder().s(condition).build()))
-                    .build())
-            .build());
-  }
-
   public void deleteRow(String user, String importId, int position) {
     mutateReviewRow(
         user,

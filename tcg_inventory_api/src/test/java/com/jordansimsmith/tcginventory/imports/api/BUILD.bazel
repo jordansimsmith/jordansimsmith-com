@@ -6,6 +6,7 @@ java_test_suite(
     srcs = [
         "FindImportsHandlerTest.java",
         "GetImportHandlerTest.java",
+        "UpdateImportRowHandlerTest.java",
     ],
     runner = "junit5",
     test_suffixes = ["Test.java"],
@@ -16,7 +17,9 @@ java_test_suite(
         "//tcg_inventory_api:lib",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/imports/api:find-imports-handler",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/imports/api:get-import-handler",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/imports/api:update-import-row-handler",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/imports/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/inventory/client",
         "@maven//:com_amazonaws_aws_lambda_java_core",
         "@maven//:com_amazonaws_aws_lambda_java_events",
         "@maven//:com_fasterxml_jackson_core_jackson_databind",

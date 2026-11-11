@@ -27,7 +27,6 @@ import type {
   GamesResponse,
   GetFetchTcgAccountResponse,
   ImportDetail,
-  ImportRow,
   ImportSummary,
   OrderDetail,
   PricingResponse,
@@ -190,8 +189,8 @@ export function createHttpClient(): ApiClient {
       importId: string,
       position: number,
       condition: Condition,
-    ): Promise<ImportRow> {
-      const response = await authenticatedFetch(
+    ): Promise<void> {
+      await authenticatedFetch(
         `/imports/${encodeURIComponent(importId)}/rows/${position}`,
         {
           method: 'PUT',
@@ -199,7 +198,6 @@ export function createHttpClient(): ApiClient {
           body: JSON.stringify({ condition }),
         },
       );
-      return response.json();
     },
 
     async deleteImportRow(importId: string, position: number): Promise<void> {

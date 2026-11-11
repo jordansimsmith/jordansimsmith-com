@@ -497,6 +497,26 @@ describe('createFakeClient imports', () => {
     expect(list.imports[0].status).toBe('review');
   });
 
+  it('updates a review condition without changing appraisal values', async () => {
+    const client = createFakeClient();
+    const review = (await client.findImports()).imports.find(
+      (item) => item.status === 'review',
+    );
+    const before = await client.getImport(review!.import_id);
+    const row = before.rows.find((item) => item.decision === 'keep')!;
+
+    await expect(
+      client.updateImportRow(review!.import_id, row.position, 'LP'),
+    ).resolves.toBeUndefined();
+
+    const after = await client.getImport(review!.import_id);
+    const updated = after.rows.find((item) => item.position === row.position)!;
+    expect(updated.condition).toBe('LP');
+    expect(updated.decision).toBe(row.decision);
+    expect(updated.market_price).toBe(row.market_price);
+    expect(updated.suggested_price).toBe(row.suggested_price);
+  });
+
   it('completes the seeded in-flight appraisal over time', async () => {
     vi.useFakeTimers();
     const client = createFakeClient();

@@ -2011,7 +2011,7 @@ export function createFakeClient(): ApiClient {
       importId: string,
       position: number,
       condition: Condition,
-    ): Promise<ImportRow> {
+    ): Promise<void> {
       const importRecord = getImportOrThrow(importId);
       if (importRecord.status !== 'review') {
         throw new Error('import is not in review status');
@@ -2021,7 +2021,6 @@ export function createFakeClient(): ApiClient {
         throw new Error('Not Found');
       }
       row.condition = condition;
-      return toImportRow(row, true);
     },
 
     async deleteImportRow(importId: string, position: number): Promise<void> {

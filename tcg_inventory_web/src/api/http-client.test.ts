@@ -574,6 +574,24 @@ describe('http client imports', () => {
     expect(init.headers.Authorization).toBe(`Basic ${btoa('alice:pw')}`);
     expect(json).not.toHaveBeenCalled();
   });
+
+  it('updates a row condition without parsing the empty response', async () => {
+    const json = vi.fn();
+    fetchSpy.mockResolvedValue({ ok: true, status: 204, json });
+
+    await expect(
+      createHttpClient().updateImportRow('imp/1', 3, 'LP'),
+    ).resolves.toBeUndefined();
+
+    const [url, init] = fetchSpy.mock.calls[0];
+    expect(url).toBe(
+      'https://api.tcg-inventory.jordansimsmith.com/imports/imp%2F1/rows/3',
+    );
+    expect(init.method).toBe('PUT');
+    expect(init.headers.Authorization).toBe(`Basic ${btoa('alice:pw')}`);
+    expect(init.body).toBe(JSON.stringify({ condition: 'LP' }));
+    expect(json).not.toHaveBeenCalled();
+  });
 });
 
 describe('http client catalog', () => {

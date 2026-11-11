@@ -343,7 +343,7 @@ lambdas = {
         "zip_file": "confirm-order-handler_deploy.jar",
     },
     "update_import_row": {
-        "handler": "com.jordansimsmith.tcginventory.imports.UpdateImportRowHandler",
+        "handler": "com.jordansimsmith.tcginventory.imports.api.UpdateImportRowHandler",
         "zip_file": "update-import-row-handler_deploy.jar",
     },
     "delete_import_row": {

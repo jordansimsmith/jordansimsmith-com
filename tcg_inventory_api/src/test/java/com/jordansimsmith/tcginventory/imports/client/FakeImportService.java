@@ -1,9 +1,11 @@
 package com.jordansimsmith.tcginventory.imports.client;
 
 import com.jordansimsmith.service.BadRequestException;
+import com.jordansimsmith.service.ConflictException;
 import com.jordansimsmith.service.NotFoundException;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceException;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
@@ -47,6 +49,71 @@ public class FakeImportService implements ImportService {
       throw new NotFoundException("Not Found");
     }
     return result;
+  }
+
+  @Override
+  public UpdateImportRowResponse updateImportRow(RequestContext ctx, UpdateImportRowRequest request)
+      throws ServiceException {
+    if (request.importId() == null || request.importId().isBlank()) {
+      throw new BadRequestException("import_id is required");
+    }
+    if (request.position() <= 0) {
+      throw new BadRequestException("position must be positive");
+    }
+    if (request.condition() == null) {
+      throw new BadRequestException("invalid condition");
+    }
+    var key = new UserImport(ctx.user(), request.importId());
+    var importDetail = imports.get(key);
+    if (importDetail == null) {
+      throw new NotFoundException("Not Found");
+    }
+    if (importDetail.status() != ImportStatus.REVIEW) {
+      throw new ConflictException("import is not in review status");
+    }
+    var rows = new ArrayList<>(importDetail.rows());
+    var rowIndex = -1;
+    for (int index = 0; index < rows.size(); index++) {
+      if (rows.get(index).position() == request.position()) {
+        rowIndex = index;
+        break;
+      }
+    }
+    if (rowIndex == -1) {
+      throw new NotFoundException("Not Found");
+    }
+    var row = rows.get(rowIndex);
+    rows.set(
+        rowIndex,
+        new ImportRow(
+            row.position(),
+            row.name(),
+            row.setCode(),
+            row.setName(),
+            row.collectorNumber(),
+            row.finish(),
+            request.condition(),
+            row.externalId(),
+            row.decision(),
+            row.decisionReason(),
+            row.marketPrice(),
+            row.suggestedPrice(),
+            row.photos(),
+            row.needsPhotos()));
+    imports.put(
+        key,
+        new GetImportResponse(
+            importDetail.importId(),
+            importDetail.game(),
+            importDetail.filename(),
+            importDetail.status(),
+            importDetail.rowCount(),
+            importDetail.createdAt(),
+            importDetail.totalSuggestedPrice(),
+            importDetail.unitCount(),
+            importDetail.placementInstructions(),
+            rows));
+    return new UpdateImportRowResponse();
   }
 
   private static int decodeContinuation(String continuation) throws BadRequestException {

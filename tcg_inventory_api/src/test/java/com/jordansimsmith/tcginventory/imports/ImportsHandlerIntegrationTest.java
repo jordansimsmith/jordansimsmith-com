@@ -11,6 +11,7 @@ import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobMessage;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
 import com.jordansimsmith.tcginventory.imports.api.GetImportHandler;
+import com.jordansimsmith.tcginventory.imports.api.UpdateImportRowHandler;
 import com.jordansimsmith.time.FakeClock;
 import com.jordansimsmith.ulid.FakeUlidGenerator;
 import java.nio.charset.StandardCharsets;
@@ -602,12 +603,8 @@ public class ImportsHandlerIntegrationTest {
             null);
 
     // assert
-    assertThat(response.getStatusCode()).isEqualTo(200);
-    var body = objectMapper.readTree(response.getBody());
-    assertThat(body.get("condition").asText()).isEqualTo("LP");
-    assertThat(body.get("name").asText()).isEqualTo("Llanowar Elves");
-    assertThat(body.get("decision").asText()).isEqualTo("keep");
-    assertThat(body.get("market_price").asText()).isEqualTo("1.50");
+    assertThat(response.getStatusCode()).isEqualTo(204);
+    assertThat(response.getBody()).isNull();
 
     var rowItem =
         importRowTable.getItem(

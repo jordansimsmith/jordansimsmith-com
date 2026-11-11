@@ -198,22 +198,10 @@ export function ImportDetailPage() {
       return;
     }
     try {
-      const updated = await apiClient.updateImportRow(
-        importId,
-        position,
-        condition,
-      );
-      setImportDetail((current) => {
-        if (!current) {
-          return current;
-        }
-        return {
-          ...current,
-          rows: current.rows.map((row) =>
-            row.position === position ? { ...row, ...updated } : row,
-          ),
-        };
-      });
+      await apiClient.updateImportRow(importId, position, condition);
+      const updated = await loadImportWithPhotos(importId);
+      setImportDetail(updated.importDetail);
+      setPhotoUrls(updated.photoUrls);
     } catch (e) {
       const message =
         e instanceof Error ? e.message : 'Failed to update condition';

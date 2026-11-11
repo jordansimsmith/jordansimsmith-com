@@ -8,4 +8,7 @@ public interface ImportService {
       throws ServiceException;
 
   GetImportResponse getImport(RequestContext ctx, GetImportRequest request) throws ServiceException;
+
+  UpdateImportRowResponse updateImportRow(RequestContext ctx, UpdateImportRowRequest request)
+      throws ServiceException;
 }

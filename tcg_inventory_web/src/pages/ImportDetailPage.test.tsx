@@ -518,11 +518,24 @@ describe('ImportDetailPage', () => {
 
   it('allows editing condition via inline select in review status', async () => {
     const user = userEvent.setup();
-    vi.spyOn(clientModule.apiClient, 'getImport').mockResolvedValue(
-      reviewImport(),
-    );
+    const getImport = vi
+      .spyOn(clientModule.apiClient, 'getImport')
+      .mockResolvedValueOnce(reviewImport())
+      .mockResolvedValueOnce(
+        reviewImport({
+          rows: [
+            importRow(1, {
+              name: 'Top Card',
+              condition: 'LP',
+              market_price: '4.55',
+              suggested_price: '4.50',
+            }),
+            ...reviewImport().rows.slice(1),
+          ],
+        }),
+      );
     vi.spyOn(clientModule.apiClient, 'updateImportRow').mockResolvedValue(
-      importRow(1, { name: 'Top Card', condition: 'LP' }),
+      undefined,
     );
 
     renderImportDetailPage();
@@ -540,6 +553,54 @@ describe('ImportDetailPage', () => {
         'LP',
       );
     });
+    await waitFor(() => {
+      expect(getImport).toHaveBeenCalledTimes(2);
+      expect((selects[0] as HTMLInputElement).value).toBe('LP');
+    });
+    expect(screen.getByText('$4.55')).toBeDefined();
+    expect(screen.getByText('$4.50')).toBeDefined();
+  });
+
+  it('shows an error when condition update refresh fails', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(clientModule.apiClient, 'getImport')
+      .mockResolvedValueOnce(reviewImport())
+      .mockRejectedValueOnce(new Error('refresh failed'));
+    vi.spyOn(clientModule.apiClient, 'updateImportRow').mockResolvedValue(
+      undefined,
+    );
+
+    renderImportDetailPage();
+    await screen.findByText('Top Card');
+    await user.selectOptions(
+      screen.getAllByLabelText(/Condition for row/)[0],
+      'LP',
+    );
+
+    expect(await screen.findByText('refresh failed')).toBeDefined();
+  });
+
+  it('shows an error when condition update fails', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(clientModule.apiClient, 'getImport').mockResolvedValue(
+      reviewImport(),
+    );
+    vi.spyOn(clientModule.apiClient, 'updateImportRow').mockRejectedValue(
+      new Error('update failed'),
+    );
+
+    renderImportDetailPage();
+    await screen.findByText('Top Card');
+    await user.selectOptions(
+      screen.getAllByLabelText(/Condition for row/)[0],
+      'LP',
+    );
+
+    expect(await screen.findByText('update failed')).toBeDefined();
+    expect(
+      (screen.getAllByLabelText(/Condition for row/)[0] as HTMLInputElement)
+        .value,
+    ).toBe('NM');
   });
 
   it('deletes a row and updates counts', async () => {

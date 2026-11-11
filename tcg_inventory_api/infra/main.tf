@@ -165,7 +165,7 @@ module "java_api" {
       artifact = var.artifacts["delete_scan"]
     }
     update_import_row = {
-      handler  = "com.jordansimsmith.tcginventory.imports.UpdateImportRowHandler"
+      handler  = "com.jordansimsmith.tcginventory.imports.api.UpdateImportRowHandler"
       artifact = var.artifacts["update_import_row"]
     }
     delete_import_row = {

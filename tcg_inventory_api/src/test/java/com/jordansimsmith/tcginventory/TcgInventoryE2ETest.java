@@ -236,9 +236,10 @@ public class TcgInventoryE2ETest {
 
     // act - update cheap row 1 condition from NM to LP, then delete it
     var updateRowResponse = put("/imports/" + importId + "/rows/1", "{\"condition\":\"LP\"}");
-    assertThat(updateRowResponse.statusCode()).isEqualTo(200);
-    var updatedRow = objectMapper.readTree(updateRowResponse.body());
-    assertThat(updatedRow.get("condition").asText()).isEqualTo("LP");
+    assertThat(updateRowResponse.statusCode()).isEqualTo(204);
+    assertThat(updateRowResponse.body()).isEmpty();
+    var updatedRows = objectMapper.readTree(get("/imports/" + importId).body()).get("rows");
+    assertThat(updatedRows.get(0).get("condition").asText()).isEqualTo("LP");
 
     var deleteRowResponse = delete("/imports/" + importId + "/rows/1");
     assertThat(deleteRowResponse.statusCode()).isEqualTo(204);

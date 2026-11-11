@@ -526,7 +526,7 @@ export interface ApiClient {
     importId: string,
     position: number,
     condition: Condition,
-  ): Promise<ImportRow>;
+  ): Promise<void>;
   deleteImportRow(importId: string, position: number): Promise<void>;
   findPhotos(request: FindPhotosRequest): Promise<FindPhotosResponse>;
   addRowPhoto(importId: string, position: number, jpeg: Blob): Promise<void>;

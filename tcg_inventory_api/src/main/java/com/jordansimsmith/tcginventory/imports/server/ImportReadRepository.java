@@ -44,6 +44,16 @@ public class ImportReadRepository {
     return importRowTable.query(request).stream().flatMap(page -> page.items().stream()).toList();
   }
 
+  @Nullable
+  public ImportRowItem getRow(String user, String importId, int position) {
+    var key =
+        Key.builder()
+            .partitionValue(ImportRowItem.formatPk(user, importId))
+            .sortValue(ImportRowItem.formatSk(position))
+            .build();
+    return importRowTable.getItem(request -> request.key(key).consistentRead(true));
+  }
+
   public ImportPage findImports(
       String user, int limit, @Nullable Map<String, AttributeValue> exclusiveStartKey) {
     var requestBuilder =
