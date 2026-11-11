@@ -446,6 +446,7 @@ describe('createFakeClient imports', () => {
     expect(review.created_at).toBeGreaterThan(confirmed.created_at);
     expect(inFlight.row_count).toBeGreaterThan(0);
     expect(confirmed.status).toBe('confirmed');
+    expect(inFlight).not.toHaveProperty('appraisal_error');
   });
 
   it('creates an import with canned demo rows without parsing uploaded csv', async () => {

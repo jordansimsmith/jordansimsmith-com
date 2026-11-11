@@ -16,6 +16,7 @@ import com.jordansimsmith.tcginventory.games.client.FakeGamesService;
 import com.jordansimsmith.tcginventory.games.client.GamesService;
 import com.jordansimsmith.tcginventory.imports.ImportItem;
 import com.jordansimsmith.tcginventory.imports.ImportRowItem;
+import com.jordansimsmith.tcginventory.imports.server.ImportsModule;
 import com.jordansimsmith.tcginventory.inventory.client.FakeInventoryService;
 import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
 import com.jordansimsmith.tcginventory.listings.server.ListingsModule;
@@ -51,7 +52,8 @@ import software.amazon.awssdk.services.sqs.SqsClient;
       CatalogModule.class,
       ListingsModule.class,
       ReportsModule.class,
-      PublishModule.class
+      PublishModule.class,
+      ImportsModule.class
     })
 public class TcgInventoryTestModule {
   @Provides

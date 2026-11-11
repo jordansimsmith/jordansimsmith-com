@@ -127,10 +127,9 @@ export type RowDecision = 'keep' | 'discard' | 'review';
 export interface ImportSummary {
   import_id: string;
   game: GameId;
-  filename: string;
+  filename: string | null;
   status: ImportStatus;
   row_count: number;
-  appraisal_error: string | null;
   created_at: number;
 }
 
@@ -183,6 +182,8 @@ export interface PlacementInstruction {
 }
 
 export interface ImportDetail extends ImportSummary {
+  filename: string;
+  appraisal_error: string | null;
   total_suggested_price: string;
   unit_count: number | null;
   placement_instructions: PlacementInstruction[] | null;

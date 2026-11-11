@@ -12,6 +12,7 @@ import com.jordansimsmith.secrets.SecretsModule;
 import com.jordansimsmith.tcginventory.catalog.server.CatalogModule;
 import com.jordansimsmith.tcginventory.fetchtcg.server.FetchTcgModule;
 import com.jordansimsmith.tcginventory.games.server.GamesModule;
+import com.jordansimsmith.tcginventory.imports.server.ImportsModule;
 import com.jordansimsmith.tcginventory.inventory.server.InventoryModule;
 import com.jordansimsmith.tcginventory.listings.server.ListingsModule;
 import com.jordansimsmith.tcginventory.orders.server.FulfillmentMessage;
@@ -48,6 +49,7 @@ import software.amazon.awssdk.services.sqs.SqsClient;
       FetchTcgModule.class,
       GamesModule.class,
       InventoryModule.class,
+      ImportsModule.class,
       ListingsModule.class,
       CatalogModule.class,
       PricingModule.class,

@@ -390,7 +390,10 @@ export function ImportDetailPage() {
                       <Text fw={600} size="sm">
                         Import summary
                       </Text>
-                      <ImportStatusBadge importSummary={importDetail} />
+                      <ImportStatusBadge
+                        status={importDetail.status}
+                        error={importDetail.appraisal_error}
+                      />
                     </Group>
                     {importDetail.status === 'appraising' && (
                       <Text size="sm" c="dimmed" className={classes.numeric}>

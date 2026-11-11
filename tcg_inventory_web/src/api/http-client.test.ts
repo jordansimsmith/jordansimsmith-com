@@ -502,6 +502,32 @@ describe('http client imports', () => {
     expect(json).toHaveBeenCalledTimes(1);
   });
 
+  it('reads legacy listing fields without relying on the removed error field', async () => {
+    const legacyPayload: unknown = {
+      imports: [
+        {
+          import_id: 'import-1',
+          game: 'mtg',
+          filename: 'old.csv',
+          status: 'review',
+          row_count: 2,
+          appraisal_error: 'legacy error',
+          created_at: 1700000000,
+        },
+      ],
+      next_continuation: null,
+    };
+    fetchSpy.mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue(legacyPayload),
+    });
+
+    const response = await createHttpClient().findImports();
+
+    expect(response.imports[0].status).toBe('review');
+    expect(response.imports[0].import_id).toBe('import-1');
+  });
+
   it('accepts an import without parsing a confirmation response body', async () => {
     const json = vi.fn();
     fetchSpy.mockResolvedValue({ ok: true, status: 202, json });

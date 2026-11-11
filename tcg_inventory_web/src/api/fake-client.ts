@@ -801,7 +801,6 @@ function toImportSummary(importRecord: FakeImport): ImportSummary {
     filename: importRecord.filename,
     status: importRecord.status,
     row_count: importRecord.rows.length,
-    appraisal_error: null,
     created_at: Math.floor(importRecord.created_at_ms / 1000),
   };
 }
@@ -902,6 +901,8 @@ function toImportDetail(importRecord: FakeImport): ImportDetail {
   ).length;
   return {
     ...toImportSummary(importRecord),
+    filename: importRecord.filename,
+    appraisal_error: null,
     total_suggested_price: totalSuggestedPrice(importRecord),
     unit_count: confirmed ? keepCount : null,
     placement_instructions: confirmed

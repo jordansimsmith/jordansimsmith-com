@@ -14,6 +14,7 @@ import com.jordansimsmith.tcginventory.catalog.FakeTcgCsvClient;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FakeFetchTcgService;
 import com.jordansimsmith.tcginventory.imports.ImportItem;
 import com.jordansimsmith.tcginventory.imports.ImportRowItem;
+import com.jordansimsmith.tcginventory.imports.client.ImportService;
 import com.jordansimsmith.tcginventory.inventory.client.FakeInventoryService;
 import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
 import com.jordansimsmith.tcginventory.listings.client.ListingService;
@@ -114,6 +115,8 @@ public interface TcgInventoryTestFactory extends CatalogFactory {
   RepricingMessageHandler repricingMessageHandler();
 
   InventoryService inventoryService();
+
+  ImportService importService();
 
   FakeInventoryService fakeInventoryService();
 

@@ -1,5 +1,5 @@
 import { Badge } from '@mantine/core';
-import type { ImportStatus, ImportSummary } from '../api/client';
+import type { ImportStatus } from '../api/client';
 
 const STATUS_COLORS: Record<ImportStatus, string> = {
   appraising: 'blue',
@@ -9,11 +9,12 @@ const STATUS_COLORS: Record<ImportStatus, string> = {
 };
 
 interface ImportStatusBadgeProps {
-  importSummary: ImportSummary;
+  status: ImportStatus;
+  error?: string | null;
 }
 
-export function ImportStatusBadge({ importSummary }: ImportStatusBadgeProps) {
-  if (importSummary.appraisal_error) {
+export function ImportStatusBadge({ status, error }: ImportStatusBadgeProps) {
+  if (error) {
     return (
       <Badge variant="light" color="red">
         failed
@@ -21,8 +22,8 @@ export function ImportStatusBadge({ importSummary }: ImportStatusBadgeProps) {
     );
   }
   return (
-    <Badge variant="light" color={STATUS_COLORS[importSummary.status]}>
-      {importSummary.status}
+    <Badge variant="light" color={STATUS_COLORS[status]}>
+      {status}
     </Badge>
   );
 }

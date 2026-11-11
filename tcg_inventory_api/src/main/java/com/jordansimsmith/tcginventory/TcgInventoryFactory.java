@@ -7,6 +7,7 @@ import com.jordansimsmith.queue.QueueClient;
 import com.jordansimsmith.tcginventory.catalog.client.CatalogService;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
 import com.jordansimsmith.tcginventory.games.client.GamesService;
+import com.jordansimsmith.tcginventory.imports.client.ImportService;
 import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
 import com.jordansimsmith.tcginventory.listings.client.ListingService;
 import com.jordansimsmith.tcginventory.orders.client.OrderService;
@@ -63,6 +64,8 @@ public interface TcgInventoryFactory {
   RepricingMessageHandler repricingMessageHandler();
 
   InventoryService inventoryService();
+
+  ImportService importService();
 
   ListingService listingService();
 

@@ -37,13 +37,15 @@ export function ImportTable({ imports, onOpen }: ImportTableProps) {
             style={{ cursor: 'pointer' }}
           >
             <Table.Td fw={500} data-field="filename">
-              {importDisplayName(importSummary.filename)}
+              {importSummary.filename === null
+                ? importSummary.import_id
+                : importDisplayName(importSummary.filename)}
             </Table.Td>
             <Table.Td data-field="game" data-label="Game">
               {getGame(importSummary.game).display_name}
             </Table.Td>
             <Table.Td data-field="status" data-label="Status">
-              <ImportStatusBadge importSummary={importSummary} />
+              <ImportStatusBadge status={importSummary.status} />
             </Table.Td>
             <Table.Td ta="right" data-field="rows" data-label="Rows">
               {importSummary.row_count}

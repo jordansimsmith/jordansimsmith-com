@@ -38,7 +38,6 @@ const importFixtures: ImportSummary[] = [
     filename: 'manabox-today.csv',
     status: 'appraising',
     row_count: 40,
-    appraisal_error: null,
     created_at: 1765420932,
   },
   {
@@ -47,7 +46,6 @@ const importFixtures: ImportSummary[] = [
     filename: 'manabox-last-week.csv',
     status: 'confirmed',
     row_count: 24,
-    appraisal_error: null,
     created_at: 1764816132,
   },
 ];
@@ -118,6 +116,61 @@ describe('ImportsPage', () => {
       .closest('tr') as HTMLTableRowElement;
     expect(within(confirmedRow).getByText('confirmed')).toBeDefined();
     expect(within(confirmedRow).getByText('24')).toBeDefined();
+  });
+
+  it('uses the import ID when a legacy import has no filename', async () => {
+    vi.spyOn(clientModule.apiClient, 'findImports').mockResolvedValue({
+      imports: [
+        {
+          import_id: 'legacy-import-id',
+          game: 'mtg',
+          filename: null,
+          status: 'review',
+          row_count: 2,
+          created_at: 1765420932,
+        },
+      ],
+      next_continuation: null,
+    });
+
+    renderImportsPage();
+
+    const row = (await screen.findByText('legacy-import-id')).closest(
+      'tr',
+    ) as HTMLTableRowElement;
+    expect(within(row).getByText('review')).toBeDefined();
+    expect(within(row).queryByText('failed')).toBeNull();
+  });
+
+  it('keeps scan filename labels and shows list request failures', async () => {
+    vi.spyOn(clientModule.apiClient, 'findImports').mockResolvedValueOnce({
+      imports: [
+        {
+          import_id: 'scan-import',
+          game: 'mtg',
+          filename: 'scan-123.scan',
+          status: 'confirmed',
+          row_count: 1,
+          created_at: 1765420932,
+        },
+      ],
+      next_continuation: null,
+    });
+
+    const { unmount } = renderImportsPage();
+    expect(await screen.findByText('Scan')).toBeDefined();
+    unmount();
+    cleanup();
+
+    vi.spyOn(clientModule.apiClient, 'findImports').mockRejectedValueOnce(
+      new Error('Imports service unavailable'),
+    );
+    renderImportsPage();
+
+    expect(
+      await screen.findByText('Imports could not be loaded'),
+    ).toBeDefined();
+    expect(screen.getAllByText('Imports service unavailable')).toHaveLength(2);
   });
 
   it('shows an empty state when there are no imports', async () => {
@@ -238,7 +291,6 @@ describe('ImportsPage', () => {
       filename: 'manabox-older.csv',
       status: 'confirmed',
       row_count: 12,
-      appraisal_error: null,
       created_at: 1764211332,
     };
     vi.spyOn(clientModule.apiClient, 'findImports').mockImplementation(
