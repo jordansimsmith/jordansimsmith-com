@@ -69,7 +69,6 @@ function importDetail(overrides: Partial<ImportDetail> = {}): ImportDetail {
     filename: 'manabox-today.csv',
     status: 'appraising',
     row_count: 40,
-    appraisal_error: null,
     created_at: 1765420932,
     total_suggested_price: '0.00',
     unit_count: null,
@@ -255,24 +254,15 @@ describe('ImportDetailPage', () => {
     expect(getImportMock).toHaveBeenCalledTimes(2);
   });
 
-  it('stops polling and shows the error when appraisal fails', async () => {
-    vi.useFakeTimers();
-    const getImportMock = vi
-      .spyOn(clientModule.apiClient, 'getImport')
-      .mockResolvedValue(
-        importDetail({ appraisal_error: 'FetchTCG authentication failed' }),
-      );
+  it('uses the import id when the filename is missing', async () => {
+    vi.spyOn(clientModule.apiClient, 'getImport').mockResolvedValue(
+      importDetail({ filename: null, status: 'review' }),
+    );
 
     renderImportDetailPage();
     await act(async () => {});
-    expect(screen.getByText('Appraisal failed')).toBeDefined();
-    expect(screen.getByText('FetchTCG authentication failed')).toBeDefined();
-    expect(screen.getByText('failed')).toBeDefined();
 
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(6000);
-    });
-    expect(getImportMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('heading', { name: 'import-2' })).toBeDefined();
   });
 
   it('shows an error with a way back when the import fails to load', async () => {

@@ -125,7 +125,7 @@ module "java_api" {
       artifact = var.artifacts["find_imports"]
     }
     get_import = {
-      handler  = "com.jordansimsmith.tcginventory.imports.GetImportHandler"
+      handler  = "com.jordansimsmith.tcginventory.imports.api.GetImportHandler"
       artifact = var.artifacts["get_import"]
     }
     delete_import = {

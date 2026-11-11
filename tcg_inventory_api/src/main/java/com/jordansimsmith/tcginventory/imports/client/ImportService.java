@@ -6,4 +6,6 @@ import com.jordansimsmith.service.ServiceException;
 public interface ImportService {
   FindImportsResponse findImports(RequestContext ctx, FindImportsRequest request)
       throws ServiceException;
+
+  GetImportResponse getImport(RequestContext ctx, GetImportRequest request) throws ServiceException;
 }

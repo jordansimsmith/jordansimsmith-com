@@ -10,17 +10,9 @@ const STATUS_COLORS: Record<ImportStatus, string> = {
 
 interface ImportStatusBadgeProps {
   status: ImportStatus;
-  error?: string | null;
 }
 
-export function ImportStatusBadge({ status, error }: ImportStatusBadgeProps) {
-  if (error) {
-    return (
-      <Badge variant="light" color="red">
-        failed
-      </Badge>
-    );
-  }
+export function ImportStatusBadge({ status }: ImportStatusBadgeProps) {
   return (
     <Badge variant="light" color={STATUS_COLORS[status]}>
       {status}

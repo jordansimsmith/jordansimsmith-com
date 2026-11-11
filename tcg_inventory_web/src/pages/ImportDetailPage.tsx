@@ -21,7 +21,6 @@ import {
 } from '../components/CollectionSurface';
 import { PageHeader } from '../components/PageHeader';
 import { ImportStatusBadge } from '../components/ImportStatusBadge';
-import { JobFailureAlert } from '../components/JobFailureAlert';
 import { ImportReviewTable } from '../components/ImportReviewTable';
 import { ConfirmImportModal } from '../components/ConfirmImportModal';
 import { DeleteImportModal } from '../components/DeleteImportModal';
@@ -85,9 +84,7 @@ export function ImportDetailPage() {
 
   const rows = importDetail?.rows ?? [];
   const showReview =
-    importDetail !== null &&
-    importDetail.status !== 'appraising' &&
-    !importDetail.appraisal_error;
+    importDetail !== null && importDetail.status !== 'appraising';
 
   useEffect(() => {
     if (!importId) {
@@ -104,8 +101,7 @@ export function ImportDetailPage() {
         setPhotoUrls(response.photoUrls);
         setError(null);
         if (
-          (response.importDetail.status === 'appraising' &&
-            !response.importDetail.appraisal_error) ||
+          response.importDetail.status === 'appraising' ||
           response.importDetail.status === 'confirming'
         ) {
           setPollingImport(true);
@@ -145,8 +141,7 @@ export function ImportDetailPage() {
         setPhotoUrls(response.photoUrls);
         setError(null);
         if (
-          (response.importDetail.status === 'appraising' &&
-            !response.importDetail.appraisal_error) ||
+          response.importDetail.status === 'appraising' ||
           response.importDetail.status === 'confirming'
         ) {
           timer = setTimeout(pollImport, POLL_INTERVAL_MS);
@@ -361,7 +356,10 @@ export function ImportDetailPage() {
         {!loading && importDetail && (
           <>
             <PageHeader
-              title={importDisplayName(importDetail.filename)}
+              title={importDisplayName(
+                importDetail.filename,
+                importDetail.import_id,
+              )}
               description={`${getGame(importDetail.game).display_name} · Uploaded ${new Date(importDetail.created_at * 1000).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short', hour12: true })}`}
               actions={
                 <Button variant="subtle" onClick={() => navigate('/imports')}>
@@ -369,13 +367,6 @@ export function ImportDetailPage() {
                 </Button>
               }
             />
-            {importDetail.appraisal_error && (
-              <JobFailureAlert
-                title="Appraisal failed"
-                error={importDetail.appraisal_error}
-                maw={480}
-              />
-            )}
             {importDetail.status !== 'confirmed' && (
               <Paper
                 component="section"
@@ -390,10 +381,7 @@ export function ImportDetailPage() {
                       <Text fw={600} size="sm">
                         Import summary
                       </Text>
-                      <ImportStatusBadge
-                        status={importDetail.status}
-                        error={importDetail.appraisal_error}
-                      />
+                      <ImportStatusBadge status={importDetail.status} />
                     </Group>
                     {importDetail.status === 'appraising' && (
                       <Text size="sm" c="dimmed" className={classes.numeric}>
@@ -401,18 +389,17 @@ export function ImportDetailPage() {
                       </Text>
                     )}
                   </Group>
-                  {!importDetail.appraisal_error &&
-                    importDetail.status === 'appraising' && (
-                      <Stack gap="xs">
-                        <Text size="sm" className={classes.numeric}>
-                          Appraising {appraised} of {importDetail.row_count}
-                        </Text>
-                        <Progress
-                          value={(appraised / importDetail.row_count) * 100}
-                          animated
-                        />
-                      </Stack>
-                    )}
+                  {importDetail.status === 'appraising' && (
+                    <Stack gap="xs">
+                      <Text size="sm" className={classes.numeric}>
+                        Appraising {appraised} of {importDetail.row_count}
+                      </Text>
+                      <Progress
+                        value={(appraised / importDetail.row_count) * 100}
+                        animated
+                      />
+                    </Stack>
+                  )}
                   {importDetail.status === 'confirming' && (
                     <Stack gap="xs">
                       <Text size="sm">Confirming import</Text>
@@ -559,7 +546,10 @@ export function ImportDetailPage() {
             />
             <DeleteImportModal
               opened={deleteOpen}
-              filename={importDetail.filename}
+              filename={importDisplayName(
+                importDetail.filename,
+                importDetail.import_id,
+              )}
               rowCount={importDetail.row_count}
               loading={deleting}
               onCancel={() => setDeleteOpen(false)}

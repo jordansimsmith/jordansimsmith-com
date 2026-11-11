@@ -6,6 +6,7 @@ java_library(
     visibility = ["//visibility:public"],
     deps = [
         "//lib/service",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/inventory/client",
         "@maven//:com_fasterxml_jackson_core_jackson_annotations",
         "@maven//:com_google_code_findbugs_jsr305",
     ],

@@ -528,6 +528,35 @@ describe('http client imports', () => {
     expect(response.imports[0].import_id).toBe('import-1');
   });
 
+  it('reads detail fields from payloads that include legacy processing fields', async () => {
+    const legacyPayload: unknown = {
+      import_id: 'import-1',
+      game: 'mtg',
+      filename: null,
+      status: 'review',
+      row_count: 0,
+      created_at: 1700000000,
+      total_suggested_price: '0.00',
+      unit_count: null,
+      placement_instructions: null,
+      rows: [],
+      appraisal_error: 'legacy failure',
+    };
+    fetchSpy.mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue(legacyPayload),
+    });
+
+    const detail = await createHttpClient().getImport('import-1');
+
+    expect(detail).toMatchObject({
+      import_id: 'import-1',
+      filename: null,
+      status: 'review',
+      total_suggested_price: '0.00',
+    });
+  });
+
   it('accepts an import without parsing a confirmation response body', async () => {
     const json = vi.fn();
     fetchSpy.mockResolvedValue({ ok: true, status: 202, json });

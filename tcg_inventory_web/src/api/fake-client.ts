@@ -901,8 +901,6 @@ function toImportDetail(importRecord: FakeImport): ImportDetail {
   ).length;
   return {
     ...toImportSummary(importRecord),
-    filename: importRecord.filename,
-    appraisal_error: null,
     total_suggested_price: totalSuggestedPrice(importRecord),
     unit_count: confirmed ? keepCount : null,
     placement_instructions: confirmed

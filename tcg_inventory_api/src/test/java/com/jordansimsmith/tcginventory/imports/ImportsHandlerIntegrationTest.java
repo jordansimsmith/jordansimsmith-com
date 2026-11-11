@@ -10,6 +10,7 @@ import com.jordansimsmith.queue.FakeQueueClient;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobMessage;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
+import com.jordansimsmith.tcginventory.imports.api.GetImportHandler;
 import com.jordansimsmith.time.FakeClock;
 import com.jordansimsmith.ulid.FakeUlidGenerator;
 import java.nio.charset.StandardCharsets;

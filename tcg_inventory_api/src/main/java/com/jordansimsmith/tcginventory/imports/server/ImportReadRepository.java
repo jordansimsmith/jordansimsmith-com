@@ -11,9 +11,37 @@ import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
 public class ImportReadRepository {
   private final DynamoDbTable<ImportItem> importTable;
+  private final DynamoDbTable<ImportRowItem> importRowTable;
 
-  public ImportReadRepository(DynamoDbTable<ImportItem> importTable) {
+  public ImportReadRepository(
+      DynamoDbTable<ImportItem> importTable, DynamoDbTable<ImportRowItem> importRowTable) {
     this.importTable = importTable;
+    this.importRowTable = importRowTable;
+  }
+
+  @Nullable
+  public ImportItem getImport(String user, String importId) {
+    var key =
+        Key.builder()
+            .partitionValue(ImportItem.formatPk(user))
+            .sortValue(ImportItem.formatSk(importId))
+            .build();
+    return importTable.getItem(request -> request.key(key).consistentRead(true));
+  }
+
+  public List<ImportRowItem> findRows(String user, String importId) {
+    var request =
+        QueryEnhancedRequest.builder()
+            .queryConditional(
+                QueryConditional.sortBeginsWith(
+                    Key.builder()
+                        .partitionValue(ImportRowItem.formatPk(user, importId))
+                        .sortValue(ImportRowItem.ROW_PREFIX)
+                        .build()))
+            .scanIndexForward(true)
+            .consistentRead(true)
+            .build();
+    return importRowTable.query(request).stream().flatMap(page -> page.items().stream()).toList();
   }
 
   public ImportPage findImports(

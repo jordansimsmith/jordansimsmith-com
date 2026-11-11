@@ -3,7 +3,10 @@ load("@contrib_rules_jvm//java:defs.bzl", "JUNIT5_DEPS", "java_test_suite")
 java_test_suite(
     name = "api-unit-tests",
     size = "small",
-    srcs = ["FindImportsHandlerTest.java"],
+    srcs = [
+        "FindImportsHandlerTest.java",
+        "GetImportHandlerTest.java",
+    ],
     runner = "junit5",
     test_suffixes = ["Test.java"],
     runtime_deps = JUNIT5_DEPS,
@@ -12,6 +15,7 @@ java_test_suite(
         "//lib/service",
         "//tcg_inventory_api:lib",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/imports/api:find-imports-handler",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/imports/api:get-import-handler",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/imports/client",
         "@maven//:com_amazonaws_aws_lambda_java_core",
         "@maven//:com_amazonaws_aws_lambda_java_events",

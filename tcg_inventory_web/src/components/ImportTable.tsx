@@ -37,9 +37,10 @@ export function ImportTable({ imports, onOpen }: ImportTableProps) {
             style={{ cursor: 'pointer' }}
           >
             <Table.Td fw={500} data-field="filename">
-              {importSummary.filename === null
-                ? importSummary.import_id
-                : importDisplayName(importSummary.filename)}
+              {importDisplayName(
+                importSummary.filename,
+                importSummary.import_id,
+              )}
             </Table.Td>
             <Table.Td data-field="game" data-label="Game">
               {getGame(importSummary.game).display_name}

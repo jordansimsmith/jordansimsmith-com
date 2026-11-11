@@ -11,6 +11,7 @@ java_library(
         "//lib/dynamodb:lib",
         "//lib/service",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/imports/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/inventory/client",
         "//third_party/dagger",
         "@maven//:com_fasterxml_jackson_core_jackson_databind",
         "@maven//:com_google_code_findbugs_jsr305",

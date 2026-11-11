@@ -182,8 +182,6 @@ export interface PlacementInstruction {
 }
 
 export interface ImportDetail extends ImportSummary {
-  filename: string;
-  appraisal_error: string | null;
   total_suggested_price: string;
   unit_count: number | null;
   placement_instructions: PlacementInstruction[] | null;

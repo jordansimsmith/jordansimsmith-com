@@ -1,0 +1,15 @@
+load("@rules_java//java:defs.bzl", "java_library")
+
+java_library(
+    name = "test-helper",
+    testonly = True,
+    srcs = ["FakeImportService.java"],
+    visibility = [
+        "//tcg_inventory_api:__pkg__",
+        "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/imports/api:__pkg__",
+    ],
+    deps = [
+        "//lib/service",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/imports/client",
+    ],
+)
