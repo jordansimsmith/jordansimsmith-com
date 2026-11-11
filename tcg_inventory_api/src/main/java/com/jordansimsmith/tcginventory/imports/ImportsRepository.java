@@ -3,13 +3,10 @@ package com.jordansimsmith.tcginventory.imports;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import java.time.Instant;
-import java.util.List;
 import java.util.Map;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
-import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
-import software.amazon.awssdk.services.dynamodb.model.ConditionCheck;
 import software.amazon.awssdk.services.dynamodb.model.Put;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItem;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItemsRequest;
@@ -17,8 +14,6 @@ import software.amazon.awssdk.services.dynamodb.model.Update;
 import software.amazon.awssdk.services.dynamodb.model.UpdateItemRequest;
 
 public class ImportsRepository {
-  private static final TableSchema<ImportRowItem> ROW_SCHEMA =
-      TableSchema.fromBean(ImportRowItem.class);
   private final DynamoDbClient dynamoDbClient;
   private final DynamoDbTable<JobItem> jobTable;
 
@@ -70,27 +65,6 @@ public class ImportsRepository {
             .build());
   }
 
-  public void updateRowPhotos(
-      String user, String importId, int position, List<ImportRowItem.Photo> photos) {
-    var row = new ImportRowItem();
-    row.setPhotos(photos);
-    mutateReviewRow(
-        user,
-        importId,
-        TransactWriteItem.builder()
-            .update(
-                Update.builder()
-                    .tableName(TcgInventoryTable.TABLE_NAME)
-                    .key(rowKey(user, importId, position))
-                    .updateExpression("SET photos = :photos")
-                    .conditionExpression("attribute_exists(pk)")
-                    .expressionAttributeValues(
-                        Map.of(
-                            ":photos", ROW_SCHEMA.itemToMap(row, true).get(ImportRowItem.PHOTOS)))
-                    .build())
-            .build());
-  }
-
   public void recordCreatedUnit(
       String user,
       String importId,
@@ -125,32 +99,6 @@ public class ImportsRepository {
         AttributeValue.builder().s(ImportRowItem.formatPk(user, importId)).build(),
         ImportRowItem.SK,
         AttributeValue.builder().s(ImportRowItem.formatSk(position)).build());
-  }
-
-  private void mutateReviewRow(String user, String importId, TransactWriteItem mutation) {
-    dynamoDbClient.transactWriteItems(
-        TransactWriteItemsRequest.builder()
-            .transactItems(
-                TransactWriteItem.builder()
-                    .conditionCheck(
-                        ConditionCheck.builder()
-                            .tableName(TcgInventoryTable.TABLE_NAME)
-                            .key(
-                                Map.of(
-                                    "pk",
-                                    AttributeValue.builder().s(ImportItem.formatPk(user)).build(),
-                                    "sk",
-                                    AttributeValue.builder()
-                                        .s(ImportItem.formatSk(importId))
-                                        .build()))
-                            .conditionExpression("attribute_exists(pk) AND #status = :review")
-                            .expressionAttributeNames(Map.of("#status", "status"))
-                            .expressionAttributeValues(
-                                Map.of(":review", AttributeValue.builder().s("review").build()))
-                            .build())
-                    .build(),
-                mutation)
-            .build());
   }
 
   public void finishConfirmation(String user, String importId, Instant now) {

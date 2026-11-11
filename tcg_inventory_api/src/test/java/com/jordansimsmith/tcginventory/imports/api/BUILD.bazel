@@ -5,6 +5,7 @@ java_test_suite(
     size = "small",
     srcs = [
         "CreateImportRowPhotoHandlerTest.java",
+        "DeleteImportRowPhotoHandlerTest.java",
         "DeleteImportHandlerTest.java",
         "DeleteImportRowHandlerTest.java",
         "FindImportsHandlerTest.java",
@@ -19,6 +20,7 @@ java_test_suite(
         "//lib/service",
         "//tcg_inventory_api:lib",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/imports/api:create-import-row-photo-handler",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/imports/api:delete-import-row-photo-handler",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/imports/api:delete-import-handler",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/imports/api:delete-import-row-handler",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/imports/api:find-imports-handler",

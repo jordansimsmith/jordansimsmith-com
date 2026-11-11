@@ -2,7 +2,10 @@ package com.jordansimsmith.tcginventory.imports.server;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -20,11 +23,15 @@ import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.tcginventory.imports.client.CreateImportRowPhotoRequest;
 import com.jordansimsmith.tcginventory.imports.client.DeleteImportRequest;
 import com.jordansimsmith.tcginventory.imports.client.DeleteImportRowRequest;
+import com.jordansimsmith.tcginventory.imports.client.DeleteImportRowPhotoRequest;
+import com.jordansimsmith.tcginventory.imports.client.DeleteImportRowPhotoResponse;
 import com.jordansimsmith.tcginventory.imports.client.GetImportRequest;
 import com.jordansimsmith.tcginventory.imports.client.ImportRow;
 import com.jordansimsmith.tcginventory.imports.client.UpdateImportRowRequest;
 import com.jordansimsmith.tcginventory.inventory.client.Condition;
 import com.jordansimsmith.tcginventory.photos.client.FakePhotosService;
+import com.jordansimsmith.tcginventory.photos.client.DeletePhotoRequest;
+import com.jordansimsmith.tcginventory.photos.client.DeletePhotoResponse;
 import com.jordansimsmith.tcginventory.photos.client.GetPhotoBytesRequest;
 import com.jordansimsmith.tcginventory.photos.client.PhotosService;
 import java.time.Instant;
@@ -65,6 +72,7 @@ class ImportReviewServiceIntegrationTest {
   private DeleteImportService deleteImportService;
   private FakePhotosService fakePhotosService;
   private CreateImportRowPhotoService createImportRowPhotoService;
+  private DeleteImportRowPhotoService deleteImportRowPhotoService;
 
   @BeforeAll
   static void setUpBeforeClass() {
@@ -92,6 +100,9 @@ class ImportReviewServiceIntegrationTest {
     fakePhotosService = new FakePhotosService();
     createImportRowPhotoService =
         new CreateImportRowPhotoService(
+            importReadRepository, importMutationRepository, fakePhotosService);
+    deleteImportRowPhotoService =
+        new DeleteImportRowPhotoService(
             importReadRepository, importMutationRepository, fakePhotosService);
   }
 
@@ -773,7 +784,9 @@ class ImportReviewServiceIntegrationTest {
     importRowTable.putItem(importRow("alice", "import-1", 1));
     var failure = new IllegalStateException("transaction failed");
     var mutationRepository = mock(ImportMutationRepository.class);
-    doThrow(failure).when(mutationRepository).updateRowPhotos("alice", "import-1", 1, anyList());
+    doThrow(failure)
+        .when(mutationRepository)
+        .updateRowPhotos(eq("alice"), eq("import-1"), eq(1), anyList());
     var service =
         new CreateImportRowPhotoService(
             importReadRepository, mutationRepository, fakePhotosService);
@@ -815,6 +828,216 @@ class ImportReviewServiceIntegrationTest {
     assertThat(importReadRepository.getRow("alice", "import-1", 1).getPhotos())
         .extracting(ImportRowItem.Photo::getPhotoId)
         .containsExactly("photo-1");
+  }
+
+  @Test
+  void deleteImportRowPhotoPreservesOrderAndPromotesNextPhoto() throws Exception {
+    importTable.putItem(importItem("alice", "import-1", "review"));
+    var row = importRow("alice", "import-1", 1);
+    row.setSuggestedPrice("25.00");
+    row.setPhotos(
+        List.of(
+            ImportRowItem.Photo.create("photo-1"),
+            ImportRowItem.Photo.create("photo-2"),
+            ImportRowItem.Photo.create("photo-3")));
+    importRowTable.putItem(row);
+    fakePhotosService.seedPhoto("alice", "photo-1", new byte[] {1});
+
+    deleteImportRowPhotoService.deleteImportRowPhoto(
+        new RequestContext("alice"), new DeleteImportRowPhotoRequest("import-1", 1, "photo-1"));
+
+    var saved = importReadRepository.getRow("alice", "import-1", 1);
+    assertThat(saved.getPhotos())
+        .extracting(ImportRowItem.Photo::getPhotoId)
+        .containsExactly("photo-2", "photo-3");
+    assertThat(saved.getDecision()).isEqualTo("keep");
+    assertThat(saved.getSuggestedPrice()).isEqualTo("25.00");
+    assertThat(saved.getLocation()).isEqualTo("A0-42");
+    assertThat(importReadRepository.getImport("alice", "import-1").getRowCount()).isEqualTo(1);
+    assertThat(importReadRepository.getImport("alice", "import-1").getCreatedAt())
+        .isEqualTo(Instant.ofEpochSecond(1_700_000_000L));
+    assertThatThrownBy(
+            () ->
+                fakePhotosService.getPhotoBytes(
+                    new RequestContext("alice"), new GetPhotoBytesRequest("photo-1")))
+        .isInstanceOf(RuntimeException.class);
+  }
+
+  @Test
+  void deleteLastPhotoMakesKeepRowNeedPhotosAgain() throws Exception {
+    importTable.putItem(importItem("alice", "import-1", "review"));
+    var row = importRow("alice", "import-1", 1);
+    row.setSuggestedPrice("25.00");
+    row.setPhotos(List.of(ImportRowItem.Photo.create("photo-1")));
+    importRowTable.putItem(row);
+    fakePhotosService.seedPhoto("alice", "photo-1", new byte[] {1});
+
+    deleteImportRowPhotoService.deleteImportRowPhoto(
+        new RequestContext("alice"), new DeleteImportRowPhotoRequest("import-1", 1, "photo-1"));
+
+    var detail = new GetImportService(importReadRepository).getImport(
+        new RequestContext("alice"), new GetImportRequest("import-1"));
+    assertThat(detail.rows().getFirst().photos()).isEmpty();
+    assertThat(detail.rows().getFirst().needsPhotos()).isTrue();
+  }
+
+  @Test
+  void deleteImportRowPhotoAllowsNonKeepRowsAndPreservesPhotoOrder() throws Exception {
+    importTable.putItem(importItem("alice", "import-1", "review"));
+    var row = importRow("alice", "import-1", 1);
+    row.setDecision("discard");
+    row.setPhotos(
+        List.of(
+            ImportRowItem.Photo.create("photo-1"),
+            ImportRowItem.Photo.create("photo-2"),
+            ImportRowItem.Photo.create("photo-3")));
+    importRowTable.putItem(row);
+    fakePhotosService.seedPhoto("alice", "photo-2", new byte[] {2});
+
+    deleteImportRowPhotoService.deleteImportRowPhoto(
+        new RequestContext("alice"), new DeleteImportRowPhotoRequest("import-1", 1, "photo-2"));
+
+    assertThat(importReadRepository.getRow("alice", "import-1", 1).getPhotos())
+        .extracting(ImportRowItem.Photo::getPhotoId)
+        .containsExactly("photo-1", "photo-3");
+  }
+
+  @Test
+  void deleteImportRowPhotoValidatesMembershipAndRequestBeforeReads() throws Exception {
+    var readRepository = mock(ImportReadRepository.class);
+    var mutationRepository = mock(ImportMutationRepository.class);
+    var photosService = mock(PhotosService.class);
+    var service = new DeleteImportRowPhotoService(readRepository, mutationRepository, photosService);
+
+    assertThatThrownBy(
+            () -> service.deleteImportRowPhoto(
+                new RequestContext("alice"), new DeleteImportRowPhotoRequest(" ", 1, "photo")))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("import_id is required");
+    assertThatThrownBy(
+            () -> service.deleteImportRowPhoto(
+                new RequestContext("alice"), new DeleteImportRowPhotoRequest("import-1", 0, "photo")))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("position must be positive");
+    assertThatThrownBy(
+            () -> service.deleteImportRowPhoto(
+                new RequestContext("alice"), new DeleteImportRowPhotoRequest("import-1", 1, " ")))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("photo_id is required");
+    verifyNoInteractions(readRepository, mutationRepository, photosService);
+
+    assertThatThrownBy(
+            () -> deleteImportRowPhotoService.deleteImportRowPhoto(
+                new RequestContext("alice"), new DeleteImportRowPhotoRequest("missing", 1, "photo-1")))
+        .isInstanceOf(NotFoundException.class)
+        .hasMessage("Not Found");
+    importTable.putItem(importItem("alice", "import-1", "review"));
+    var row = importRow("alice", "import-1", 1);
+    row.setPhotos(null);
+    importRowTable.putItem(row);
+    assertThatThrownBy(
+            () -> deleteImportRowPhotoService.deleteImportRowPhoto(
+                new RequestContext("alice"), new DeleteImportRowPhotoRequest("import-1", 1, "photo")))
+        .isInstanceOf(NotFoundException.class)
+        .hasMessage("Not Found");
+    assertThatThrownBy(
+            () -> deleteImportRowPhotoService.deleteImportRowPhoto(
+                new RequestContext("bob"), new DeleteImportRowPhotoRequest("import-1", 1, "photo-1")))
+        .isInstanceOf(NotFoundException.class)
+        .hasMessage("Not Found");
+    importRowTable.deleteItem(row);
+    assertThatThrownBy(
+            () -> deleteImportRowPhotoService.deleteImportRowPhoto(
+                new RequestContext("alice"), new DeleteImportRowPhotoRequest("import-1", 1, "photo-1")))
+        .isInstanceOf(NotFoundException.class)
+        .hasMessage("Not Found");
+    importRowTable.putItem(row);
+
+    importTable.putItem(importItem("alice", "import-1", "confirmed"));
+    assertThatThrownBy(
+            () -> deleteImportRowPhotoService.deleteImportRowPhoto(
+                new RequestContext("alice"), new DeleteImportRowPhotoRequest("import-1", 1, "photo-1")))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("import is not in review status");
+    importTable.putItem(importItem("alice", "import-1", "review"));
+    row.setPhotos(List.of(ImportRowItem.Photo.create("other-photo")));
+    importRowTable.putItem(row);
+    assertThatThrownBy(
+            () -> deleteImportRowPhotoService.deleteImportRowPhoto(
+                new RequestContext("alice"), new DeleteImportRowPhotoRequest("import-1", 1, "photo-1")))
+        .isInstanceOf(NotFoundException.class)
+        .hasMessage("Not Found");
+  }
+
+  @Test
+  void deleteImportRowPhotoTransactionFailurePreventsPhotosDeletion() {
+    importTable.putItem(importItem("alice", "import-1", "review"));
+    importRowTable.putItem(importRow("alice", "import-1", 1));
+    var mutationRepository = mock(ImportMutationRepository.class);
+    var photosService = mock(PhotosService.class);
+    var failure = TransactionCanceledException.builder().message("review changed").build();
+    doThrow(failure).when(mutationRepository).updateRowPhotos(any(), any(), anyInt(), anyList());
+    var service =
+        new DeleteImportRowPhotoService(importReadRepository, mutationRepository, photosService);
+
+    assertThatThrownBy(
+            () -> service.deleteImportRowPhoto(
+                new RequestContext("alice"), new DeleteImportRowPhotoRequest("import-1", 1, "photo-1")))
+        .isSameAs(failure);
+    verify(photosService, never()).deletePhoto(any(), any());
+  }
+
+  @Test
+  void deleteImportRowPhotoPreservesOpaqueIdentifiers() throws Exception {
+    var readRepository = mock(ImportReadRepository.class);
+    var mutationRepository = mock(ImportMutationRepository.class);
+    var photosService = mock(PhotosService.class);
+    when(readRepository.getImport("alice", "opaque/import")).thenReturn(importItem("alice", "opaque/import", "review"));
+    var row = importRow("alice", "opaque/import", 3);
+    row.setPhotos(List.of(ImportRowItem.Photo.create("opaque/photo")));
+    when(readRepository.getRow("alice", "opaque/import", 3)).thenReturn(row);
+    when(photosService.deletePhoto(any(), any())).thenReturn(new DeletePhotoResponse());
+    var service = new DeleteImportRowPhotoService(readRepository, mutationRepository, photosService);
+
+    service.deleteImportRowPhoto(
+        new RequestContext("alice"), new DeleteImportRowPhotoRequest("opaque/import", 3, "opaque/photo"));
+
+    verify(mutationRepository)
+        .updateRowPhotos("alice", "opaque/import", 3, List.of());
+    verify(photosService)
+        .deletePhoto(
+            new RequestContext("alice"),
+            new DeletePhotoRequest("opaque/photo"));
+  }
+
+  @Test
+  void deleteImportRowPhotoPersistsBeforePhotosAndLeavesReferencesRemovedOnFailure() throws Exception {
+    importTable.putItem(importItem("alice", "import-1", "review"));
+    var row = importRow("alice", "import-1", 1);
+    row.setPhotos(List.of(ImportRowItem.Photo.create("photo-1")));
+    importRowTable.putItem(row);
+    var photosService = mock(PhotosService.class);
+    var failure = new IllegalStateException("photos delete failed");
+    doThrow(failure).when(photosService).deletePhoto(any(), any());
+    var service =
+        new DeleteImportRowPhotoService(
+            importReadRepository, importMutationRepository, photosService);
+
+    assertThatThrownBy(
+            () -> service.deleteImportRowPhoto(
+                new RequestContext("alice"), new DeleteImportRowPhotoRequest("import-1", 1, "photo-1")))
+        .isSameAs(failure);
+    assertThat(importReadRepository.getRow("alice", "import-1", 1).getPhotos()).isEmpty();
+    assertThatThrownBy(
+            () -> service.deleteImportRowPhoto(
+                new RequestContext("alice"), new DeleteImportRowPhotoRequest("import-1", 1, "photo-1")))
+        .isInstanceOf(NotFoundException.class)
+        .hasMessage("Not Found");
+
+    var mapper = new ObjectMapper();
+    assertThat(mapper.writeValueAsString(new DeleteImportRowPhotoRequest("opaque/id", 2, "photo/id")))
+        .isEqualTo("{\"import_id\":\"opaque/id\",\"position\":2,\"photo_id\":\"photo/id\"}");
+    assertThat(mapper.writeValueAsString(new DeleteImportRowPhotoResponse())).isEqualTo("{}");
   }
 
   @Test

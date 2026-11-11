@@ -577,29 +577,6 @@ java_binary(
 )
 
 java_binary(
-    name = "delete-import-row-photo-handler",
-    srcs = ["src/main/java/com/jordansimsmith/tcginventory/imports/DeleteImportRowPhotoHandler.java"],
-    create_executable = False,
-    resources = [
-        "src/main/resources/logback.xml",
-    ],
-    deps = [
-        ":import-lib",
-        ":lib",
-        "//lib/http:lib",
-        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/photos/client",
-        "@maven//:ch_qos_logback_logback_classic",
-        "@maven//:ch_qos_logback_logback_core",
-        "@maven//:com_amazonaws_aws_lambda_java_core",
-        "@maven//:com_amazonaws_aws_lambda_java_events",
-        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
-        "@maven//:com_google_guava_guava",
-        "@maven//:org_slf4j_slf4j_api",
-        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
-    ],
-)
-
-java_binary(
     name = "fetchtcg-stub-server",
     testonly = True,
     srcs = ["src/test/java/com/jordansimsmith/tcginventory/fetchtcg/FetchTcgStubServer.java"],
@@ -783,7 +760,6 @@ java_test_suite(
         ":confirm-scan-handler",
         ":create-import-handler",
         ":create-scan-handler",
-        ":delete-import-row-photo-handler",
         ":delete-scan-handler",
         ":delete-scan-row-handler",
         ":find-catalog-alternatives-handler",
@@ -809,6 +785,7 @@ java_test_suite(
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/imports/api:create-import-row-photo-handler",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/imports/api:delete-import-row-photo-handler",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/imports/api:delete-import-handler",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/imports/api:delete-import-row-handler",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/imports/api:get-import-handler",
@@ -874,7 +851,7 @@ localstack_image(
         ":identify-scan-handler_deploy.jar",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/inventory/api:delete-unit-handler_deploy.jar",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/imports/api:delete-import-row-handler_deploy.jar",
-        ":delete-import-row-photo-handler_deploy.jar",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/imports/api:delete-import-row-photo-handler_deploy.jar",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/imports/api:update-import-row-handler_deploy.jar",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/inventory/api:update-unit-handler_deploy.jar",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/imports/api:delete-import-handler_deploy.jar",

@@ -6,6 +6,7 @@ import com.jordansimsmith.service.NotFoundException;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceException;
 import com.jordansimsmith.tcginventory.photos.client.CreatePhotoRequest;
+import com.jordansimsmith.tcginventory.photos.client.DeletePhotoRequest;
 import com.jordansimsmith.tcginventory.photos.client.PhotosService;
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -91,6 +92,82 @@ public class FakeImportService implements ImportService {
             importDetail.placementInstructions(),
             rows));
     return new CreateImportRowPhotoResponse();
+  }
+
+  @Override
+  public DeleteImportRowPhotoResponse deleteImportRowPhoto(
+      RequestContext ctx, DeleteImportRowPhotoRequest request) throws ServiceException {
+    if (request.importId() == null || request.importId().isBlank()) {
+      throw new BadRequestException("import_id is required");
+    }
+    if (request.photoId() == null || request.photoId().isBlank()) {
+      throw new BadRequestException("photo_id is required");
+    }
+    if (request.position() <= 0) {
+      throw new BadRequestException("position must be positive");
+    }
+    var key = new UserImport(ctx.user(), request.importId());
+    var importDetail = imports.get(key);
+    if (importDetail == null) {
+      throw new NotFoundException("Not Found");
+    }
+    if (importDetail.status() != ImportStatus.REVIEW) {
+      throw new ConflictException("import is not in review status");
+    }
+    var rows = new ArrayList<>(importDetail.rows());
+    var rowIndex = -1;
+    for (int index = 0; index < rows.size(); index++) {
+      if (rows.get(index).position() == request.position()) {
+        rowIndex = index;
+        break;
+      }
+    }
+    if (rowIndex == -1) {
+      throw new NotFoundException("Not Found");
+    }
+    var row = rows.get(rowIndex);
+    var remainingPhotos =
+        row.photos().stream().filter(photoId -> !photoId.equals(request.photoId())).toList();
+    if (remainingPhotos.size() == row.photos().size()) {
+      throw new NotFoundException("Not Found");
+    }
+    var needsPhotos =
+        row.decision() == ImportDecision.KEEP
+            && row.suggestedPrice() != null
+            && new BigDecimal(row.suggestedPrice()).compareTo(new BigDecimal("20.00")) >= 0
+            && remainingPhotos.isEmpty();
+    rows.set(
+        rowIndex,
+        new ImportRow(
+            row.position(),
+            row.name(),
+            row.setCode(),
+            row.setName(),
+            row.collectorNumber(),
+            row.finish(),
+            row.condition(),
+            row.externalId(),
+            row.decision(),
+            row.decisionReason(),
+            row.marketPrice(),
+            row.suggestedPrice(),
+            remainingPhotos,
+            needsPhotos));
+    imports.put(
+        key,
+        new GetImportResponse(
+            importDetail.importId(),
+            importDetail.game(),
+            importDetail.filename(),
+            importDetail.status(),
+            importDetail.rowCount(),
+            importDetail.createdAt(),
+            importDetail.totalSuggestedPrice(),
+            importDetail.unitCount(),
+            importDetail.placementInstructions(),
+            rows));
+    photosService.deletePhoto(ctx, new DeletePhotoRequest(request.photoId()));
+    return new DeleteImportRowPhotoResponse();
   }
 
   @Override

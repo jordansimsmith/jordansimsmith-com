@@ -355,7 +355,7 @@ lambdas = {
         "zip_file": "create-import-row-photo-handler_deploy.jar",
     },
     "delete_import_row_photo": {
-        "handler": "com.jordansimsmith.tcginventory.imports.DeleteImportRowPhotoHandler",
+        "handler": "com.jordansimsmith.tcginventory.imports.api.DeleteImportRowPhotoHandler",
         "zip_file": "delete-import-row-photo-handler_deploy.jar",
     },
     "create_report": {

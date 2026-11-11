@@ -9,6 +9,8 @@ import com.jordansimsmith.tcginventory.imports.client.DeleteImportRequest;
 import com.jordansimsmith.tcginventory.imports.client.DeleteImportResponse;
 import com.jordansimsmith.tcginventory.imports.client.DeleteImportRowRequest;
 import com.jordansimsmith.tcginventory.imports.client.DeleteImportRowResponse;
+import com.jordansimsmith.tcginventory.imports.client.DeleteImportRowPhotoRequest;
+import com.jordansimsmith.tcginventory.imports.client.DeleteImportRowPhotoResponse;
 import com.jordansimsmith.tcginventory.imports.client.FindImportsRequest;
 import com.jordansimsmith.tcginventory.imports.client.FindImportsResponse;
 import com.jordansimsmith.tcginventory.imports.client.GetImportRequest;
@@ -52,6 +54,9 @@ public class ImportsModule {
     var createImportRowPhotoService =
         new CreateImportRowPhotoService(
             importReadRepository, importMutationRepository, photosService);
+    var deleteImportRowPhotoService =
+        new DeleteImportRowPhotoService(
+            importReadRepository, importMutationRepository, photosService);
     return new ImportService() {
       @Override
       public FindImportsResponse findImports(RequestContext ctx, FindImportsRequest request)
@@ -87,6 +92,12 @@ public class ImportsModule {
       public CreateImportRowPhotoResponse createImportRowPhoto(
           RequestContext ctx, CreateImportRowPhotoRequest request) throws ServiceException {
         return createImportRowPhotoService.createImportRowPhoto(ctx, request);
+      }
+
+      @Override
+      public DeleteImportRowPhotoResponse deleteImportRowPhoto(
+          RequestContext ctx, DeleteImportRowPhotoRequest request) throws ServiceException {
+        return deleteImportRowPhotoService.deleteImportRowPhoto(ctx, request);
       }
     };
   }

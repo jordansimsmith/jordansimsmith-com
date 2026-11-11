@@ -20,4 +20,7 @@ public interface ImportService {
 
   CreateImportRowPhotoResponse createImportRowPhoto(
       RequestContext ctx, CreateImportRowPhotoRequest request) throws ServiceException;
+
+  DeleteImportRowPhotoResponse deleteImportRowPhoto(
+      RequestContext ctx, DeleteImportRowPhotoRequest request) throws ServiceException;
 }

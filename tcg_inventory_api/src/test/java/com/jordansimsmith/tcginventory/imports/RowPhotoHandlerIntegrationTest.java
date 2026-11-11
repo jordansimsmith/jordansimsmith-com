@@ -10,6 +10,7 @@ import com.jordansimsmith.s3.S3Container;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
 import com.jordansimsmith.tcginventory.imports.api.CreateImportRowPhotoHandler;
+import com.jordansimsmith.tcginventory.imports.api.DeleteImportRowPhotoHandler;
 import com.jordansimsmith.tcginventory.imports.api.GetImportHandler;
 import com.jordansimsmith.tcginventory.photos.client.GetPhotoBytesRequest;
 import java.nio.charset.StandardCharsets;
@@ -116,44 +117,6 @@ public class RowPhotoHandlerIntegrationTest {
     var photos = objectMapper.readTree(getResponse.getBody()).get("rows").get(0).get("photos");
     assertThat(photos).hasSize(1);
     assertThat(photos.get(0).asText()).isEqualTo("FAKE_PHOTO_0000000002");
-  }
-
-  @Test
-  void deletePhotoShouldConflictWhenNotInReview() {
-    // arrange
-    var importId = seedImport("jordan", "review", "keep", "25.00");
-    createImportRowPhotoHandler.handleRequest(
-        buildCreateEvent("jordan", importId, 1, JPEG_BYTES), null);
-    var importItem =
-        importTable.getItem(
-            Key.builder()
-                .partitionValue(ImportItem.formatPk("jordan"))
-                .sortValue(ImportItem.formatSk(importId))
-                .build());
-    importItem.setStatus("confirmed");
-    importTable.putItem(importItem);
-
-    // act
-    var response =
-        deleteImportRowPhotoHandler.handleRequest(
-            buildDeleteEvent("jordan", importId, 1, "FAKE_PHOTO_0000000001"), null);
-
-    // assert
-    assertThat(response.getStatusCode()).isEqualTo(409);
-  }
-
-  @Test
-  void deletePhotoShouldReturn404ForUnknownPhoto() {
-    // arrange
-    var importId = seedImport("jordan", "review", "keep", "25.00");
-
-    // act
-    var response =
-        deleteImportRowPhotoHandler.handleRequest(
-            buildDeleteEvent("jordan", importId, 1, "missing"), null);
-
-    // assert
-    assertThat(response.getStatusCode()).isEqualTo(404);
   }
 
   @Test
