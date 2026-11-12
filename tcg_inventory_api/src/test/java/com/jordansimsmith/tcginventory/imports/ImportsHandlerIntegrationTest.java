@@ -6,17 +6,12 @@ import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
-import com.jordansimsmith.queue.FakeQueueClient;
-import com.jordansimsmith.tcginventory.JobItem;
-import com.jordansimsmith.tcginventory.JobMessage;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
 import com.jordansimsmith.tcginventory.imports.api.DeleteImportHandler;
 import com.jordansimsmith.tcginventory.imports.api.DeleteImportRowHandler;
 import com.jordansimsmith.tcginventory.imports.api.FindImportsHandler;
 import com.jordansimsmith.tcginventory.imports.api.GetImportHandler;
 import com.jordansimsmith.tcginventory.imports.api.UpdateImportRowHandler;
-import com.jordansimsmith.time.FakeClock;
-import com.jordansimsmith.ulid.FakeUlidGenerator;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Base64;
@@ -28,24 +23,12 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
-import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
-import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 
 @Testcontainers
 public class ImportsHandlerIntegrationTest {
-  private static final String CSV_HEADER =
-      "Name,Set code,Set name,Collector number,Foil,Rarity,Quantity,Scryfall"
-          + " ID,Misprint,Altered,Condition,Language";
-
-  private FakeClock fakeClock;
-  private FakeUlidGenerator fakeUlidGenerator;
-  private FakeQueueClient<JobMessage> fakeJobsQueue;
   private ObjectMapper objectMapper;
   private DynamoDbTable<ImportItem> importTable;
   private DynamoDbTable<ImportRowItem> importRowTable;
-  private DynamoDbTable<JobItem> jobTable;
-
-  private CreateImportHandler createImportHandler;
   private GetImportHandler getImportHandler;
   private FindImportsHandler findImportsHandler;
   private DeleteImportHandler deleteImportHandler;
@@ -69,19 +52,11 @@ public class ImportsHandlerIntegrationTest {
         TcgInventoryTestFactory.create(
             dynamoDbContainer.getEndpoint(), TcgInventoryTestFactory.UNUSED_S3_ENDPOINT);
 
-    fakeClock = factory.fakeClock();
-    fakeUlidGenerator = factory.fakeUlidGenerator();
-    fakeJobsQueue = factory.fakeJobsQueue();
     objectMapper = factory.objectMapper();
     importTable = factory.importTable();
     importRowTable = factory.importRowTable();
-    jobTable = factory.jobTable();
 
     DynamoDbUtils.reset(factory.dynamoDbClient());
-    fakeUlidGenerator.reset();
-    fakeJobsQueue.reset();
-
-    createImportHandler = new CreateImportHandler(factory);
     getImportHandler = new GetImportHandler(factory);
     findImportsHandler = new FindImportsHandler(factory);
     deleteImportHandler = new DeleteImportHandler(factory);
@@ -90,179 +65,9 @@ public class ImportsHandlerIntegrationTest {
   }
 
   @Test
-  void createImportShouldPersistImportAndRows() throws Exception {
-    // arrange
-    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    var csv =
-        CSV_HEADER
-            + "\n"
-            + "Llanowar"
-            + " Elves,DOM,Dominaria,168,Normal,Common,1,581b7327-3215-4a4f-b4ae-d9d4002ba882,false,false,near_mint,en\n"
-            + "Sol Ring,CMR,Commander Legends,472,Normal,Mythic"
-            + " Rare,1,58b26011-e103-45c4-a253-900f4e6b2eeb,false,false,mint,en";
-    var event = buildCreateEvent("jordan", csv, "manabox-export.csv");
-
-    // act
-    var response = createImportHandler.handleRequest(event, null);
-
-    // assert
-    assertThat(response.getStatusCode()).isEqualTo(200);
-
-    var body = objectMapper.readTree(response.getBody());
-    assertThat(body.get("import_id").asText()).isNotEmpty();
-    assertThat(body.get("filename").asText()).isEqualTo("manabox-export.csv");
-    assertThat(body.get("status").asText()).isEqualTo("appraising");
-    assertThat(body.get("game").asText()).isEqualTo("mtg");
-    assertThat(body.get("row_count").asInt()).isEqualTo(2);
-    assertThat(body.get("appraisal_error").isNull()).isTrue();
-    assertThat(body.get("created_at").asLong()).isEqualTo(1700000000);
-
-    var importId = body.get("import_id").asText();
-
-    // verify rows in DynamoDB
-    var rowQuery =
-        QueryConditional.sortBeginsWith(
-            Key.builder()
-                .partitionValue(ImportRowItem.formatPk("jordan", importId))
-                .sortValue(ImportRowItem.ROW_PREFIX)
-                .build());
-    var rows =
-        importRowTable
-            .query(QueryEnhancedRequest.builder().queryConditional(rowQuery).build())
-            .stream()
-            .flatMap(page -> page.items().stream())
-            .toList();
-    assertThat(rows).hasSize(2);
-    assertThat(rows.get(0).getPosition()).isEqualTo(1);
-    assertThat(rows.get(0).getName()).isEqualTo("Sol Ring");
-    assertThat(rows.get(1).getPosition()).isEqualTo(2);
-    assertThat(rows.get(1).getName()).isEqualTo("Llanowar Elves");
-
-    // verify job item in DynamoDB
-    var importItem =
-        importTable.getItem(
-            Key.builder()
-                .partitionValue(ImportItem.formatPk("jordan"))
-                .sortValue(ImportItem.formatSk(importId))
-                .build());
-    assertThat(importItem.getGame()).isEqualTo("mtg");
-    assertThat(importItem.getJobId()).isNotEmpty();
-
-    var jobItem =
-        jobTable.getItem(
-            Key.builder()
-                .partitionValue(JobItem.formatPk("jordan"))
-                .sortValue(JobItem.formatSk(importItem.getJobId()))
-                .build());
-    assertThat(jobItem).isNotNull();
-    assertThat(jobItem.getJobType()).isEqualTo("appraise");
-    assertThat(jobItem.getStatus()).isEqualTo("queued");
-    assertThat(jobItem.getImportId()).isEqualTo(importId);
-
-    // verify SQS enqueue
-    assertThat(fakeJobsQueue.getSends()).hasSize(1);
-    var send = fakeJobsQueue.getSends().get(0);
-    assertThat(send.message().jobType()).isEqualTo("appraise");
-    assertThat(send.messageGroupId()).isEqualTo("jordan");
-    assertThat(send.messageDeduplicationId()).isEqualTo(importItem.getJobId() + "#0");
-  }
-
-  @Test
-  void createImportShouldExpandQuantities() throws Exception {
-    // arrange
-    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    var csv =
-        CSV_HEADER
-            + "\n"
-            + "Sol Ring,CMR,Commander Legends,472,Normal,Mythic"
-            + " Rare,3,58b26011-e103-45c4-a253-900f4e6b2eeb,false,false,mint,en";
-    var event = buildCreateEvent("jordan", csv, "export.csv");
-
-    // act
-    var response = createImportHandler.handleRequest(event, null);
-
-    // assert
-    assertThat(response.getStatusCode()).isEqualTo(200);
-    var body = objectMapper.readTree(response.getBody());
-    assertThat(body.get("row_count").asInt()).isEqualTo(3);
-  }
-
-  @Test
-  void createImportShouldRejectMalformedCsv() {
-    // arrange
-    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    var csv = "Wrong,Headers,Only\ndata,here,now";
-    var event = buildCreateEvent("jordan", csv, "bad.csv");
-
-    // act
-    var response = createImportHandler.handleRequest(event, null);
-
-    // assert
-    assertThat(response.getStatusCode()).isEqualTo(400);
-  }
-
-  @Test
-  void createImportShouldRejectEmptyBody() {
-    // arrange
-    var event = buildCreateEvent("jordan", "", "empty.csv");
-
-    // act
-    var response = createImportHandler.handleRequest(event, null);
-
-    // assert
-    assertThat(response.getStatusCode()).isEqualTo(400);
-  }
-
-  @Test
-  void createImportShouldRequireGameBeforeWritingImport() {
-    // arrange
-    var event =
-        buildCreateEvent("jordan", buildSingleCardCsv(), Map.of("filename", "missing-game.csv"));
-
-    // act
-    var response = createImportHandler.handleRequest(event, null);
-
-    // assert
-    assertThat(response.getStatusCode()).isEqualTo(400);
-    assertThat(fakeJobsQueue.getSends()).isEmpty();
-    assertNoImports("jordan");
-  }
-
-  @Test
-  void createImportShouldRejectRegisteredGameWithDisabledImportBeforeWritingImport()
-      throws Exception {
-    // arrange
-    var event =
-        buildCreateEvent(
-            "jordan",
-            buildSingleCardCsv(),
-            Map.of("filename", "unsupported-game.csv", "game", "pokemon"));
-
-    // act
-    var response = createImportHandler.handleRequest(event, null);
-
-    // assert
-    assertThat(response.getStatusCode()).isEqualTo(400);
-    assertThat(objectMapper.readTree(response.getBody()).get("message").asText())
-        .isEqualTo("CSV import is unavailable for game: pokemon");
-    assertThat(fakeJobsQueue.getSends()).isEmpty();
-    assertNoImports("jordan");
-  }
-
-  @Test
   void getImportShouldReturnDetailWithRows() throws Exception {
     // arrange
-    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    var csv =
-        CSV_HEADER
-            + "\n"
-            + "Llanowar"
-            + " Elves,DOM,Dominaria,168,Normal,Common,1,581b7327-3215-4a4f-b4ae-d9d4002ba882,false,false,near_mint,en";
-    var createResponse =
-        createImportHandler.handleRequest(buildCreateEvent("jordan", csv, "test.csv"), null);
-    assertThat(objectMapper.readTree(createResponse.getBody()).get("game").asText())
-        .isEqualTo("mtg");
-    var importId = objectMapper.readTree(createResponse.getBody()).get("import_id").asText();
+    var importId = createImportWithUndecidedRow("jordan");
 
     // act
     var response =
@@ -285,7 +90,7 @@ public class ImportsHandlerIntegrationTest {
     assertThat(row.get("condition").asText()).isEqualTo("NM");
     assertThat(row.has("game")).isFalse();
     assertThat(row.has("external_source")).isFalse();
-    assertThat(row.get("external_id").asText()).isEqualTo("581b7327-3215-4a4f-b4ae-d9d4002ba882");
+    assertThat(row.get("external_id").asText()).isEqualTo("opaque/card");
     assertThat(row.get("decision").isNull()).isTrue();
     assertThat(row.get("decision_reason").isNull()).isTrue();
     assertThat(body.get("total_suggested_price").asText()).isEqualTo("0.00");
@@ -352,22 +157,7 @@ public class ImportsHandlerIntegrationTest {
   @Test
   void deleteImportShouldRemoveImportAndRows() throws Exception {
     // arrange
-    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    var createResponse =
-        createImportHandler.handleRequest(
-            buildCreateEvent("jordan", buildSingleCardCsv(), "test.csv"), null);
-    var importId = objectMapper.readTree(createResponse.getBody()).get("import_id").asText();
-    completeAppraisal(importId);
-
-    // simulate review status (deletion only allowed in review)
-    var importItem =
-        importTable.getItem(
-            Key.builder()
-                .partitionValue(ImportItem.formatPk("jordan"))
-                .sortValue(ImportItem.formatSk(importId))
-                .build());
-    importItem.setStatus("review");
-    importTable.putItem(importItem);
+    var importId = createReviewImportWithRow("jordan");
 
     // act
     var response =
@@ -388,63 +178,6 @@ public class ImportsHandlerIntegrationTest {
                 .handleRequest(buildEventWithPathParam("jordan", Map.of()), null)
                 .getBody())
         .doesNotContain(importId);
-  }
-
-  private String buildSingleCardCsv() {
-    return CSV_HEADER
-        + "\n"
-        + "Llanowar"
-        + " Elves,DOM,Dominaria,168,Normal,Common,1,581b7327-3215-4a4f-b4ae-d9d4002ba882,false,false,near_mint,en";
-  }
-
-  private APIGatewayV2HTTPEvent buildCreateEvent(String user, String body, String filename) {
-    return buildCreateEvent(user, body, Map.of("game", "mtg", "filename", filename));
-  }
-
-  private APIGatewayV2HTTPEvent buildCreateEvent(
-      String user, String body, Map<String, String> queryParams) {
-    var authHeader =
-        "Basic "
-            + Base64.getEncoder()
-                .encodeToString((user + ":password").getBytes(StandardCharsets.UTF_8));
-    return APIGatewayV2HTTPEvent.builder()
-        .withHeaders(Map.of("Authorization", authHeader, "content-type", "text/csv"))
-        .withQueryStringParameters(queryParams)
-        .withBody(body)
-        .build();
-  }
-
-  private void assertNoImports(String user) {
-    var importQuery =
-        QueryConditional.sortBeginsWith(
-            Key.builder()
-                .partitionValue(ImportItem.formatPk(user))
-                .sortValue(ImportItem.IMPORT_PREFIX)
-                .build());
-    var imports =
-        importTable
-            .query(QueryEnhancedRequest.builder().queryConditional(importQuery).build())
-            .stream()
-            .flatMap(page -> page.items().stream())
-            .toList();
-    assertThat(imports).isEmpty();
-  }
-
-  private void completeAppraisal(String importId) {
-    var importItem =
-        importTable.getItem(
-            Key.builder()
-                .partitionValue(ImportItem.formatPk("jordan"))
-                .sortValue(ImportItem.formatSk(importId))
-                .build());
-    var jobItem =
-        jobTable.getItem(
-            Key.builder()
-                .partitionValue(JobItem.formatPk("jordan"))
-                .sortValue(JobItem.formatSk(importItem.getJobId()))
-                .build());
-    jobItem.setStatus("succeeded");
-    jobTable.putItem(jobItem);
   }
 
   private APIGatewayV2HTTPEvent buildEventWithPathParam(
@@ -470,6 +203,27 @@ public class ImportsHandlerIntegrationTest {
         .withPathParameters(pathParams)
         .withBody(body)
         .build();
+  }
+
+  private String createImportWithUndecidedRow(String user) {
+    var importId = "import-detail";
+    importTable.putItem(
+        ImportItem.create(
+            user, "mtg", importId, "test.csv", 1, null, Instant.ofEpochSecond(1700000000)));
+    importRowTable.putItem(
+        ImportRowItem.create(
+            user,
+            importId,
+            1,
+            "Llanowar Elves",
+            "dom",
+            "Dominaria",
+            "168",
+            "normal",
+            "NM",
+            "opaque/card",
+            "en"));
+    return importId;
   }
 
   private String createReviewImportWithRow(String user) {

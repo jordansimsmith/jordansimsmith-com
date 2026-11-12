@@ -1952,9 +1952,9 @@ export function createFakeClient(): ApiClient {
 
     async createImport(
       game: GameId,
-      filename: string,
+      filename: string | null,
       _csv: string,
-    ): Promise<ImportSummary> {
+    ): Promise<CreateImportResponse> {
       const gameMetadata = getGame(FAKE_GAMES, game);
       if (!gameMetadata.csv_import_enabled) {
         throw new Error(`CSV import is unavailable for game: ${game}`);
@@ -1978,7 +1978,7 @@ export function createFakeClient(): ApiClient {
         created_at_ms: Date.now(),
       };
       importRecords.push(importRecord);
-      return toImportSummary(importRecord);
+      return { import_id: importRecord.import_id };
     },
 
     async findImports(): Promise<FindImportsResponse> {

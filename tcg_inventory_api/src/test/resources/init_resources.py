@@ -223,7 +223,7 @@ lambdas = {
         "zip_file": "get-repricing-handler_deploy.jar",
     },
     "create_import": {
-        "handler": "com.jordansimsmith.tcginventory.imports.CreateImportHandler",
+        "handler": "com.jordansimsmith.tcginventory.imports.api.CreateImportHandler",
         "zip_file": "create-import-handler_deploy.jar",
     },
     "find_imports": {

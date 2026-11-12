@@ -12,11 +12,15 @@ import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 public class ImportReadRepository {
   private final DynamoDbTable<ImportItem> importTable;
   private final DynamoDbTable<ImportRowItem> importRowTable;
+  private final DynamoDbTable<CreateImportOperationItem> createImportOperationTable;
 
   public ImportReadRepository(
-      DynamoDbTable<ImportItem> importTable, DynamoDbTable<ImportRowItem> importRowTable) {
+      DynamoDbTable<ImportItem> importTable,
+      DynamoDbTable<ImportRowItem> importRowTable,
+      DynamoDbTable<CreateImportOperationItem> createImportOperationTable) {
     this.importTable = importTable;
     this.importRowTable = importRowTable;
+    this.createImportOperationTable = createImportOperationTable;
   }
 
   @Nullable
@@ -27,6 +31,16 @@ public class ImportReadRepository {
             .sortValue(ImportItem.formatSk(importId))
             .build();
     return importTable.getItem(request -> request.key(key).consistentRead(true));
+  }
+
+  @Nullable
+  public CreateImportOperationItem getCreateImportOperation(String user, String operationId) {
+    var key =
+        Key.builder()
+            .partitionValue("USER#" + user + "#IMPORT_OPERATIONS")
+            .sortValue("CREATE#" + operationId)
+            .build();
+    return createImportOperationTable.getItem(request -> request.key(key).consistentRead(true));
   }
 
   public List<ImportRowItem> findRows(String user, String importId) {

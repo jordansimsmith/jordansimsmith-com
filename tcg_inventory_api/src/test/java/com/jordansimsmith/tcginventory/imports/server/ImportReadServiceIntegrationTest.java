@@ -46,6 +46,7 @@ class ImportReadServiceIntegrationTest {
   private static DynamoDbClient dynamoDbClient;
   private static DynamoDbTable<ImportItem> importTable;
   private static DynamoDbTable<ImportRowItem> importRowTable;
+  private static DynamoDbTable<CreateImportOperationItem> createImportOperationTable;
 
   private final ObjectMapper objectMapper = new ObjectMapper();
   private FindImportsService findImportsService;
@@ -61,6 +62,8 @@ class ImportReadServiceIntegrationTest {
     var enhancedClient = DynamoDbEnhancedClient.builder().dynamoDbClient(dynamoDbClient).build();
     importTable = enhancedClient.table(TABLE_NAME, TableSchema.fromBean(ImportItem.class));
     importRowTable = enhancedClient.table(TABLE_NAME, TableSchema.fromBean(ImportRowItem.class));
+    createImportOperationTable =
+        enhancedClient.table(TABLE_NAME, TableSchema.fromBean(CreateImportOperationItem.class));
     DynamoDbUtils.createTable(dynamoDbClient, importTable);
   }
 
@@ -68,8 +71,12 @@ class ImportReadServiceIntegrationTest {
   void setUp() {
     DynamoDbUtils.reset(dynamoDbClient);
     findImportsService =
-        new FindImportsService(new ImportReadRepository(importTable, importRowTable), objectMapper);
-    getImportService = new GetImportService(new ImportReadRepository(importTable, importRowTable));
+        new FindImportsService(
+            new ImportReadRepository(importTable, importRowTable, createImportOperationTable),
+            objectMapper);
+    getImportService =
+        new GetImportService(
+            new ImportReadRepository(importTable, importRowTable, createImportOperationTable));
   }
 
   @Test

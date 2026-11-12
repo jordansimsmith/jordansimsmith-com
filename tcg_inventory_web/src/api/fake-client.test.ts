@@ -455,11 +455,12 @@ describe('createFakeClient imports', () => {
 
     const created = await client.createImport('mtg', 'bulk.csv', UPLOAD_BODY);
 
-    expect(created.status).toBe('appraising');
-    expect(created.filename).toBe('bulk.csv');
-    expect(created.row_count).toBe(4);
+    expect(created).toEqual({ import_id: expect.any(String) });
 
     const detail = await client.getImport(created.import_id);
+    expect(detail.status).toBe('appraising');
+    expect(detail.filename).toBe('bulk.csv');
+    expect(detail.row_count).toBe(4);
     expect(detail.rows.map((row) => row.position)).toEqual([1, 2, 3, 4]);
     expect(detail.rows.map((row) => row.name)).toEqual([
       'Ponder',
@@ -536,7 +537,7 @@ describe('createFakeClient imports', () => {
       'Name,Quantity\nOpt,1',
     );
 
-    expect(created.row_count).toBe(4);
+    expect((await client.getImport(created.import_id)).row_count).toBe(4);
   });
 
   it('rejects unknown import ids', async () => {

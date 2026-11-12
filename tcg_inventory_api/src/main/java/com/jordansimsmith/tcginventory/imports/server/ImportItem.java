@@ -132,6 +132,27 @@ public class ImportItem {
     updatedAt = value;
   }
 
+  public static ImportItem create(
+      String user,
+      String game,
+      String importId,
+      @Nullable String filename,
+      int rowCount,
+      Instant now) {
+    var item = new ImportItem();
+    item.setPk(formatPk(user));
+    item.setSk(formatSk(importId));
+    item.setImportId(importId);
+    item.setGame(game);
+    item.setFilename(filename);
+    item.setStatus("appraising");
+    item.setRowCount(rowCount);
+    item.setCreatedAt(now);
+    item.setAppraisedRowCount(0);
+    item.setUpdatedAt(now);
+    return item;
+  }
+
   public static String formatPk(String user) {
     return USER_PREFIX + user;
   }

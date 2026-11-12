@@ -41,6 +41,7 @@ class ImportConfirmationProcessingIntegrationTest {
   private static DynamoDbClient dynamoDbClient;
   private static DynamoDbTable<ImportItem> importTable;
   private static DynamoDbTable<ImportRowItem> importRowTable;
+  private static DynamoDbTable<CreateImportOperationItem> createImportOperationTable;
   private static ImportReadRepository reads;
   private FakeClock clock;
   private ImportMutationRepository writes;
@@ -57,8 +58,10 @@ class ImportConfirmationProcessingIntegrationTest {
     var enhancedClient = DynamoDbEnhancedClient.builder().dynamoDbClient(dynamoDbClient).build();
     importTable = enhancedClient.table(TABLE_NAME, TableSchema.fromBean(ImportItem.class));
     importRowTable = enhancedClient.table(TABLE_NAME, TableSchema.fromBean(ImportRowItem.class));
+    createImportOperationTable =
+        enhancedClient.table(TABLE_NAME, TableSchema.fromBean(CreateImportOperationItem.class));
     DynamoDbUtils.createTable(dynamoDbClient, importTable);
-    reads = new ImportReadRepository(importTable, importRowTable);
+    reads = new ImportReadRepository(importTable, importRowTable, createImportOperationTable);
   }
 
   @BeforeEach

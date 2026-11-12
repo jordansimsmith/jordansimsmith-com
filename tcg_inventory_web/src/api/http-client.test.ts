@@ -502,6 +502,24 @@ describe('http client imports', () => {
     expect(json).toHaveBeenCalledTimes(1);
   });
 
+  it('omits the filename query when creating an import without one', async () => {
+    fetchSpy.mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({ import_id: 'import-1' }),
+    });
+    const client = createHttpClient();
+
+    await expect(client.createImport('mtg', null, 'csv body')).resolves.toEqual(
+      {
+        import_id: 'import-1',
+      },
+    );
+
+    expect(fetchSpy.mock.calls[0][0]).toBe(
+      'https://api.tcg-inventory.jordansimsmith.com/imports?game=mtg',
+    );
+  });
+
   it('reads legacy listing fields without relying on the removed error field', async () => {
     const legacyPayload: unknown = {
       imports: [

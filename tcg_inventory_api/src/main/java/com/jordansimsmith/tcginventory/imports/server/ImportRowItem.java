@@ -249,6 +249,33 @@ public class ImportRowItem {
     location = value;
   }
 
+  public static ImportRowItem create(
+      String user,
+      String importId,
+      int position,
+      String name,
+      String setCode,
+      String setName,
+      String collectorNumber,
+      String finish,
+      String condition,
+      String externalId,
+      String language) {
+    var item = new ImportRowItem();
+    item.setPk(formatPk(user, importId));
+    item.setSk(formatSk(position));
+    item.setPosition(position);
+    item.setName(name);
+    item.setSetCode(setCode);
+    item.setSetName(setName);
+    item.setCollectorNumber(collectorNumber);
+    item.setFinish(finish);
+    item.setCondition(condition);
+    item.setExternalId(externalId);
+    item.setLanguage(language);
+    return item;
+  }
+
   public static String formatPk(String user, String importId) {
     return USER_PREFIX + user + "#" + IMPORT_PREFIX + importId;
   }

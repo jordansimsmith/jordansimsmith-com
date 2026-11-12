@@ -10,16 +10,70 @@ import com.jordansimsmith.tcginventory.photos.client.DeletePhotoRequest;
 import com.jordansimsmith.tcginventory.photos.client.PhotosService;
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class FakeImportService implements ImportService {
   private final Map<UserImport, GetImportResponse> imports = new HashMap<>();
+  private final Map<UserOperation, String> createOperations = new HashMap<>();
   private final PhotosService photosService;
+  private int createOperationCounter;
 
   public FakeImportService(PhotosService photosService) {
     this.photosService = photosService;
+  }
+
+  @Override
+  public CreateImportResponse createImport(RequestContext ctx, CreateImportRequest request)
+      throws ServiceException {
+    var operation = new UserOperation(ctx.user(), request.operationId());
+    var previous = createOperations.get(operation);
+    if (previous != null) {
+      return new CreateImportResponse(previous);
+    }
+    var rows = new ArrayList<ImportRow>();
+    if (request.rows() != null) {
+      var orderedRows = new ArrayList<>(request.rows());
+      Collections.reverse(orderedRows);
+      for (int index = 0; index < orderedRows.size(); index++) {
+        var row = orderedRows.get(index);
+        rows.add(
+            new ImportRow(
+                index + 1,
+                row.name(),
+                row.setCode(),
+                row.setName(),
+                row.collectorNumber(),
+                row.finish(),
+                row.condition(),
+                row.externalId(),
+                null,
+                null,
+                null,
+                null,
+                List.of(),
+                false));
+      }
+    }
+    var importId = "fake-import-create-%d".formatted(++createOperationCounter);
+    imports.put(
+        new UserImport(ctx.user(), importId),
+        new GetImportResponse(
+            importId,
+            request.game(),
+            request.filename(),
+            ImportStatus.APPRAISING,
+            rows.size(),
+            System.currentTimeMillis() / 1000,
+            "0.00",
+            null,
+            null,
+            rows));
+    createOperations.put(operation, importId);
+    return new CreateImportResponse(importId);
   }
 
   @Override
@@ -357,4 +411,6 @@ public class FakeImportService implements ImportService {
   }
 
   private record UserImport(String user, String importId) {}
+
+  private record UserOperation(String user, String operationId) {}
 }

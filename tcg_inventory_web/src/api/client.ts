@@ -133,6 +133,10 @@ export interface ImportSummary {
   created_at: number;
 }
 
+export interface CreateImportResponse {
+  import_id: string;
+}
+
 export interface FindImportsResponse {
   imports: ImportSummary[];
   next_continuation: string | null;
@@ -517,9 +521,9 @@ export interface ApiClient {
   updatePricing(update: UpdatePricingRequest): Promise<PricingResponse>;
   createImport(
     game: GameId,
-    filename: string,
+    filename: string | null,
     csv: string,
-  ): Promise<ImportSummary>;
+  ): Promise<CreateImportResponse>;
   findImports(params?: FindImportsParams): Promise<FindImportsResponse>;
   getImport(importId: string): Promise<ImportDetail>;
   updateImportRow(

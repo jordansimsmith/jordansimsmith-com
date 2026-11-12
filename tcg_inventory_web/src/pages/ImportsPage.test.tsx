@@ -90,10 +90,7 @@ describe('ImportsPage', () => {
       next_continuation: null,
     });
     vi.spyOn(clientModule.apiClient, 'createImport').mockResolvedValue({
-      ...importFixtures[0],
       import_id: 'import-3',
-      filename: 'bulk.csv',
-      row_count: 1,
     });
   });
 

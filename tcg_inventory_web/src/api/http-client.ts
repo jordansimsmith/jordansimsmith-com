@@ -143,10 +143,13 @@ export function createHttpClient(): ApiClient {
 
     async createImport(
       game: GameId,
-      filename: string,
+      filename: string | null,
       csv: string,
-    ): Promise<ImportSummary> {
-      const query = new URLSearchParams({ game, filename });
+    ): Promise<CreateImportResponse> {
+      const query = new URLSearchParams({ game });
+      if (filename !== null) {
+        query.set('filename', filename);
+      }
       const response = await authenticatedFetch(`/imports?${query}`, {
         method: 'POST',
         headers: { 'Content-Type': 'text/csv' },

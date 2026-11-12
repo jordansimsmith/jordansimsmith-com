@@ -47,6 +47,7 @@ class AppraisalProcessingIntegrationTest {
   private static DynamoDbClient dynamoDbClient;
   private static DynamoDbTable<ImportItem> importTable;
   private static DynamoDbTable<ImportRowItem> importRowTable;
+  private static DynamoDbTable<CreateImportOperationItem> createImportOperationTable;
 
   private ImportReadRepository importReadRepository;
   private ImportMutationRepository importMutationRepository;
@@ -65,13 +66,16 @@ class AppraisalProcessingIntegrationTest {
     var enhancedClient = DynamoDbEnhancedClient.builder().dynamoDbClient(dynamoDbClient).build();
     importTable = enhancedClient.table(TABLE_NAME, TableSchema.fromBean(ImportItem.class));
     importRowTable = enhancedClient.table(TABLE_NAME, TableSchema.fromBean(ImportRowItem.class));
+    createImportOperationTable =
+        enhancedClient.table(TABLE_NAME, TableSchema.fromBean(CreateImportOperationItem.class));
     DynamoDbUtils.createTable(dynamoDbClient, importTable);
   }
 
   @BeforeEach
   void setUp() {
     DynamoDbUtils.reset(dynamoDbClient);
-    importReadRepository = new ImportReadRepository(importTable, importRowTable);
+    importReadRepository =
+        new ImportReadRepository(importTable, importRowTable, createImportOperationTable);
     importMutationRepository = new ImportMutationRepository(dynamoDbClient, TABLE_NAME);
     queue = new FakeQueueClient<>();
     clock = new FakeClock();

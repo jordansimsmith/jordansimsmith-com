@@ -6,11 +6,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.ConditionCheck;
 import software.amazon.awssdk.services.dynamodb.model.Delete;
 import software.amazon.awssdk.services.dynamodb.model.DeleteItemRequest;
+import software.amazon.awssdk.services.dynamodb.model.Put;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItem;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItemsRequest;
 import software.amazon.awssdk.services.dynamodb.model.Update;
@@ -23,6 +25,39 @@ public class ImportMutationRepository {
   public ImportMutationRepository(DynamoDbClient dynamoDbClient, String tableName) {
     this.dynamoDbClient = dynamoDbClient;
     this.tableName = tableName;
+  }
+
+  public void createRows(List<ImportRowItem> rows) {
+    var schema = TableSchema.fromBean(ImportRowItem.class);
+    for (var row : rows) {
+      dynamoDbClient.putItem(
+          request -> request.tableName(tableName).item(schema.itemToMap(row, true)));
+    }
+  }
+
+  public void createImport(ImportItem item, CreateImportOperationItem operation) {
+    dynamoDbClient.transactWriteItems(
+        TransactWriteItemsRequest.builder()
+            .transactItems(
+                TransactWriteItem.builder()
+                    .put(
+                        Put.builder()
+                            .tableName(tableName)
+                            .item(TableSchema.fromBean(ImportItem.class).itemToMap(item, true))
+                            .conditionExpression("attribute_not_exists(pk)")
+                            .build())
+                    .build(),
+                TransactWriteItem.builder()
+                    .put(
+                        Put.builder()
+                            .tableName(tableName)
+                            .item(
+                                TableSchema.fromBean(CreateImportOperationItem.class)
+                                    .itemToMap(operation, true))
+                            .conditionExpression("attribute_not_exists(pk)")
+                            .build())
+                    .build())
+            .build());
   }
 
   public void recordAppraisal(

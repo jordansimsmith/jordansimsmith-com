@@ -5,6 +5,9 @@ import com.jordansimsmith.queue.QueueClient;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceException;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
+import com.jordansimsmith.tcginventory.games.client.GamesService;
+import com.jordansimsmith.tcginventory.imports.client.CreateImportRequest;
+import com.jordansimsmith.tcginventory.imports.client.CreateImportResponse;
 import com.jordansimsmith.tcginventory.imports.client.CreateImportRowPhotoRequest;
 import com.jordansimsmith.tcginventory.imports.client.CreateImportRowPhotoResponse;
 import com.jordansimsmith.tcginventory.imports.client.DeleteImportRequest;
@@ -24,6 +27,7 @@ import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
 import com.jordansimsmith.tcginventory.photos.client.PhotosService;
 import com.jordansimsmith.tcginventory.pricing.client.PricingService;
 import com.jordansimsmith.time.Clock;
+import com.jordansimsmith.ulid.UlidGenerator;
 import dagger.Module;
 import dagger.Provides;
 import javax.inject.Named;
@@ -43,7 +47,10 @@ public class ImportsModule {
         dynamoDbEnhancedClient.table(tableName, TableSchema.fromBean(ImportItem.class));
     var importRowTable =
         dynamoDbEnhancedClient.table(tableName, TableSchema.fromBean(ImportRowItem.class));
-    return new ImportReadRepository(importTable, importRowTable);
+    var createImportOperationTable =
+        dynamoDbEnhancedClient.table(
+            tableName, TableSchema.fromBean(CreateImportOperationItem.class));
+    return new ImportReadRepository(importTable, importRowTable, createImportOperationTable);
   }
 
   @Provides
@@ -59,7 +66,20 @@ public class ImportsModule {
       ImportReadRepository importReadRepository,
       ImportMutationRepository importMutationRepository,
       ObjectMapper objectMapper,
-      PhotosService photosService) {
+      PhotosService photosService,
+      GamesService gamesService,
+      QueueClient<ImportMessage> importsQueue,
+      Clock clock,
+      UlidGenerator ulidGenerator) {
+    var createImportService =
+        new CreateImportService(
+            importReadRepository,
+            importMutationRepository,
+            gamesService,
+            new ImportCsvParserFactory(new ManaBoxCsvParser()),
+            importsQueue,
+            clock,
+            ulidGenerator);
     var findImportsService = new FindImportsService(importReadRepository, objectMapper);
     var getImportService = new GetImportService(importReadRepository);
     var updateImportRowService =
@@ -75,6 +95,12 @@ public class ImportsModule {
         new DeleteImportRowPhotoService(
             importReadRepository, importMutationRepository, photosService);
     return new ImportService() {
+      @Override
+      public CreateImportResponse createImport(RequestContext ctx, CreateImportRequest request)
+          throws ServiceException {
+        return createImportService.createImport(ctx, request);
+      }
+
       @Override
       public FindImportsResponse findImports(RequestContext ctx, FindImportsRequest request)
           throws ServiceException {
