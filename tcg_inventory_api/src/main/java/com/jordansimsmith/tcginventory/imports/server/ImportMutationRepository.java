@@ -82,6 +82,58 @@ public class ImportMutationRepository {
             .build());
   }
 
+  public void recordCreatedUnit(
+      String user,
+      String importId,
+      int position,
+      String skuId,
+      int sequenceNumber,
+      String location) {
+    dynamoDbClient.updateItem(
+        UpdateItemRequest.builder()
+            .tableName(tableName)
+            .key(
+                Map.of(
+                    ImportRowItem.PK,
+                    AttributeValue.fromS(ImportRowItem.formatPk(user, importId)),
+                    ImportRowItem.SK,
+                    AttributeValue.fromS(ImportRowItem.formatSk(position))))
+            .updateExpression(
+                "SET #skuId = :skuId, #sequenceNumber = :sequenceNumber, #location = :location")
+            .conditionExpression("attribute_exists(pk) AND attribute_not_exists(#skuId)")
+            .expressionAttributeNames(
+                Map.of(
+                    "#skuId", ImportRowItem.SKU_ID,
+                    "#sequenceNumber", ImportRowItem.SEQUENCE_NUMBER,
+                    "#location", ImportRowItem.LOCATION))
+            .expressionAttributeValues(
+                Map.of(
+                    ":skuId", AttributeValue.fromS(skuId),
+                    ":sequenceNumber", AttributeValue.fromN(Integer.toString(sequenceNumber)),
+                    ":location", AttributeValue.fromS(location)))
+            .build());
+  }
+
+  public void finishConfirmation(String user, String importId, Instant now) {
+    dynamoDbClient.updateItem(
+        UpdateItemRequest.builder()
+            .tableName(tableName)
+            .key(
+                Map.of(
+                    ImportItem.PK, AttributeValue.fromS(ImportItem.formatPk(user)),
+                    ImportItem.SK, AttributeValue.fromS(ImportItem.formatSk(importId))))
+            .updateExpression("SET #status = :confirmed, #updatedAt = :updatedAt")
+            .conditionExpression("attribute_exists(pk) AND #status = :confirming")
+            .expressionAttributeNames(
+                Map.of("#status", ImportItem.STATUS, "#updatedAt", ImportItem.UPDATED_AT))
+            .expressionAttributeValues(
+                Map.of(
+                    ":confirmed", AttributeValue.fromS("confirmed"),
+                    ":confirming", AttributeValue.fromS("confirming"),
+                    ":updatedAt", AttributeValue.fromN(Long.toString(now.getEpochSecond()))))
+            .build());
+  }
+
   public void checkpointAppraisal(
       String user, String importId, int expectedPosition, int position, Instant now) {
     dynamoDbClient.updateItem(

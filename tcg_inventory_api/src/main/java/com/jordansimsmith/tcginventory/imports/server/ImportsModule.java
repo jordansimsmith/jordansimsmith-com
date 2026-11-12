@@ -20,6 +20,7 @@ import com.jordansimsmith.tcginventory.imports.client.GetImportResponse;
 import com.jordansimsmith.tcginventory.imports.client.ImportService;
 import com.jordansimsmith.tcginventory.imports.client.UpdateImportRowRequest;
 import com.jordansimsmith.tcginventory.imports.client.UpdateImportRowResponse;
+import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
 import com.jordansimsmith.tcginventory.photos.client.PhotosService;
 import com.jordansimsmith.tcginventory.pricing.client.PricingService;
 import com.jordansimsmith.time.Clock;
@@ -132,6 +133,25 @@ public class ImportsModule {
         pricingService,
         new AppraisalPolicy(),
         importsQueue,
+        clock);
+  }
+
+  @Provides
+  @Singleton
+  ImportConfirmationMessageHandler importConfirmationMessageHandler(
+      DynamoDbEnhancedClient dynamoDbEnhancedClient,
+      DynamoDbClient dynamoDbClient,
+      @Named("tcgInventoryTableName") String tableName,
+      InventoryService inventoryService,
+      Clock clock) {
+    var importTable =
+        dynamoDbEnhancedClient.table(tableName, TableSchema.fromBean(ImportItem.class));
+    var importRowTable =
+        dynamoDbEnhancedClient.table(tableName, TableSchema.fromBean(ImportRowItem.class));
+    return new ImportConfirmationMessageHandler(
+        new ImportReadRepository(importTable, importRowTable),
+        new ImportMutationRepository(dynamoDbClient, tableName),
+        inventoryService,
         clock);
   }
 }
