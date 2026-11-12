@@ -5,6 +5,7 @@ import type {
   CatalogCardsResponse,
   Condition,
   ConfirmScanRequest,
+  CreateImportResponse,
   CreateScanRequest,
   CreateScanResponse,
   Finish,
@@ -645,7 +646,7 @@ function appraisePrices(
 interface FakeImport {
   import_id: string;
   game: GameId;
-  filename: string;
+  filename: string | null;
   status: ImportStatus;
   rows: FakeImportRow[];
   created_at_ms: number;
