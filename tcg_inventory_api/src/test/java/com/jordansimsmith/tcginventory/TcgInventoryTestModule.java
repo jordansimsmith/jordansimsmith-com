@@ -14,9 +14,6 @@ import com.jordansimsmith.tcginventory.fetchtcg.client.FakeFetchTcgService;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
 import com.jordansimsmith.tcginventory.games.client.FakeGamesService;
 import com.jordansimsmith.tcginventory.games.client.GamesService;
-import com.jordansimsmith.tcginventory.imports.ImportItem;
-import com.jordansimsmith.tcginventory.imports.ImportRowItem;
-import com.jordansimsmith.tcginventory.imports.server.CreateImportOperationItem;
 import com.jordansimsmith.tcginventory.imports.server.ImportMessage;
 import com.jordansimsmith.tcginventory.imports.server.ImportsModule;
 import com.jordansimsmith.tcginventory.inventory.client.FakeInventoryService;
@@ -100,26 +97,6 @@ public class TcgInventoryTestModule {
       DynamoDbEnhancedClient dynamoDbEnhancedClient) {
     var schema = TableSchema.fromBean(TcgInventoryTableDefinition.class);
     return dynamoDbEnhancedClient.table(TcgInventoryTable.TABLE_NAME, schema);
-  }
-
-  @Provides
-  @Singleton
-  DynamoDbTable<ImportItem> importTable(DynamoDbEnhancedClient client) {
-    return client.table(TcgInventoryTable.TABLE_NAME, TableSchema.fromBean(ImportItem.class));
-  }
-
-  @Provides
-  @Singleton
-  DynamoDbTable<ImportRowItem> importRowTable(DynamoDbEnhancedClient client) {
-    return client.table(TcgInventoryTable.TABLE_NAME, TableSchema.fromBean(ImportRowItem.class));
-  }
-
-  @Provides
-  @Singleton
-  DynamoDbTable<CreateImportOperationItem> createImportOperationTable(
-      DynamoDbEnhancedClient client) {
-    return client.table(
-        TcgInventoryTable.TABLE_NAME, TableSchema.fromBean(CreateImportOperationItem.class));
   }
 
   @Provides

@@ -57,6 +57,49 @@ class AppraisalResolverTest {
   }
 
   @Test
+  void resolverShouldTreatSameCardFoundInMultipleSetsAsOneMatch() throws Exception {
+    // arrange
+    var fetchTcgService = new FakeFetchTcgService();
+    fetchTcgService.seedSets(
+        "mtg", "multi-set", List.of(new CardSet(42, "First Set"), new CardSet(43, "Second Set")));
+    var resultCard = new CardSearchResult("shared-card");
+    fetchTcgService.seedSearchResult("mtg", 42, "Lightning Bolt", "foil", List.of(resultCard));
+    fetchTcgService.seedSearchResult("mtg", 43, "Lightning Bolt", "foil", List.of(resultCard));
+    fetchTcgService.seedCard(
+        "shared-card",
+        new GetCardResponse(
+            "shared-card", "Lightning Bolt", null, Map.of("scryfallId", "printing")));
+    var row = row("Lightning Bolt", "foil", "printing", "en");
+    row.setSetCode("multi-set");
+
+    // act
+    var result = resolver(fetchTcgService).resolve(CTX, row);
+
+    // assert
+    assertThat(result.decision()).isEqualTo(AppraisalResult.Decision.RESOLVED);
+    assertThat(result.cardId()).isEqualTo("shared-card");
+    assertThat(result.setId()).isEqualTo(42);
+  }
+
+  @Test
+  void resolverShouldReturnReviewForAnUnmappedSet() throws Exception {
+    // arrange
+    var fetchTcgService = new FakeFetchTcgService();
+    fetchTcgService.seedSets("mtg", "unmapped-set", List.of());
+    var row = row("Lightning Bolt", "normal", "printing", "en");
+    row.setSetCode("unmapped-set");
+
+    // act
+    var result = resolver(fetchTcgService).resolve(CTX, row);
+
+    // assert
+    assertThat(result.decision()).isEqualTo(AppraisalResult.Decision.REVIEW);
+    assertThat(result.notes()).isEqualTo("unmapped set");
+    assertThat(result.cardId()).isNull();
+    assertThat(result.setId()).isNull();
+  }
+
+  @Test
   void cardMatcherUsesTheProvidedGame() throws Exception {
     var fetchTcgService = new FakeFetchTcgService();
     fetchTcgService.seedSearchResult(

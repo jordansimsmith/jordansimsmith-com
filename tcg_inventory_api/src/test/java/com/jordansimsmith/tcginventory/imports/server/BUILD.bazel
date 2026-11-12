@@ -38,8 +38,8 @@ java_test_suite(
     size = "medium",
     srcs = [
         "AppraisalProcessingIntegrationTest.java",
-        "CreateImportServiceIntegrationTest.java",
         "ConfirmImportServiceIntegrationTest.java",
+        "CreateImportServiceIntegrationTest.java",
         "ImportConfirmationProcessingIntegrationTest.java",
         "ImportReadServiceIntegrationTest.java",
         "ImportReviewServiceIntegrationTest.java",

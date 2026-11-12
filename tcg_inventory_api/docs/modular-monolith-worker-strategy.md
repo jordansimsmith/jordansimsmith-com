@@ -2,7 +2,7 @@
 
 This document extends the [modular monolith engineering strategy](modular-monolith-strategy.md) with the ownership, execution, and recovery rules for background work. Each vertical may have synchronous service operations and asynchronous processing. Both belong to the same domain owner.
 
-The [service README](../README.md) describes the runtime currently implemented. Orders, Pricing, Reports, and Publish own their worker records or lifecycle, messages, and queue adapters. Imports and Scans still use the shared Jobs records and dispatcher. This document describes the target architecture and migration rules; it does not change those remaining shared workflows. Do not introduce a generic Jobs vertical.
+The [service README](../README.md) describes the runtime currently implemented. Imports, Orders, Pricing, Reports, and Publish own their workflow records or lifecycle, messages, and queue adapters. Scans confirmation still uses the shared Jobs record and dispatcher. Historical Imports and Orders Jobs records remain stored, but their runtime work uses owner-local queues and workers. Do not introduce a generic Jobs vertical.
 
 ## Ownership and public contracts
 
@@ -119,7 +119,7 @@ The same limitation applies when one service accepts a follow-up operation befor
 
 ## Cross-vertical workflows
 
-Worker implementations obey the same client-only dependencies as synchronous server operations. Publish calls Orders and Listings services; Scans requests Imports work through an Imports service. They do not import foreign message handlers, construct foreign records, or send foreign queue messages.
+Worker implementations obey the same client-only dependencies as synchronous server operations. Publish calls Orders and Listings services. Shared Jobs remains the Scans confirmation adapter: it validates the selected identities, calls `ImportService#createImport` with the scan ID as the stable operation ID, and saves the returned `import_id` on the scan. The Jobs record stores only `scan_id`; Imports then owns its appraisal and confirmation messages on the Imports FIFO. Scans does not construct Imports records or publish to the Imports queue.
 
 Pass the owning operation's user scope through `RequestContext`. Transactions stay within the owning vertical, and a successful service call commits that owner's work independently. The orchestrator records its own progress without sharing transaction handles or database models.
 

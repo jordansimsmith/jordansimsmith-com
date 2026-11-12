@@ -84,4 +84,19 @@ class GetPriceServiceIntegrationTest {
     assertThat(aliceUpdated.suggestedPrice()).isEqualByComparingTo("0.50");
     assertThat(bobZeroFloor.suggestedPrice()).isEqualByComparingTo("0.10");
   }
+
+  @Test
+  void getPriceShouldUseDefaultFloorWhenSavedPricingItemHasNoFloor() throws Exception {
+    // arrange
+    var service = new GetPriceService(new PricingRepository(pricingTable), fetchTcgService);
+    var itemWithoutFloor = PricingItem.create("alice", null);
+    pricingTable.putItem(itemWithoutFloor);
+
+    // act
+    var response =
+        service.getPrice(new RequestContext("alice"), new GetPriceRequest("card-1", Condition.NM));
+
+    // assert
+    assertThat(response.suggestedPrice()).isEqualByComparingTo("0.25");
+  }
 }

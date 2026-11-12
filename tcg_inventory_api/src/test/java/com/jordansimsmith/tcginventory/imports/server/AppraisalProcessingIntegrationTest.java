@@ -6,6 +6,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
@@ -16,6 +19,7 @@ import com.jordansimsmith.service.ServiceUnavailableException;
 import com.jordansimsmith.tcginventory.inventory.client.Condition;
 import com.jordansimsmith.tcginventory.pricing.client.FakePricingService;
 import com.jordansimsmith.tcginventory.pricing.client.GetPriceResponse;
+import com.jordansimsmith.tcginventory.pricing.client.PricingService;
 import com.jordansimsmith.time.FakeClock;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -258,17 +262,50 @@ class AppraisalProcessingIntegrationTest {
     assertThat(stored.getFetchtcgSetId()).isNull();
   }
 
+  @Test
+  void repeatedRowsShouldResolveAndFetchPricingIndependently() throws Exception {
+    // arrange
+    var rows = rows(2);
+    rows.get(1).setExternalId(rows.getFirst().getExternalId());
+    importTable.putItem(parent(2, 0));
+    rows.forEach(importRowTable::putItem);
+    var resolvedPositions = new ArrayList<Integer>();
+    PricingService pricingSpy = spy(pricingService);
+    var resolver =
+        (AppraisalResolver)
+            (ctx, row) -> {
+              resolvedPositions.add(row.getPosition());
+              return keepResult();
+            };
+
+    // act
+    handler(resolver, queue, pricingSpy).handleMessage(new RequestContext(USER), message());
+
+    // assert
+    assertThat(resolvedPositions).containsExactly(1, 2);
+    verify(pricingSpy, times(2)).getPrice(any(), any());
+    assertThat(importReadRepository.getRow(USER, IMPORT_ID, 1).getDecision()).isEqualTo("keep");
+    assertThat(importReadRepository.getRow(USER, IMPORT_ID, 2).getDecision()).isEqualTo("keep");
+  }
+
   private AppraisalMessageHandler handler(AppraisalResolver resolver) {
-    return handler(resolver, queue);
+    return handler(resolver, queue, pricingService);
   }
 
   private AppraisalMessageHandler handler(
       AppraisalResolver resolver, QueueClient<ImportMessage> importsQueue) {
+    return handler(resolver, importsQueue, pricingService);
+  }
+
+  private AppraisalMessageHandler handler(
+      AppraisalResolver resolver,
+      QueueClient<ImportMessage> importsQueue,
+      PricingService priceService) {
     return new AppraisalMessageHandler(
         importReadRepository,
         importMutationRepository,
         new AppraisalResolverFactory(resolver),
-        pricingService,
+        priceService,
         appraisalPolicy,
         importsQueue,
         clock);

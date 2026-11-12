@@ -8,8 +8,6 @@ import com.jordansimsmith.service.ServiceException;
 import com.jordansimsmith.tcginventory.photos.client.CreatePhotoRequest;
 import com.jordansimsmith.tcginventory.photos.client.DeletePhotoRequest;
 import com.jordansimsmith.tcginventory.photos.client.PhotosService;
-import com.jordansimsmith.tcginventory.imports.client.ConfirmImportRequest;
-import com.jordansimsmith.tcginventory.imports.client.ConfirmImportResponse;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -262,8 +260,7 @@ public class FakeImportService implements ImportService {
     if (importDetail.status() != ImportStatus.REVIEW) {
       throw new ConflictException("import is not in review status");
     }
-    var rowsNeedingPhotos =
-        importDetail.rows().stream().filter(ImportRow::needsPhotos).count();
+    var rowsNeedingPhotos = importDetail.rows().stream().filter(ImportRow::needsPhotos).count();
     if (rowsNeedingPhotos > 0) {
       throw new ConflictException(rowsNeedingPhotos + " rows need photos before confirm");
     }

@@ -76,7 +76,8 @@ public class GetImportService {
         item.getMarketPrice(),
         item.getSuggestedPrice(),
         photoIds,
-        ImportPhotoPolicy.needsPhotos(item.getDecision(), item.getSuggestedPrice(), photoIds.size()));
+        ImportPhotoPolicy.needsPhotos(
+            item.getDecision(), item.getSuggestedPrice(), photoIds.size()));
   }
 
   private static String totalSuggestedPrice(List<ImportRowItem> keepRows) {

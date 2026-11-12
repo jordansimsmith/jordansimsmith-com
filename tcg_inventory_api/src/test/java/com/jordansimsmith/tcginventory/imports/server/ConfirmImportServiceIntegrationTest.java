@@ -10,9 +10,9 @@ import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.queue.FakeQueueClient;
 import com.jordansimsmith.queue.QueueClient;
-import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ConflictException;
 import com.jordansimsmith.service.NotFoundException;
+import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceException;
 import com.jordansimsmith.tcginventory.games.client.FakeGamesService;
 import com.jordansimsmith.tcginventory.imports.client.ConfirmImportRequest;
@@ -31,8 +31,8 @@ import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
-import software.amazon.awssdk.services.dynamodb.model.ConditionalCheckFailedException;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
+import software.amazon.awssdk.services.dynamodb.model.ConditionalCheckFailedException;
 import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
 
 @Testcontainers
@@ -221,7 +221,9 @@ class ConfirmImportServiceIntegrationTest {
     }
 
     assertThatThrownBy(
-            () -> service.confirmImport(new RequestContext(USER), new ConfirmImportRequest(IMPORT_ID)))
+            () ->
+                service.confirmImport(
+                    new RequestContext(USER), new ConfirmImportRequest(IMPORT_ID)))
         .isInstanceOf(ConflictException.class)
         .hasMessage("1 rows need photos before confirm");
     assertThat(queue.getMessages()).isEmpty();

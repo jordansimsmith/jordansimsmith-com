@@ -48,7 +48,6 @@ COMMON_DEPS = [
     "@maven//:com_fasterxml_jackson_core_jackson_annotations",
     "@maven//:com_fasterxml_jackson_core_jackson_core",
     "@maven//:com_fasterxml_jackson_core_jackson_databind",
-    "@maven//:com_fasterxml_jackson_dataformat_jackson_dataformat_csv",
     "@maven//:com_google_code_findbugs_jsr305",
     "@maven//:com_google_guava_guava",
     "@maven//:org_slf4j_slf4j_api",
@@ -176,22 +175,6 @@ java_library(
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/imports/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/inventory/client",
-    ] + COMMON_DEPS,
-)
-
-java_library(
-    name = "import-lib",
-    srcs = glob(
-        ["src/main/java/com/jordansimsmith/tcginventory/imports/*.java"],
-        exclude = ["src/main/java/com/jordansimsmith/tcginventory/imports/*Handler.java"],
-    ),
-    deps = [
-        ":lib",
-        "//lib/service",
-        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/client",
-        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
-        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/inventory/client",
-        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/client",
     ] + COMMON_DEPS,
 )
 
@@ -461,13 +444,11 @@ java_binary(
     ],
     deps = [
         ":catalog-lib",
-        ":import-lib",
         ":lib",
         ":scan-lib",
         "//lib/queue:lib",
         "//lib/service",
         "//lib/time:lib",
-        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/inventory/client",
         "@maven//:ch_qos_logback_logback_classic",
         "@maven//:ch_qos_logback_logback_core",
         "@maven//:com_amazonaws_aws_lambda_java_core",
@@ -525,7 +506,6 @@ java_library(
     ],
     deps = [
         ":catalog-lib",
-        ":import-lib",
         ":lib",
         ":scan-lib",
         "//lib/dynamodb:test-lib",
@@ -591,7 +571,6 @@ java_test_suite(
         ":find-catalog-alternatives-handler",
         ":find-catalog-cards-handler",
         ":get-catalog-card-handler",
-        ":import-lib",
         ":lib",
         ":scan-lib",
         ":test-lib",
@@ -669,7 +648,6 @@ java_test_suite(
         ":get-catalog-card-handler",
         ":get-scan-handler",
         ":identify-scan-handler",
-        ":import-lib",
         ":jobs-handler",
         ":lib",
         ":scan-lib",
@@ -813,7 +791,6 @@ java_test_suite(
     runtime_deps = JUNIT5_DEPS,
     deps = [
         ":catalog-lib",
-        ":import-lib",
         ":lib",
         ":scan-lib",
         ":test-lib",

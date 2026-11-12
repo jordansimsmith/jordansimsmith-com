@@ -35,7 +35,8 @@ class ConfirmImportServiceTest {
     var queue = new FakeQueueClient<ImportMessage>();
     var parent = parent("review");
     when(reads.getImport(USER, IMPORT_ID)).thenReturn(parent);
-    when(reads.findRows(USER, IMPORT_ID)).thenReturn(List.of(row(1, ImportDecision.KEEP, null, "19.99")));
+    when(reads.findRows(USER, IMPORT_ID))
+        .thenReturn(List.of(row(1, ImportDecision.KEEP, null, "19.99")));
     var service = new ConfirmImportService(reads, writes, queue, () -> NOW);
 
     service.confirmImport(new RequestContext(USER), new ConfirmImportRequest(IMPORT_ID));
@@ -62,7 +63,8 @@ class ConfirmImportServiceTest {
 
     verify(reads, never()).findRows(USER, IMPORT_ID);
     verify(writes, never()).startConfirmation(USER, IMPORT_ID, NOW);
-    verify(queue, never()).send(ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any());
+    verify(queue, never())
+        .send(ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any());
   }
 
   @Test
@@ -82,7 +84,8 @@ class ConfirmImportServiceTest {
         .isInstanceOf(ConflictException.class)
         .hasMessage("import is not in review status");
     verify(reads, times(2)).getImport(USER, IMPORT_ID);
-    verify(writes, never()).startConfirmation(ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any());
+    verify(writes, never())
+        .startConfirmation(ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any());
   }
 
   @Test
@@ -103,11 +106,15 @@ class ConfirmImportServiceTest {
     var service = new ConfirmImportService(reads, writes, queue, () -> NOW);
 
     assertThatThrownBy(
-            () -> service.confirmImport(new RequestContext(USER), new ConfirmImportRequest(IMPORT_ID)))
+            () ->
+                service.confirmImport(
+                    new RequestContext(USER), new ConfirmImportRequest(IMPORT_ID)))
         .isInstanceOf(ConflictException.class)
         .hasMessage("2 rows need photos before confirm");
-    verify(writes, never()).startConfirmation(ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any());
-    verify(queue, never()).send(ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any());
+    verify(writes, never())
+        .startConfirmation(ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any());
+    verify(queue, never())
+        .send(ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any());
   }
 
   @Test
@@ -159,11 +166,18 @@ class ConfirmImportServiceTest {
     var service = new ConfirmImportService(reads, writes, queue, () -> NOW);
 
     assertThatThrownBy(
-            () -> service.confirmImport(new RequestContext(USER), new ConfirmImportRequest(IMPORT_ID)))
+            () ->
+                service.confirmImport(
+                    new RequestContext(USER), new ConfirmImportRequest(IMPORT_ID)))
         .isSameAs(failure);
     var order = inOrder(writes, queue);
     order.verify(writes).startConfirmation(USER, IMPORT_ID, NOW);
-    order.verify(queue).send(ArgumentMatchers.any(), ArgumentMatchers.eq(IMPORT_ID), ArgumentMatchers.eq(IMPORT_ID + "#confirm"));
+    order
+        .verify(queue)
+        .send(
+            ArgumentMatchers.any(),
+            ArgumentMatchers.eq(IMPORT_ID),
+            ArgumentMatchers.eq(IMPORT_ID + "#confirm"));
   }
 
   private static ImportItem parent(String status) {

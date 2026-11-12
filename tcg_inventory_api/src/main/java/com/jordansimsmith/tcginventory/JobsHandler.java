@@ -9,11 +9,6 @@ import com.jordansimsmith.queue.QueueClient;
 import com.jordansimsmith.service.ServiceException;
 import com.jordansimsmith.service.ServiceUnavailableException;
 import com.jordansimsmith.tcginventory.catalog.CatalogFactory;
-import com.jordansimsmith.tcginventory.imports.AppraiseJobProcessor;
-import com.jordansimsmith.tcginventory.imports.ImportConfirmationJobProcessor;
-import com.jordansimsmith.tcginventory.imports.ImportItem;
-import com.jordansimsmith.tcginventory.imports.ImportRowItem;
-import com.jordansimsmith.tcginventory.imports.ImportsRepository;
 import com.jordansimsmith.tcginventory.scans.ScanConfirmationJobProcessor;
 import com.jordansimsmith.tcginventory.scans.ScanItem;
 import com.jordansimsmith.tcginventory.scans.ScanRepository;
@@ -32,9 +27,7 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
   private final Clock clock;
   private final DynamoDbTable<JobItem> jobTable;
   private final QueueClient<JobMessage> jobsQueue;
-  private final JobProcessor appraiseJobProcessor;
   private final JobProcessor scanConfirmationJobProcessor;
-  private final JobProcessor importConfirmationJobProcessor;
 
   public JobsHandler() {
     this(CatalogFactory.create());
@@ -47,13 +40,6 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
     this.jobTable = factory.jobTable();
     this.jobsQueue = factory.jobsQueue();
     var enhancedClient = factory.dynamoDbEnhancedClient();
-    this.appraiseJobProcessor =
-        new AppraiseJobProcessor(
-            TcgInventoryTable.table(enhancedClient, ImportItem.class),
-            TcgInventoryTable.table(enhancedClient, ImportRowItem.class),
-            factory.clock(),
-            factory.fetchTcgService(),
-            factory.pricingService());
     this.scanConfirmationJobProcessor =
         new ScanConfirmationJobProcessor(
             new ScanRepository(
@@ -64,13 +50,6 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
             factory.catalogs(),
             factory.gamesService(),
             factory.importService());
-    this.importConfirmationJobProcessor =
-        new ImportConfirmationJobProcessor(
-            factory.clock(),
-            TcgInventoryTable.table(enhancedClient, ImportItem.class),
-            TcgInventoryTable.table(enhancedClient, ImportRowItem.class),
-            new ImportsRepository(factory.dynamoDbClient(), factory.jobTable()),
-            factory.inventoryService());
   }
 
   @Override
@@ -100,14 +79,15 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
       return;
     }
 
+    var processor = jobProcessor(message.jobType());
+
     if ("queued".equals(status)) {
       jobItem.setStatus("running");
       jobItem.setProcessedCount(0);
       jobItem.setUpdatedAt(clock.now());
-      jobTable.putItem(jobItem);
+      jobTable.updateItem(jobItem);
     }
 
-    var processor = jobProcessor(message.jobType());
     JobProcessor.JobResult result;
     try {
       result = processor.processBatch(message.user(), jobItem);
@@ -117,14 +97,14 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
       jobItem.setStatus("failed");
       jobItem.setError(e.getMessage());
       jobItem.setUpdatedAt(clock.now());
-      jobTable.putItem(jobItem);
+      jobTable.updateItem(jobItem);
       return;
     }
     if (result instanceof JobProcessor.FailureJobResult failure) {
       jobItem.setStatus("failed");
       jobItem.setError(failure.error());
       jobItem.setUpdatedAt(clock.now());
-      jobTable.putItem(jobItem);
+      jobTable.updateItem(jobItem);
       return;
     }
 
@@ -162,7 +142,7 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
     if (result.continuation() == null) {
       jobItem.setStatus("succeeded");
     }
-    jobTable.putItem(jobItem);
+    jobTable.updateItem(jobItem);
 
     if (result.continuation() != null) {
       jobsQueue.send(message, message.user(), message.deduplicationId(result.processedCount()));
@@ -171,9 +151,7 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
 
   private JobProcessor jobProcessor(String jobType) {
     return switch (jobType) {
-      case "appraise" -> appraiseJobProcessor;
       case "scan_confirmation" -> scanConfirmationJobProcessor;
-      case "import_confirmation" -> importConfirmationJobProcessor;
       default -> throw new IllegalArgumentException("unknown job type: " + jobType);
     };
   }

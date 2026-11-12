@@ -954,7 +954,6 @@ public class ScansHandlerIntegrationTest {
     assertThat(confirmationMessage.jobType()).isEqualTo("scan_confirmation");
     var confirmationJob = getJob(user, confirmationMessage.jobId());
     assertThat(confirmationJob.getScanId()).isEqualTo(scanId);
-    assertThat(confirmationJob.getImportId()).isNull();
     assertThat(getScanRow(user, scanId, 1).getSelectedExternalId())
         .isEqualTo("a9738cda-adb1-47fb-9f4c-ecd930228c4d");
     assertThat(getScanRow(user, scanId, 2).getSelectedExternalId())

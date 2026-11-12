@@ -50,12 +50,14 @@ class ConfirmImportHandlerTest {
     assertThat(response.getBody()).isNull();
     assertThat(response.getHeaders().get("Access-Control-Allow-Origin"))
         .isEqualTo("https://tcg-inventory.jordansimsmith.com");
-    verify(importService).confirmImport(new RequestContext("jordan"), new ConfirmImportRequest("opaque/id"));
+    verify(importService)
+        .confirmImport(new RequestContext("jordan"), new ConfirmImportRequest("opaque/id"));
   }
 
   @Test
   void missingPathParameterShouldBeValidatedByService() throws Exception {
-    when(importService.confirmImport(any(), any())).thenThrow(new BadRequestException("import_id is required"));
+    when(importService.confirmImport(any(), any()))
+        .thenThrow(new BadRequestException("import_id is required"));
 
     var response = handler.handleRequest(event(null), null);
 

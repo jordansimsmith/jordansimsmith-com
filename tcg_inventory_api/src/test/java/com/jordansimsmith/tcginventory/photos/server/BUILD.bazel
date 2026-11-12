@@ -22,6 +22,7 @@ java_test_suite(
         "@maven//:org_mockito_mockito_core",
         "@maven//:org_testcontainers_junit_jupiter",
         "@maven//:software_amazon_awssdk_auth",
+        "@maven//:software_amazon_awssdk_aws_crt_client",
         "@maven//:software_amazon_awssdk_regions",
         "@maven//:software_amazon_awssdk_s3",
     ],
