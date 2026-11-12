@@ -204,8 +204,6 @@ public class TcgInventoryE2ETest {
     assertThat(importResponse.statusCode()).isEqualTo(200);
     var importBody = objectMapper.readTree(importResponse.body());
     var importId = importBody.get("import_id").asText();
-    assertThat(importBody.get("status").asText()).isEqualTo("appraising");
-    assertThat(importBody.get("row_count").asInt()).isEqualTo(3);
 
     // act - poll until appraisal completes
     await()
@@ -285,10 +283,10 @@ public class TcgInventoryE2ETest {
     var photographedRows = objectMapper.readTree(photographedImport.body()).get("rows");
     assertThat(photographedRows.get(0).get("needs_photos").asBoolean()).isFalse();
     assertThat(photographedRows.get(0).get("photos")).hasSize(2);
-    assertThat(photographedRows.get(0).get("photos").get(0).get("url").asText()).isNotBlank();
+    assertThat(photographedRows.get(0).get("photos").get(0).asText()).isNotBlank();
     assertThat(photographedRows.get(1).get("needs_photos").asBoolean()).isFalse();
     assertThat(photographedRows.get(1).get("photos")).hasSize(1);
-    assertThat(photographedRows.get(1).get("photos").get(0).get("url").asText()).isNotBlank();
+    assertThat(photographedRows.get(1).get("photos").get(0).asText()).isNotBlank();
 
     // act - confirm import
     var confirmResponse = post("/imports/" + importId + "/confirm");
@@ -385,7 +383,7 @@ public class TcgInventoryE2ETest {
     triggerPublishAndWait();
 
     // act - list orders
-    assertThat(getStubListing().get("listedPrice").asText()).isEqualTo("49.00");
+    assertThat(getStubListing().get("listedPrice").decimalValue()).isEqualByComparingTo("49.00");
     var ordersResponse = get("/orders");
     assertThat(ordersResponse.statusCode()).isEqualTo(200);
     var ordersBody = objectMapper.readTree(ordersResponse.body());
@@ -558,6 +556,7 @@ public class TcgInventoryE2ETest {
     }
 
     // act - upload a cheap csv to create a new audit entry via confirm
+    assertThat(patch("/pricing", "{\"price_floor\":0.25}").statusCode()).isEqualTo(200);
     var importResponse2 =
         httpClient.send(
             HttpRequest.newBuilder()

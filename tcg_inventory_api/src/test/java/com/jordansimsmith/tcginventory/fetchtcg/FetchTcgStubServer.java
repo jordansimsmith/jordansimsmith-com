@@ -19,12 +19,12 @@ public final class FetchTcgStubServer {
 
   private static final String SEARCH_RESPONSE =
       """
-      {"searchResults":{"content":[{"id":"mtg_168_c_dom_normal"}]}}\
+      {"searchResults":{"number":0,"size":100,"last":true,"content":[{"id":"mtg_168_c_dom_normal"}]}}\
       """;
 
   private static final String HIT_SEARCH_RESPONSE =
       """
-      {"searchResults":{"content":[{"id":"mtg_hit_c_dom_normal"}]}}\
+      {"searchResults":{"number":0,"size":100,"last":true,"content":[{"id":"mtg_hit_c_dom_normal"}]}}\
       """;
 
   private static final String CARD_RESPONSE =
@@ -41,17 +41,17 @@ public final class FetchTcgStubServer {
 
   private static final String LISTINGS_RESPONSE =
       """
-      {"searchResults":{"content":[]}}\
+      {"searchResults":{"number":0,"size":100,"last":true,"content":[]}}\
       """;
 
   private static final String HIT_LISTINGS_RESPONSE =
       """
-      {"searchResults":{"content":[{"id":900010,"condition":"raw-nm","listedPrice":40.00,"sellerProfileName":"jordan"},{"id":900011,"condition":"raw-nm","listedPrice":50.00,"sellerProfileName":"rival"}]}}\
+      {"searchResults":{"number":0,"size":100,"last":true,"content":[{"id":900010,"condition":"raw-nm","listedPriceInRequestedCurrency":40.00,"sellerProfileName":"jordan"},{"id":900011,"condition":"raw-nm","listedPriceInRequestedCurrency":50.00,"sellerProfileName":"rival"}]}}\
       """;
 
   private static final String SELLER_OFFERS_EMPTY =
       """
-      {"content":[],"number":0,"size":100,"last":true,"number":0,"size":100,"last":true,"totalPages":1}\
+      {"content":[],"number":0,"size":100,"last":true,"totalPages":1}\
       """;
 
   private static final String PROFILE_RESPONSE = "{\"username\":\"jordan\"}";

@@ -307,6 +307,7 @@ lambdas = {
         "timeout": 900,
         "environment": {
             "FETCHTCG_BASE_URL": os.environ.get("FETCHTCG_BASE_URL", ""),
+            "FIREBASE_TOKEN_URL": os.environ.get("FIREBASE_TOKEN_URL", ""),
         },
     },
     "orders_worker": {
