@@ -5,6 +5,7 @@ java_test_suite(
     srcs = [
         "AppraisalMessageHandlerTest.java",
         "AppraisalResolverTest.java",
+        "ConfirmImportServiceTest.java",
         "ImportConfirmationMessageHandlerTest.java",
         "ManaBoxCsvParserTest.java",
     ],
@@ -12,6 +13,7 @@ java_test_suite(
     test_suffixes = ["Test.java"],
     runtime_deps = JUNIT5_DEPS,
     deps = [
+        "//lib/queue:lib",
         "//lib/queue:test-lib",
         "//lib/service",
         "//lib/time:lib",
@@ -37,6 +39,7 @@ java_test_suite(
     srcs = [
         "AppraisalProcessingIntegrationTest.java",
         "CreateImportServiceIntegrationTest.java",
+        "ConfirmImportServiceIntegrationTest.java",
         "ImportConfirmationProcessingIntegrationTest.java",
         "ImportReadServiceIntegrationTest.java",
         "ImportReviewServiceIntegrationTest.java",

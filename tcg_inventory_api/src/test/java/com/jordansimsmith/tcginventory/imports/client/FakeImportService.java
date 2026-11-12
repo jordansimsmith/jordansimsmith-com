@@ -8,6 +8,8 @@ import com.jordansimsmith.service.ServiceException;
 import com.jordansimsmith.tcginventory.photos.client.CreatePhotoRequest;
 import com.jordansimsmith.tcginventory.photos.client.DeletePhotoRequest;
 import com.jordansimsmith.tcginventory.photos.client.PhotosService;
+import com.jordansimsmith.tcginventory.imports.client.ConfirmImportRequest;
+import com.jordansimsmith.tcginventory.imports.client.ConfirmImportResponse;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -240,6 +242,45 @@ public class FakeImportService implements ImportService {
     }
     imports.remove(key);
     return new DeleteImportResponse();
+  }
+
+  @Override
+  public ConfirmImportResponse confirmImport(RequestContext ctx, ConfirmImportRequest request)
+      throws ServiceException {
+    if (request.importId() == null || request.importId().isBlank()) {
+      throw new BadRequestException("import_id is required");
+    }
+    var key = new UserImport(ctx.user(), request.importId());
+    var importDetail = imports.get(key);
+    if (importDetail == null) {
+      throw new NotFoundException("Not Found");
+    }
+    if (importDetail.status() == ImportStatus.CONFIRMING
+        || importDetail.status() == ImportStatus.CONFIRMED) {
+      return new ConfirmImportResponse();
+    }
+    if (importDetail.status() != ImportStatus.REVIEW) {
+      throw new ConflictException("import is not in review status");
+    }
+    var rowsNeedingPhotos =
+        importDetail.rows().stream().filter(ImportRow::needsPhotos).count();
+    if (rowsNeedingPhotos > 0) {
+      throw new ConflictException(rowsNeedingPhotos + " rows need photos before confirm");
+    }
+    imports.put(
+        key,
+        new GetImportResponse(
+            importDetail.importId(),
+            importDetail.game(),
+            importDetail.filename(),
+            ImportStatus.CONFIRMING,
+            importDetail.rowCount(),
+            importDetail.createdAt(),
+            importDetail.totalSuggestedPrice(),
+            importDetail.unitCount(),
+            importDetail.placementInstructions(),
+            importDetail.rows()));
+    return new ConfirmImportResponse();
   }
 
   public void seedImport(String user, GetImportResponse importDetail) {

@@ -19,6 +19,7 @@ import com.jordansimsmith.tcginventory.TcgInventoryFactory;
 import com.jordansimsmith.tcginventory.imports.client.CreateImportResponse;
 import com.jordansimsmith.tcginventory.imports.client.ImportService;
 import com.jordansimsmith.ulid.UlidGenerator;
+import java.util.HashMap;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -92,7 +93,7 @@ class CreateImportHandlerTest {
 
   private static APIGatewayV2HTTPEvent event(
       String game, String filename, String body, String contentType) {
-    var query = new java.util.HashMap<String, String>();
+    var query = new HashMap<String, String>();
     if (game != null) {
       query.put("game", game);
     }

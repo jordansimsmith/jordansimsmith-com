@@ -152,7 +152,7 @@
         "confirm_scan": "//tcg_inventory_api:confirm-scan-handler_deploy.jar",
         "delete_scan_row": "//tcg_inventory_api:delete-scan-row-handler_deploy.jar",
         "delete_scan": "//tcg_inventory_api:delete-scan-handler_deploy.jar",
-        "confirm_import": "//tcg_inventory_api:confirm-import-handler_deploy.jar",
+        "confirm_import": "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/imports/api:confirm-import-handler_deploy.jar",
         "update_import_row": "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/imports/api:update-import-row-handler_deploy.jar",
         "delete_import_row": "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/imports/api:delete-import-row-handler_deploy.jar",
         "create_import_row_photo": "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/imports/api:create-import-row-photo-handler_deploy.jar",

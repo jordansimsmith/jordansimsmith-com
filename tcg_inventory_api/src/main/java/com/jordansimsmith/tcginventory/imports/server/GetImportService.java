@@ -17,8 +17,6 @@ import java.util.List;
 import java.util.Locale;
 
 public class GetImportService {
-  private static final BigDecimal PHOTO_PRICE_THRESHOLD = new BigDecimal("20");
-
   private final ImportReadRepository importReadRepository;
 
   public GetImportService(ImportReadRepository importReadRepository) {
@@ -78,14 +76,7 @@ public class GetImportService {
         item.getMarketPrice(),
         item.getSuggestedPrice(),
         photoIds,
-        needsPhotos(item, photoIds.size()));
-  }
-
-  private static boolean needsPhotos(ImportRowItem item, int photoCount) {
-    return "keep".equals(item.getDecision())
-        && item.getSuggestedPrice() != null
-        && photoCount == 0
-        && new BigDecimal(item.getSuggestedPrice()).compareTo(PHOTO_PRICE_THRESHOLD) >= 0;
+        ImportPhotoPolicy.needsPhotos(item.getDecision(), item.getSuggestedPrice(), photoIds.size()));
   }
 
   private static String totalSuggestedPrice(List<ImportRowItem> keepRows) {

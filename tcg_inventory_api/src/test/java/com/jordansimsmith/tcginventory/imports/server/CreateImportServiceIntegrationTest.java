@@ -9,6 +9,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
@@ -16,6 +17,7 @@ import com.jordansimsmith.queue.FakeQueueClient;
 import com.jordansimsmith.queue.QueueClient;
 import com.jordansimsmith.service.BadRequestException;
 import com.jordansimsmith.service.RequestContext;
+import com.jordansimsmith.service.ServiceException;
 import com.jordansimsmith.tcginventory.games.client.FakeGamesService;
 import com.jordansimsmith.tcginventory.games.client.GetGameRequest;
 import com.jordansimsmith.tcginventory.games.client.GetGameResponse;
@@ -29,6 +31,7 @@ import com.jordansimsmith.ulid.FakeUlidGenerator;
 import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
@@ -280,7 +283,7 @@ class CreateImportServiceIntegrationTest {
             new RequestContext("alice"),
             new CreateImportRequest("operation-queue", "unsupported", "bad csv", null, null));
     assertThat(replay.importId()).isEqualTo(receipt.getImportId());
-    org.mockito.Mockito.verify(failingQueue).send(any(), anyString(), anyString());
+    verify(failingQueue).send(any(), anyString(), anyString());
   }
 
   @Test
@@ -310,7 +313,8 @@ class CreateImportServiceIntegrationTest {
   }
 
   @Test
-  void competingAdmissionsCommitOnlyOneReceiptAndParent() throws Exception {
+  void competingAdmissionsCommitOnlyOneReceiptAndParent()
+      throws ExecutionException, InterruptedException, ServiceException {
     var bothReadReceipt = new CountDownLatch(2);
     var games = spy(new FakeGamesService());
     doAnswer(

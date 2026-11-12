@@ -239,7 +239,7 @@ lambdas = {
         "zip_file": "delete-import-handler_deploy.jar",
     },
     "confirm_import": {
-        "handler": "com.jordansimsmith.tcginventory.imports.ConfirmImportHandler",
+        "handler": "com.jordansimsmith.tcginventory.imports.api.ConfirmImportHandler",
         "zip_file": "confirm-import-handler_deploy.jar",
     },
     "create_scan": {

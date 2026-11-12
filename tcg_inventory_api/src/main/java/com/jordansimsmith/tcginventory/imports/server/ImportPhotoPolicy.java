@@ -1,0 +1,16 @@
+package com.jordansimsmith.tcginventory.imports.server;
+
+import java.math.BigDecimal;
+import javax.annotation.Nullable;
+
+public class ImportPhotoPolicy {
+  private static final BigDecimal PHOTO_PRICE_THRESHOLD = new BigDecimal("20");
+
+  public static boolean needsPhotos(
+      @Nullable String decision, @Nullable String suggestedPrice, int photoCount) {
+    return "keep".equals(decision)
+        && suggestedPrice != null
+        && photoCount == 0
+        && new BigDecimal(suggestedPrice).compareTo(PHOTO_PRICE_THRESHOLD) >= 0;
+  }
+}

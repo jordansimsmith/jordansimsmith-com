@@ -169,6 +169,26 @@ public class ImportMutationRepository {
             .build());
   }
 
+  public void startConfirmation(String user, String importId, Instant now) {
+    dynamoDbClient.updateItem(
+        UpdateItemRequest.builder()
+            .tableName(tableName)
+            .key(
+                Map.of(
+                    ImportItem.PK, AttributeValue.fromS(ImportItem.formatPk(user)),
+                    ImportItem.SK, AttributeValue.fromS(ImportItem.formatSk(importId))))
+            .updateExpression("SET #status = :confirming, #updatedAt = :updatedAt")
+            .conditionExpression("attribute_exists(pk) AND #status = :review")
+            .expressionAttributeNames(
+                Map.of("#status", ImportItem.STATUS, "#updatedAt", ImportItem.UPDATED_AT))
+            .expressionAttributeValues(
+                Map.of(
+                    ":review", AttributeValue.fromS("review"),
+                    ":confirming", AttributeValue.fromS("confirming"),
+                    ":updatedAt", AttributeValue.fromN(Long.toString(now.getEpochSecond()))))
+            .build());
+  }
+
   public void checkpointAppraisal(
       String user, String importId, int expectedPosition, int position, Instant now) {
     dynamoDbClient.updateItem(

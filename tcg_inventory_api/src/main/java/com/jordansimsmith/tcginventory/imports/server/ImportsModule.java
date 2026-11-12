@@ -8,6 +8,8 @@ import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
 import com.jordansimsmith.tcginventory.games.client.GamesService;
 import com.jordansimsmith.tcginventory.imports.client.CreateImportRequest;
 import com.jordansimsmith.tcginventory.imports.client.CreateImportResponse;
+import com.jordansimsmith.tcginventory.imports.client.ConfirmImportRequest;
+import com.jordansimsmith.tcginventory.imports.client.ConfirmImportResponse;
 import com.jordansimsmith.tcginventory.imports.client.CreateImportRowPhotoRequest;
 import com.jordansimsmith.tcginventory.imports.client.CreateImportRowPhotoResponse;
 import com.jordansimsmith.tcginventory.imports.client.DeleteImportRequest;
@@ -94,6 +96,9 @@ public class ImportsModule {
     var deleteImportRowPhotoService =
         new DeleteImportRowPhotoService(
             importReadRepository, importMutationRepository, photosService);
+    var confirmImportService =
+        new ConfirmImportService(
+            importReadRepository, importMutationRepository, importsQueue, clock);
     return new ImportService() {
       @Override
       public CreateImportResponse createImport(RequestContext ctx, CreateImportRequest request)
@@ -141,6 +146,12 @@ public class ImportsModule {
       public DeleteImportRowPhotoResponse deleteImportRowPhoto(
           RequestContext ctx, DeleteImportRowPhotoRequest request) throws ServiceException {
         return deleteImportRowPhotoService.deleteImportRowPhoto(ctx, request);
+      }
+
+      @Override
+      public ConfirmImportResponse confirmImport(RequestContext ctx, ConfirmImportRequest request)
+          throws ServiceException {
+        return confirmImportService.confirmImport(ctx, request);
       }
     };
   }

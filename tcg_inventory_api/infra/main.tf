@@ -133,7 +133,7 @@ module "java_api" {
       artifact = var.artifacts["delete_import"]
     }
     confirm_import = {
-      handler  = "com.jordansimsmith.tcginventory.imports.ConfirmImportHandler"
+      handler  = "com.jordansimsmith.tcginventory.imports.api.ConfirmImportHandler"
       artifact = var.artifacts["confirm_import"]
     }
     create_scan = {
