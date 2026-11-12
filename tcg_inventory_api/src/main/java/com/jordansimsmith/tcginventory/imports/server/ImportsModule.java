@@ -1,16 +1,18 @@
 package com.jordansimsmith.tcginventory.imports.server;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jordansimsmith.queue.QueueClient;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceException;
+import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
 import com.jordansimsmith.tcginventory.imports.client.CreateImportRowPhotoRequest;
 import com.jordansimsmith.tcginventory.imports.client.CreateImportRowPhotoResponse;
 import com.jordansimsmith.tcginventory.imports.client.DeleteImportRequest;
 import com.jordansimsmith.tcginventory.imports.client.DeleteImportResponse;
-import com.jordansimsmith.tcginventory.imports.client.DeleteImportRowRequest;
-import com.jordansimsmith.tcginventory.imports.client.DeleteImportRowResponse;
 import com.jordansimsmith.tcginventory.imports.client.DeleteImportRowPhotoRequest;
 import com.jordansimsmith.tcginventory.imports.client.DeleteImportRowPhotoResponse;
+import com.jordansimsmith.tcginventory.imports.client.DeleteImportRowRequest;
+import com.jordansimsmith.tcginventory.imports.client.DeleteImportRowResponse;
 import com.jordansimsmith.tcginventory.imports.client.FindImportsRequest;
 import com.jordansimsmith.tcginventory.imports.client.FindImportsResponse;
 import com.jordansimsmith.tcginventory.imports.client.GetImportRequest;
@@ -19,6 +21,8 @@ import com.jordansimsmith.tcginventory.imports.client.ImportService;
 import com.jordansimsmith.tcginventory.imports.client.UpdateImportRowRequest;
 import com.jordansimsmith.tcginventory.imports.client.UpdateImportRowResponse;
 import com.jordansimsmith.tcginventory.photos.client.PhotosService;
+import com.jordansimsmith.tcginventory.pricing.client.PricingService;
+import com.jordansimsmith.time.Clock;
 import dagger.Module;
 import dagger.Provides;
 import javax.inject.Named;
@@ -100,5 +104,34 @@ public class ImportsModule {
         return deleteImportRowPhotoService.deleteImportRowPhoto(ctx, request);
       }
     };
+  }
+
+  @Provides
+  @Singleton
+  AppraisalMessageHandler appraisalMessageHandler(
+      DynamoDbEnhancedClient dynamoDbEnhancedClient,
+      DynamoDbClient dynamoDbClient,
+      @Named("tcgInventoryTableName") String tableName,
+      FetchTcgService fetchTcgService,
+      PricingService pricingService,
+      QueueClient<ImportMessage> importsQueue,
+      Clock clock) {
+    var importTable =
+        dynamoDbEnhancedClient.table(tableName, TableSchema.fromBean(ImportItem.class));
+    var importRowTable =
+        dynamoDbEnhancedClient.table(tableName, TableSchema.fromBean(ImportRowItem.class));
+    var importReadRepository = new ImportReadRepository(importTable, importRowTable);
+    var importMutationRepository = new ImportMutationRepository(dynamoDbClient, tableName);
+    var cardMatcher = new FetchTcgCardMatcher(fetchTcgService);
+    var resolver = new MagicTheGatheringAppraisalResolver(fetchTcgService, cardMatcher);
+    var resolverFactory = new AppraisalResolverFactory(resolver);
+    return new AppraisalMessageHandler(
+        importReadRepository,
+        importMutationRepository,
+        resolverFactory,
+        pricingService,
+        new AppraisalPolicy(),
+        importsQueue,
+        clock);
   }
 }

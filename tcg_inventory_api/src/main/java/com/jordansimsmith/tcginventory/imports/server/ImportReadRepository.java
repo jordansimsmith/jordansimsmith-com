@@ -44,6 +44,29 @@ public class ImportReadRepository {
     return importRowTable.query(request).stream().flatMap(page -> page.items().stream()).toList();
   }
 
+  public List<ImportRowItem> findAppraisalRows(
+      String user, String importId, int afterPosition, int throughPosition) {
+    if (afterPosition >= throughPosition) {
+      return List.of();
+    }
+    var request =
+        QueryEnhancedRequest.builder()
+            .queryConditional(
+                QueryConditional.sortBetween(
+                    Key.builder()
+                        .partitionValue(ImportRowItem.formatPk(user, importId))
+                        .sortValue(ImportRowItem.formatSk(afterPosition + 1))
+                        .build(),
+                    Key.builder()
+                        .partitionValue(ImportRowItem.formatPk(user, importId))
+                        .sortValue(ImportRowItem.formatSk(throughPosition))
+                        .build()))
+            .scanIndexForward(true)
+            .consistentRead(true)
+            .build();
+    return importRowTable.query(request).stream().flatMap(page -> page.items().stream()).toList();
+  }
+
   @Nullable
   public ImportRowItem getRow(String user, String importId, int position) {
     var key =

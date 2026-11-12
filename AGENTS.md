@@ -90,6 +90,7 @@ When performing the code review step, check for:
 - Do not catch and rethrow `ServiceException` just to pass it through. Let it propagate unless the current boundary must translate its meaning or handle it.
 - Let exceptions bubble up naturally when appropriate instead of unnecessarily catching them
 - Always use imports instead of fully qualified names (e.g., `import java.util.ArrayList;` instead of `java.util.ArrayList`)
+- Put `RequestContext` first in every method that accepts it.
 - When a signature gains a required parameter, update every call site; do not add an overload, default, or dummy wrapper to avoid touching existing callers
 - Keep DynamoDB item `create` methods as persistence mappers: accept attribute values as they should be stored, including precomputed IDs and their standalone fields. Do not pass domain objects into item creation to validate them or derive business IDs there; keep that logic in the caller. Item creation may derive persistence keys and initialize storage fields.
 - Members are public or private. Package-private is allowed only when annotated `@VisibleForTesting`

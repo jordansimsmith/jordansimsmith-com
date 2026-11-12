@@ -1,7 +1,11 @@
 package com.jordansimsmith.tcginventory.imports.server;
 
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.ConditionCheck;
@@ -10,6 +14,7 @@ import software.amazon.awssdk.services.dynamodb.model.DeleteItemRequest;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItem;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItemsRequest;
 import software.amazon.awssdk.services.dynamodb.model.Update;
+import software.amazon.awssdk.services.dynamodb.model.UpdateItemRequest;
 
 public class ImportMutationRepository {
   private final DynamoDbClient dynamoDbClient;
@@ -18,6 +23,119 @@ public class ImportMutationRepository {
   public ImportMutationRepository(DynamoDbClient dynamoDbClient, String tableName) {
     this.dynamoDbClient = dynamoDbClient;
     this.tableName = tableName;
+  }
+
+  public void recordAppraisal(
+      String user,
+      String importId,
+      int position,
+      String decision,
+      @Nullable String reason,
+      @Nullable String marketPrice,
+      @Nullable String suggestedPrice,
+      @Nullable String fetchTcgCardId,
+      @Nullable Integer fetchTcgSetId) {
+    var names = new HashMap<String, String>();
+    var values = new HashMap<String, AttributeValue>();
+    var assignments = new ArrayList<String>();
+    names.put("#decision", ImportRowItem.DECISION);
+    values.put(":decision", AttributeValue.fromS(decision));
+    assignments.add("#decision = :decision");
+    if (reason != null) {
+      names.put("#decisionReason", ImportRowItem.DECISION_REASON);
+      values.put(":decisionReason", AttributeValue.fromS(reason));
+      assignments.add("#decisionReason = :decisionReason");
+    }
+    if (marketPrice != null) {
+      names.put("#marketPrice", ImportRowItem.MARKET_PRICE);
+      values.put(":marketPrice", AttributeValue.fromS(marketPrice));
+      assignments.add("#marketPrice = :marketPrice");
+    }
+    if (suggestedPrice != null) {
+      names.put("#suggestedPrice", ImportRowItem.SUGGESTED_PRICE);
+      values.put(":suggestedPrice", AttributeValue.fromS(suggestedPrice));
+      assignments.add("#suggestedPrice = :suggestedPrice");
+    }
+    if (fetchTcgCardId != null) {
+      names.put("#fetchTcgCardId", ImportRowItem.FETCHTCG_CARD_ID);
+      values.put(":fetchTcgCardId", AttributeValue.fromS(fetchTcgCardId));
+      assignments.add("#fetchTcgCardId = :fetchTcgCardId");
+    }
+    if (fetchTcgSetId != null) {
+      names.put("#fetchTcgSetId", ImportRowItem.FETCHTCG_SET_ID);
+      values.put(":fetchTcgSetId", AttributeValue.fromN(fetchTcgSetId.toString()));
+      assignments.add("#fetchTcgSetId = :fetchTcgSetId");
+    }
+    dynamoDbClient.updateItem(
+        UpdateItemRequest.builder()
+            .tableName(tableName)
+            .key(
+                Map.of(
+                    ImportRowItem.PK,
+                    AttributeValue.fromS(ImportRowItem.formatPk(user, importId)),
+                    ImportRowItem.SK,
+                    AttributeValue.fromS(ImportRowItem.formatSk(position))))
+            .updateExpression("SET " + String.join(", ", assignments))
+            .conditionExpression("attribute_exists(pk)")
+            .expressionAttributeNames(names)
+            .expressionAttributeValues(values)
+            .build());
+  }
+
+  public void checkpointAppraisal(
+      String user, String importId, int expectedPosition, int position, Instant now) {
+    dynamoDbClient.updateItem(
+        UpdateItemRequest.builder()
+            .tableName(tableName)
+            .key(
+                Map.of(
+                    ImportItem.PK, AttributeValue.fromS(ImportItem.formatPk(user)),
+                    ImportItem.SK, AttributeValue.fromS(ImportItem.formatSk(importId))))
+            .updateExpression("SET #appraised = :position, #updatedAt = :updatedAt")
+            .conditionExpression(
+                "attribute_exists(pk) AND #status = :appraising AND #appraised = :expected "
+                    + "AND #appraised < :position")
+            .expressionAttributeNames(
+                Map.of(
+                    "#status", ImportItem.STATUS,
+                    "#appraised", ImportItem.APPRAISED_ROW_COUNT,
+                    "#updatedAt", ImportItem.UPDATED_AT))
+            .expressionAttributeValues(
+                Map.of(
+                    ":appraising", AttributeValue.fromS("appraising"),
+                    ":expected", AttributeValue.fromN(Integer.toString(expectedPosition)),
+                    ":position", AttributeValue.fromN(Integer.toString(position)),
+                    ":updatedAt", AttributeValue.fromN(Long.toString(now.getEpochSecond()))))
+            .build());
+  }
+
+  public void finishAppraisal(
+      String user, String importId, int expectedPosition, int position, Instant now) {
+    dynamoDbClient.updateItem(
+        UpdateItemRequest.builder()
+            .tableName(tableName)
+            .key(
+                Map.of(
+                    ImportItem.PK, AttributeValue.fromS(ImportItem.formatPk(user)),
+                    ImportItem.SK, AttributeValue.fromS(ImportItem.formatSk(importId))))
+            .updateExpression(
+                "SET #appraised = :position, #updatedAt = :updatedAt, #status = :review")
+            .conditionExpression(
+                "attribute_exists(pk) AND #status = :appraising AND #appraised = :expected "
+                    + "AND #appraised <= :position")
+            .expressionAttributeNames(
+                Map.of(
+                    "#status", ImportItem.STATUS,
+                    "#appraised", ImportItem.APPRAISED_ROW_COUNT,
+                    "#updatedAt", ImportItem.UPDATED_AT))
+            .expressionAttributeValues(
+                Map.of(
+                    ":appraising", AttributeValue.fromS("appraising"),
+                    ":expected", AttributeValue.fromN(Integer.toString(expectedPosition)),
+                    ":position", AttributeValue.fromN(Integer.toString(position)),
+                    ":updatedAt", AttributeValue.fromN(Long.toString(now.getEpochSecond())),
+                    ":review", AttributeValue.fromS("review")))
+            .build());
   }
 
   public void updateRowCondition(String user, String importId, int position, String condition) {

@@ -21,6 +21,8 @@ public class ImportItem {
   public static final String STATUS = "status";
   public static final String ROW_COUNT = "row_count";
   public static final String CREATED_AT = "created_at";
+  public static final String APPRAISED_ROW_COUNT = "appraised_row_count";
+  public static final String UPDATED_AT = "updated_at";
 
   private String pk;
   private String sk;
@@ -30,6 +32,8 @@ public class ImportItem {
   private String status;
   private Integer rowCount;
   private Instant createdAt;
+  private Integer appraisedRowCount;
+  private Instant updatedAt;
 
   @DynamoDbPartitionKey
   @DynamoDbAttribute(PK)
@@ -105,6 +109,27 @@ public class ImportItem {
 
   public void setCreatedAt(@Nullable Instant value) {
     createdAt = value;
+  }
+
+  @Nullable
+  @DynamoDbAttribute(APPRAISED_ROW_COUNT)
+  public Integer getAppraisedRowCount() {
+    return appraisedRowCount;
+  }
+
+  public void setAppraisedRowCount(@Nullable Integer value) {
+    appraisedRowCount = value;
+  }
+
+  @Nullable
+  @DynamoDbConvertedBy(EpochSecondConverter.class)
+  @DynamoDbAttribute(UPDATED_AT)
+  public Instant getUpdatedAt() {
+    return updatedAt;
+  }
+
+  public void setUpdatedAt(@Nullable Instant value) {
+    updatedAt = value;
   }
 
   public static String formatPk(String user) {

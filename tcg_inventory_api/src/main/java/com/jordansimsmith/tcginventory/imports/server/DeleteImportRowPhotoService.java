@@ -48,8 +48,7 @@ public class DeleteImportRowPhotoService {
     return new DeleteImportRowPhotoResponse();
   }
 
-  private static void checkRequest(DeleteImportRowPhotoRequest request)
-      throws BadRequestException {
+  private static void checkRequest(DeleteImportRowPhotoRequest request) throws BadRequestException {
     if (request.importId() == null || request.importId().isBlank()) {
       throw new BadRequestException("import_id is required");
     }
@@ -61,8 +60,8 @@ public class DeleteImportRowPhotoService {
     }
   }
 
-  private static ArrayList<ImportRowItem.Photo> removePhoto(
-      ImportRowItem row, String photoId) throws NotFoundException {
+  private static ArrayList<ImportRowItem.Photo> removePhoto(ImportRowItem row, String photoId)
+      throws NotFoundException {
     var remaining = new ArrayList<ImportRowItem.Photo>();
     var found = false;
     if (row.getPhotos() != null) {

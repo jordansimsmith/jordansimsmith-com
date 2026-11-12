@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -18,6 +19,7 @@ import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.tcginventory.TcgInventoryFactory;
 import com.jordansimsmith.tcginventory.imports.client.DeleteImportRowPhotoResponse;
 import com.jordansimsmith.tcginventory.imports.client.ImportService;
+import java.util.HashMap;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -52,7 +54,7 @@ class DeleteImportRowPhotoHandlerTest {
         .isEqualTo("https://tcg-inventory.jordansimsmith.com");
     verify(importService)
         .deleteImportRowPhoto(
-            new RequestContext("jordan"),
+            eq(new RequestContext("jordan")),
             argThat(
                 request ->
                     request.importId().equals("opaque/id")
@@ -61,7 +63,7 @@ class DeleteImportRowPhotoHandlerTest {
   }
 
   @Test
-  void malformedPositionReturnsBadRequestWithoutDelegation() {
+  void malformedPositionReturnsBadRequestWithoutDelegation() throws Exception {
     assertThat(handler.handleRequest(event("import-1", "bad", "photo-1"), null).getStatusCode())
         .isEqualTo(400);
     assertThat(handler.handleRequest(event("import-1", null, "photo-1"), null).getStatusCode())
@@ -74,8 +76,7 @@ class DeleteImportRowPhotoHandlerTest {
     when(importService.deleteImportRowPhoto(any(), any()))
         .thenThrow(new BadRequestException("photo_id is required"));
 
-    assertThat(
-            handler.handleRequest(event("import-1", "1", " "), null).getStatusCode())
+    assertThat(handler.handleRequest(event("import-1", "1", " "), null).getStatusCode())
         .isEqualTo(400);
   }
 
@@ -89,9 +90,8 @@ class DeleteImportRowPhotoHandlerTest {
         .hasCause(failure);
   }
 
-  private static APIGatewayV2HTTPEvent event(
-      String importId, String position, String photoId) {
-    var pathParameters = new java.util.HashMap<String, String>();
+  private static APIGatewayV2HTTPEvent event(String importId, String position, String photoId) {
+    var pathParameters = new HashMap<String, String>();
     pathParameters.put("import_id", importId);
     pathParameters.put("position", position);
     pathParameters.put("photo_id", photoId);

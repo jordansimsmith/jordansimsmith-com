@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -19,6 +20,7 @@ import com.jordansimsmith.tcginventory.TcgInventoryFactory;
 import com.jordansimsmith.tcginventory.imports.client.CreateImportRowPhotoResponse;
 import com.jordansimsmith.tcginventory.imports.client.ImportService;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -55,7 +57,7 @@ class CreateImportRowPhotoHandlerTest {
         .isEqualTo("https://tcg-inventory.jordansimsmith.com");
     verify(importService)
         .createImportRowPhoto(
-            new RequestContext("jordan"),
+            eq(new RequestContext("jordan")),
             argThat(
                 request ->
                     request.importId().equals("opaque/id")
@@ -64,7 +66,7 @@ class CreateImportRowPhotoHandlerTest {
   }
 
   @Test
-  void invalidTransportValuesReturnBadRequestWithoutDelegation() {
+  void invalidTransportValuesReturnBadRequestWithoutDelegation() throws Exception {
     assertThat(
             handler
                 .handleRequest(event("import-1", "1", "image/png", new byte[] {1}), null)
@@ -121,7 +123,7 @@ class CreateImportRowPhotoHandlerTest {
             .withHeaders(Map.of("Authorization", AUTH_HEADER, "content-type", contentType))
             .withPathParameters(pathParameters);
     if (bytes != null) {
-      builder.withBody(java.util.Base64.getEncoder().encodeToString(bytes));
+      builder.withBody(Base64.getEncoder().encodeToString(bytes));
     }
     return builder.build();
   }

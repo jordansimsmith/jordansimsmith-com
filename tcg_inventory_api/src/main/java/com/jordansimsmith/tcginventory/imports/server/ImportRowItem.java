@@ -22,8 +22,11 @@ public class ImportRowItem {
   public static final String FINISH = "finish";
   public static final String CONDITION = "condition";
   public static final String EXTERNAL_ID = "external_id";
+  public static final String LANGUAGE = "language";
   public static final String DECISION = "decision";
   public static final String DECISION_REASON = "decision_reason";
+  public static final String FETCHTCG_CARD_ID = "fetchtcg_card_id";
+  public static final String FETCHTCG_SET_ID = "fetchtcg_set_id";
   public static final String MARKET_PRICE = "market_price";
   public static final String SUGGESTED_PRICE = "suggested_price";
   public static final String PHOTOS = "photos";
@@ -41,8 +44,11 @@ public class ImportRowItem {
   private String finish;
   private String condition;
   private String externalId;
+  private String language;
   private String decision;
   private String decisionReason;
+  private String fetchtcgCardId;
+  private Integer fetchtcgSetId;
   private String marketPrice;
   private String suggestedPrice;
   private List<Photo> photos;
@@ -142,6 +148,15 @@ public class ImportRowItem {
     externalId = value;
   }
 
+  @DynamoDbAttribute(LANGUAGE)
+  public String getLanguage() {
+    return language;
+  }
+
+  public void setLanguage(@Nullable String value) {
+    language = value;
+  }
+
   @DynamoDbAttribute(DECISION)
   public String getDecision() {
     return decision;
@@ -158,6 +173,26 @@ public class ImportRowItem {
 
   public void setDecisionReason(@Nullable String value) {
     decisionReason = value;
+  }
+
+  @Nullable
+  @DynamoDbAttribute(FETCHTCG_CARD_ID)
+  public String getFetchtcgCardId() {
+    return fetchtcgCardId;
+  }
+
+  public void setFetchtcgCardId(@Nullable String value) {
+    fetchtcgCardId = value;
+  }
+
+  @Nullable
+  @DynamoDbAttribute(FETCHTCG_SET_ID)
+  public Integer getFetchtcgSetId() {
+    return fetchtcgSetId;
+  }
+
+  public void setFetchtcgSetId(@Nullable Integer value) {
+    fetchtcgSetId = value;
   }
 
   @DynamoDbAttribute(MARKET_PRICE)
