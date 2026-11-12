@@ -470,7 +470,7 @@ java_binary(
 java_binary(
     name = "firebase-stub-server",
     testonly = True,
-    srcs = ["src/test/java/com/jordansimsmith/tcginventory/FirebaseStubServer.java"],
+    srcs = ["src/test/java/com/jordansimsmith/tcginventory/fetchtcg/FirebaseStubServer.java"],
     create_executable = False,
 )
 

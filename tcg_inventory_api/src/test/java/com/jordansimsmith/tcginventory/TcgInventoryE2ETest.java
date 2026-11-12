@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.tcginventory.catalog.ScryfallStubContainer;
 import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgStubContainer;
+import com.jordansimsmith.tcginventory.fetchtcg.FirebaseStubContainer;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
