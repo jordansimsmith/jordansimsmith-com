@@ -1,26 +1,26 @@
-"""CollectorVision pins, cache metadata, downloads, and image macro."""
+"""CollectorVision cache metadata and Lambda image assembly."""
 
 load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load")
 load("@rules_pkg//:pkg.bzl", "pkg_tar")
-
-COLLECTORVISION_COMMIT = "2a122d00d25c8d112a90e47bf235a021e0c53b0c"
-COLLECTORVISION_SOURCE_URL = "https://github.com/HanClinto/CollectorVision"
-COLLECTORVISION_LICENSE_URL = "https://raw.githubusercontent.com/HanClinto/CollectorVision/{}/LICENSE".format(COLLECTORVISION_COMMIT)
-COLLECTORVISION_LICENSE_SHA256 = "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0"
-
-CATALOG_VERSION = 40
-CATALOG_ROWS = 113031
-CATALOG_SOURCE_UPDATED_AT = "2026-09-21T09:05:30.034Z"
-CATALOG_RECORDS_URL = "https://hanclinto.github.io/CollectorVisionCatalog/catalog-v2/scryfall-mtg/version/40/base/records.jsonl.gz"
-CATALOG_RECORDS_SIZE = 9043401
-CATALOG_RECORDS_SHA256 = "cd566e2d103c532c9e79644e152496a53494a9b04b3cd1a43c5baf3e8589bff9"
-CATALOG_EMBEDDINGS_URL = "https://hanclinto.github.io/CollectorVisionCatalog/catalog-v2/scryfall-mtg/version/40/base/embeddings.f16.gz"
-CATALOG_EMBEDDINGS_SIZE = 26451329
-CATALOG_EMBEDDINGS_SHA256 = "bbe2eab30e2db5d1c2811c2429cecb9435a6d537319bd82c521733407becdd40"
-
-MILO_URL = "https://raw.githubusercontent.com/HanClinto/CollectorVision/{}/collector_vision/weights/milo.onnx".format(COLLECTORVISION_COMMIT)
-MILO_SHA256 = "bd13d8d60383c69da04dce261f32e93fdaeaa8fd618fbc991e7385f71b3d45df"
-MILO_SIZE = 5191100
+load("@rules_pkg//pkg:mappings.bzl", "REMOVE_BASE_DIRECTORY", "pkg_attributes", "pkg_files")
+load("@rules_python//python:pip.bzl", "whl_filegroup")
+load(
+    "//third_party/collectorvision:pins.bzl",
+    "CATALOG_EMBEDDINGS_SHA256",
+    "CATALOG_EMBEDDINGS_SIZE",
+    "CATALOG_EMBEDDINGS_URL",
+    "CATALOG_RECORDS_SHA256",
+    "CATALOG_RECORDS_SIZE",
+    "CATALOG_RECORDS_URL",
+    "CATALOG_ROWS",
+    "CATALOG_SOURCE_UPDATED_AT",
+    "CATALOG_VERSION",
+    "COLLECTORVISION_COMMIT",
+    "COLLECTORVISION_SOURCE_URL",
+    "EMBEDDING",
+    "MILO_SHA256",
+    "MILO_SIZE",
+)
 
 _CATALOG_DESCRIPTOR = {
     "game": "magic-the-gathering",
@@ -31,20 +31,12 @@ _CATALOG_DESCRIPTOR = {
     "recommended": True,
 }
 
-_EMBEDDING = {
-    "model": "collectorvision@9d45a37ebfe40f22ece70507015645de134dc3ec:milo-1.0.0@sha256:{}".format(MILO_SHA256),
-    "dimensions": 128,
-    "dtype": "float16",
-    "byte_order": "little",
-    "layout": "row-major",
-}
-
 def _feed():
     return {
         "checked_at": CATALOG_SOURCE_UPDATED_AT,
         "families": {
             "milo1": {
-                "embedding": _EMBEDDING,
+                "embedding": EMBEDDING,
                 "catalogs": {
                     "scryfall/mtg": {
                         "public_name": "scryfall-mtg",
@@ -83,7 +75,7 @@ def _snapshot():
         "family": "milo1",
         "version": CATALOG_VERSION,
         "rows": CATALOG_ROWS,
-        "embedding": _EMBEDDING,
+        "embedding": EMBEDDING,
         "descriptor": _CATALOG_DESCRIPTOR,
         "metadata_loaded": True,
         "assets": {
@@ -115,58 +107,7 @@ collectorvision_cache = rule(
     },
 )
 
-def _download_impl(repository_ctx):
-    repository_ctx.download(
-        output = repository_ctx.attr.filename,
-        sha256 = repository_ctx.attr.sha256,
-        url = repository_ctx.attr.urls,
-    )
-    repository_ctx.file(
-        "BUILD.bazel",
-        "exports_files([\"{}\"])\n".format(repository_ctx.attr.filename),
-    )
-
-collectorvision_download = repository_rule(
-    implementation = _download_impl,
-    attrs = {
-        "filename": attr.string(mandatory = True),
-        "sha256": attr.string(mandatory = True),
-        "urls": attr.string_list(mandatory = True),
-    },
-)
-
-def _repositories(module_ctx):
-    collectorvision_download(
-        name = "collectorvision_catalog_records",
-        filename = "records.jsonl.gz",
-        sha256 = CATALOG_RECORDS_SHA256,
-        urls = [CATALOG_RECORDS_URL],
-    )
-    collectorvision_download(
-        name = "collectorvision_catalog_embeddings",
-        filename = "embeddings.f16.gz",
-        sha256 = CATALOG_EMBEDDINGS_SHA256,
-        urls = [CATALOG_EMBEDDINGS_URL],
-    )
-    collectorvision_download(
-        name = "collectorvision_milo",
-        filename = "milo.onnx",
-        sha256 = MILO_SHA256,
-        urls = [MILO_URL],
-    )
-    collectorvision_download(
-        name = "collectorvision_license",
-        filename = "LICENSE",
-        sha256 = COLLECTORVISION_LICENSE_SHA256,
-        urls = [COLLECTORVISION_LICENSE_URL],
-    )
-
-collectorvision = module_extension(
-    implementation = _repositories,
-    tag_classes = {},
-)
-
-def collectorvision_image(name, base, handler, repo_tag):
+def collectorvision_image(name, base, handler, repo_tag, application_files):
     """Define the CollectorVision Lambda image and its minimal offline entrypoint."""
     cache_metadata = name + "-cache-metadata"
     cache_layer = name + "-cache"
@@ -204,11 +145,20 @@ def collectorvision_image(name, base, handler, repo_tag):
         "urllib3",
     ]:
         package_layer = name + "-" + package.replace("_", "-") + "-dependencies"
+        whl_filegroup(
+            name = package_layer + "-wheel",
+            whl = "@pypi//{}:whl".format(package),
+        )
+        pkg_files(
+            name = package_layer + "-files",
+            srcs = [":" + package_layer + "-wheel"],
+            attributes = pkg_attributes(mode = "0555"),
+            prefix = "var/task",
+            renames = {":" + package_layer + "-wheel": REMOVE_BASE_DIRECTORY},
+        )
         pkg_tar(
             name = package_layer,
-            srcs = ["@pypi//{}:extracted_whl_files".format(package)],
-            package_dir = "/var/task",
-            strip_prefix = "/external/rules_python++pip+pypi_312_{}/site-packages".format(package),
+            srcs = [":" + package_layer + "-files"],
         )
         python_package_layers.append(":" + package_layer)
 
@@ -220,10 +170,7 @@ def collectorvision_image(name, base, handler, repo_tag):
 
     pkg_tar(
         name = application,
-        files = {
-            "src/main/python/tcg_inventory_scan_worker/__init__.py": "tcg_inventory_scan_worker/__init__.py",
-            "src/main/python/tcg_inventory_scan_worker/worker.py": "tcg_inventory_scan_worker/worker.py",
-        },
+        files = application_files,
         package_dir = "/var/task",
     )
 
@@ -231,9 +178,9 @@ def collectorvision_image(name, base, handler, repo_tag):
         name = cache_layer,
         files = {
             ":" + name + "-feed.json": "catalog-v2/feed.json",
-            ":" + name + "-snapshot.json": "catalog-v2/snapshots/milo1--scryfall--mtg/metadata/version-40/snapshot.json",
-            "@collectorvision_catalog_records//:records.jsonl.gz": "catalog-v2/snapshots/milo1--scryfall--mtg/metadata/version-40/records.jsonl.gz",
-            "@collectorvision_catalog_embeddings//:embeddings.f16.gz": "catalog-v2/snapshots/milo1--scryfall--mtg/metadata/version-40/embeddings.f16.gz",
+            ":" + name + "-snapshot.json": "catalog-v2/snapshots/milo1--scryfall--mtg/metadata/version-{}/snapshot.json".format(CATALOG_VERSION),
+            "@collectorvision_catalog_records//file": "catalog-v2/snapshots/milo1--scryfall--mtg/metadata/version-{}/records.jsonl.gz".format(CATALOG_VERSION),
+            "@collectorvision_catalog_embeddings//file": "catalog-v2/snapshots/milo1--scryfall--mtg/metadata/version-{}/embeddings.f16.gz".format(CATALOG_VERSION),
         },
         package_dir = "/opt/collectorvision",
     )
@@ -241,7 +188,7 @@ def collectorvision_image(name, base, handler, repo_tag):
     pkg_tar(
         name = model,
         files = {
-            "@collectorvision_milo//:milo.onnx": "models/{}/model.onnx".format(MILO_SHA256),
+            "@collectorvision_milo//file": "models/{}/model.onnx".format(MILO_SHA256),
         },
         package_dir = "/opt/collectorvision",
     )
@@ -249,7 +196,7 @@ def collectorvision_image(name, base, handler, repo_tag):
     pkg_tar(
         name = license_layer,
         files = {
-            "@collectorvision_license//:LICENSE": "usr/share/licenses/collectorvision/LICENSE",
+            "@collectorvision_license//file": "usr/share/licenses/collectorvision/LICENSE",
         },
     )
 

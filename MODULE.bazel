@@ -144,7 +144,7 @@ bazel_dep(
 
 bazel_dep(name = "rules_python", version = "2.0.0")
 
-collectorvision = use_extension("//tcg_inventory_api:collectorvision.bzl", "collectorvision")
+collectorvision = use_extension("//third_party/collectorvision:repositories.bzl", "collectorvision")
 use_repo(
     collectorvision,
     "collectorvision_catalog_embeddings",

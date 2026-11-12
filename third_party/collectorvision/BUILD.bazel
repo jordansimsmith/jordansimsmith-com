@@ -1,0 +1,4 @@
+exports_files([
+    "pins.bzl",
+    "repositories.bzl",
+])

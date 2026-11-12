@@ -177,8 +177,8 @@
       },
       "images": {
         "scan_worker": {
-          "push": "//tcg_inventory_api:scan-worker-image-push",
-          "digest": "//tcg_inventory_api:scan-worker-image.digest",
+          "push": "//tcg_inventory_api/src/main/python/tcg_inventory_scan_worker:scan-worker-image-push",
+          "digest": "//tcg_inventory_api/src/main/python/tcg_inventory_scan_worker:scan-worker-image.digest",
           "repository": "tcg_inventory_scan_worker",
           "region": "ap-southeast-2"
         }

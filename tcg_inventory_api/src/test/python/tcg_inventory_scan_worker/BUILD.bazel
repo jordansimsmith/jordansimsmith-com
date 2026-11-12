@@ -1,0 +1,16 @@
+load("@rules_python//python:defs.bzl", "py_test")
+
+py_test(
+    name = "scan-worker-unit-tests",
+    size = "small",
+    srcs = [
+        "test_runner.py",
+        "test_worker.py",
+    ],
+    main = "test_runner.py",
+    deps = [
+        "//tcg_inventory_api/src/main/python/tcg_inventory_scan_worker:scan-worker-lib",
+        "@pypi//pillow",
+        "@pypi//pytest",
+    ],
+)

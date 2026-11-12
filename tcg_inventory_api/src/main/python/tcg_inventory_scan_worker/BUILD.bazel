@@ -1,0 +1,35 @@
+load("@rules_oci//oci:defs.bzl", "oci_push")
+load("@rules_python//python:defs.bzl", "py_library")
+load(":collectorvision.bzl", "collectorvision_image")
+
+py_library(
+    name = "scan-worker-lib",
+    srcs = [
+        "__init__.py",
+        "worker.py",
+    ],
+    imports = [".."],
+    visibility = ["//tcg_inventory_api/src/test/python/tcg_inventory_scan_worker:__pkg__"],
+    deps = [
+        "@pypi//boto3",
+        "@pypi//collectorvision",
+        "@pypi//numpy",
+        "@pypi//opencv_python_headless",
+    ],
+)
+
+collectorvision_image(
+    name = "scan-worker-image",
+    application_files = {
+        "__init__.py": "tcg_inventory_scan_worker/__init__.py",
+        "worker.py": "tcg_inventory_scan_worker/worker.py",
+    },
+    base = "@lambda_python312//:lambda_python312",
+    handler = "tcg_inventory_scan_worker.worker.lambda_handler",
+    repo_tag = "bazel/tcg-inventory-scan-worker:latest",
+)
+
+oci_push(
+    name = "scan-worker-image-push",
+    image = ":scan-worker-image",
+)
