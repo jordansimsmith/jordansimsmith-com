@@ -15,6 +15,9 @@ import com.jordansimsmith.tcginventory.imports.ImportItem;
 import com.jordansimsmith.tcginventory.imports.ImportRowItem;
 import com.jordansimsmith.tcginventory.imports.ImportsRepository;
 import com.jordansimsmith.tcginventory.scans.ScanConfirmationJobProcessor;
+import com.jordansimsmith.tcginventory.scans.ScanItem;
+import com.jordansimsmith.tcginventory.scans.ScanRepository;
+import com.jordansimsmith.tcginventory.scans.ScanRowItem;
 import com.jordansimsmith.time.Clock;
 import java.io.IOException;
 import org.slf4j.Logger;
@@ -51,7 +54,16 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
             factory.clock(),
             factory.fetchTcgService(),
             factory.pricingService());
-    this.scanConfirmationJobProcessor = new ScanConfirmationJobProcessor(factory);
+    this.scanConfirmationJobProcessor =
+        new ScanConfirmationJobProcessor(
+            new ScanRepository(
+                TcgInventoryTable.table(enhancedClient, ScanItem.class),
+                TcgInventoryTable.table(enhancedClient, ScanRowItem.class),
+                factory.dynamoDbClient(),
+                factory.clock()),
+            factory.catalogs(),
+            factory.gamesService(),
+            factory.importService());
     this.importConfirmationJobProcessor =
         new ImportConfirmationJobProcessor(
             factory.clock(),

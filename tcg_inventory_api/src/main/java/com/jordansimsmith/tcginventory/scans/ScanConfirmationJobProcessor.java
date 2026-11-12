@@ -1,60 +1,42 @@
 package com.jordansimsmith.tcginventory.scans;
 
 import com.google.common.base.Strings;
-import com.jordansimsmith.queue.QueueClient;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceException;
 import com.jordansimsmith.tcginventory.JobItem;
-import com.jordansimsmith.tcginventory.JobMessage;
 import com.jordansimsmith.tcginventory.JobProcessor;
-import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.catalog.CatalogCard;
 import com.jordansimsmith.tcginventory.catalog.CatalogException;
-import com.jordansimsmith.tcginventory.catalog.CatalogFactory;
 import com.jordansimsmith.tcginventory.catalog.Catalogs;
 import com.jordansimsmith.tcginventory.games.client.Game;
 import com.jordansimsmith.tcginventory.games.client.GamesService;
 import com.jordansimsmith.tcginventory.games.client.GetGameRequest;
-import com.jordansimsmith.tcginventory.imports.ImportItem;
-import com.jordansimsmith.tcginventory.imports.ImportRowItem;
-import com.jordansimsmith.time.Clock;
-import com.jordansimsmith.ulid.UlidGenerator;
+import com.jordansimsmith.tcginventory.imports.client.CreateImportRequest;
+import com.jordansimsmith.tcginventory.imports.client.CreateImportRow;
+import com.jordansimsmith.tcginventory.imports.client.ImportService;
+import com.jordansimsmith.tcginventory.imports.client.Language;
+import com.jordansimsmith.tcginventory.inventory.client.Condition;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.stream.Collectors;
-import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 
 public class ScanConfirmationJobProcessor implements JobProcessor {
-  private record ConfirmedScanRow(
-      String externalId, String name, String setCode, String setName, String collectorNumber) {}
-
-  private final Clock clock;
   private final ScanRepository scanRepository;
   private final Catalogs catalogs;
-  private final DynamoDbTable<ImportItem> importTable;
-  private final DynamoDbTable<ImportRowItem> importRowTable;
-  private final DynamoDbTable<JobItem> jobTable;
-  private final QueueClient<JobMessage> jobsQueue;
-  private final UlidGenerator ulidGenerator;
   private final GamesService gamesService;
+  private final ImportService importService;
 
-  public ScanConfirmationJobProcessor(CatalogFactory factory) {
-    this.clock = factory.clock();
-    this.scanRepository =
-        new ScanRepository(
-            TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ScanItem.class),
-            TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ScanRowItem.class),
-            factory.dynamoDbClient(),
-            factory.clock());
-    this.catalogs = factory.catalogs();
-    this.importTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ImportItem.class);
-    this.importRowTable =
-        TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ImportRowItem.class);
-    this.jobTable = factory.jobTable();
-    this.jobsQueue = factory.jobsQueue();
-    this.ulidGenerator = factory.ulidGenerator();
-    this.gamesService = factory.gamesService();
+  public ScanConfirmationJobProcessor(
+      ScanRepository scanRepository,
+      Catalogs catalogs,
+      GamesService gamesService,
+      ImportService importService) {
+    this.scanRepository = scanRepository;
+    this.catalogs = catalogs;
+    this.gamesService = gamesService;
+    this.importService = importService;
   }
 
   @Override
@@ -80,60 +62,35 @@ public class ScanConfirmationJobProcessor implements JobProcessor {
         gamesService
             .getGame(new RequestContext(user), new GetGameRequest(scanItem.getGame()))
             .game();
-    List<ConfirmedScanRow> confirmedRows;
+    List<CreateImportRow> confirmedRows;
     try {
-      confirmedRows = validateCatalogRows(game, scanItem.getFinish(), scanRows);
+      confirmedRows =
+          validateCatalogRows(
+              game, scanItem.getFinish(), Condition.valueOf(scanItem.getCondition()), scanRows);
     } catch (IllegalArgumentException e) {
       scanRepository.failScanConfirmation(user, scanId, e.getMessage());
       return new JobProcessor.FailureJobResult(e.getMessage());
     }
-    var importId = ulidGenerator.generate();
-    var appraisalJobId = ulidGenerator.generate();
-    var now = clock.now();
-    importTable.putItem(
-        ImportItem.create(
-            user,
-            scanItem.getGame(),
-            importId,
-            scanId + ".scan",
-            confirmedRows.size(),
-            appraisalJobId,
-            now));
+    Collections.reverse(confirmedRows);
+    var response =
+        importService.createImport(
+            new RequestContext(user),
+            new CreateImportRequest(
+                scanId, scanItem.getGame(), null, scanId + ".scan", confirmedRows));
 
-    for (int index = 0; index < confirmedRows.size(); index++) {
-      var selected = confirmedRows.get(index);
-      importRowTable.putItem(
-          ImportRowItem.create(
-              user,
-              importId,
-              index + 1,
-              selected.name(),
-              selected.setCode(),
-              selected.setName(),
-              selected.collectorNumber(),
-              scanItem.getFinish(),
-              scanItem.getCondition(),
-              selected.externalId(),
-              "en"));
-    }
-
-    jobTable.putItem(JobItem.create(user, appraisalJobId, "appraise", importId, now));
-    var appraisalMessage = new JobMessage(user, appraisalJobId, "appraise");
-    jobsQueue.send(appraisalMessage, user, appraisalMessage.deduplicationId(0));
-
-    if (!scanRepository.transitionScanToConfirmed(user, scanId, importId)) {
+    if (!scanRepository.transitionScanToConfirmed(user, scanId, response.importId())) {
       var currentScan = scanRepository.getScan(user, scanId);
       if (currentScan == null
           || !"confirmed".equals(currentScan.getStatus())
-          || !importId.equals(currentScan.getImportId())) {
+          || !response.importId().equals(currentScan.getImportId())) {
         throw new IllegalStateException("scan changed before confirmation completed");
       }
     }
     return new JobProcessor.SuccessJobResult(0, null);
   }
 
-  private List<ConfirmedScanRow> validateCatalogRows(
-      Game game, String finish, List<ScanRowItem> scanRows) {
+  private ArrayList<CreateImportRow> validateCatalogRows(
+      Game game, String finish, Condition condition, List<ScanRowItem> scanRows) {
     if (scanRows.isEmpty()) {
       throw new IllegalArgumentException("scan has no retained rows");
     }
@@ -150,7 +107,7 @@ public class ScanConfirmationJobProcessor implements JobProcessor {
     var resolvedCards =
         catalogs.forGame(game).findCards(game, List.copyOf(requestedIds)).values().stream()
             .collect(Collectors.toMap(CatalogCard::externalId, card -> card));
-    var confirmedRows = new ArrayList<ConfirmedScanRow>();
+    var confirmedRows = new ArrayList<CreateImportRow>();
     for (var row : scanRows) {
       var card = resolvedCards.get(row.getSelectedExternalId());
       if (card == null) {
@@ -166,13 +123,16 @@ public class ScanConfirmationJobProcessor implements JobProcessor {
                 .formatted(row.getScanPosition(), finish));
       }
       confirmedRows.add(
-          new ConfirmedScanRow(
+          new CreateImportRow(
               card.externalId(),
               card.name(),
               card.setCode(),
               card.setName(),
-              card.collectorNumber()));
+              card.collectorNumber(),
+              finish,
+              condition,
+              Language.ENGLISH));
     }
-    return List.copyOf(confirmedRows);
+    return confirmedRows;
   }
 }

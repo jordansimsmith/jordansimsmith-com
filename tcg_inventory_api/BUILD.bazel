@@ -172,9 +172,10 @@ java_library(
     ),
     deps = [
         ":catalog-lib",
-        ":import-lib",
         ":lib",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/imports/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/inventory/client",
     ] + COMMON_DEPS,
 )
 
@@ -383,7 +384,6 @@ java_binary(
     ],
     deps = [
         ":catalog-lib",
-        ":import-lib",
         ":lib",
         ":scan-lib",
         "//lib/http:lib",
