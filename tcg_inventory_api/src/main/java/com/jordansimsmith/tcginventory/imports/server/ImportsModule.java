@@ -36,18 +36,30 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 public class ImportsModule {
   @Provides
   @Singleton
-  ImportService importService(
+  ImportReadRepository importReadRepository(
       DynamoDbEnhancedClient dynamoDbEnhancedClient,
-      DynamoDbClient dynamoDbClient,
-      @Named("tcgInventoryTableName") String tableName,
-      ObjectMapper objectMapper,
-      PhotosService photosService) {
+      @Named("tcgInventoryTableName") String tableName) {
     var importTable =
         dynamoDbEnhancedClient.table(tableName, TableSchema.fromBean(ImportItem.class));
     var importRowTable =
         dynamoDbEnhancedClient.table(tableName, TableSchema.fromBean(ImportRowItem.class));
-    var importReadRepository = new ImportReadRepository(importTable, importRowTable);
-    var importMutationRepository = new ImportMutationRepository(dynamoDbClient, tableName);
+    return new ImportReadRepository(importTable, importRowTable);
+  }
+
+  @Provides
+  @Singleton
+  ImportMutationRepository importMutationRepository(
+      DynamoDbClient dynamoDbClient, @Named("tcgInventoryTableName") String tableName) {
+    return new ImportMutationRepository(dynamoDbClient, tableName);
+  }
+
+  @Provides
+  @Singleton
+  ImportService importService(
+      ImportReadRepository importReadRepository,
+      ImportMutationRepository importMutationRepository,
+      ObjectMapper objectMapper,
+      PhotosService photosService) {
     var findImportsService = new FindImportsService(importReadRepository, objectMapper);
     var getImportService = new GetImportService(importReadRepository);
     var updateImportRowService =
@@ -110,19 +122,12 @@ public class ImportsModule {
   @Provides
   @Singleton
   AppraisalMessageHandler appraisalMessageHandler(
-      DynamoDbEnhancedClient dynamoDbEnhancedClient,
-      DynamoDbClient dynamoDbClient,
-      @Named("tcgInventoryTableName") String tableName,
+      ImportReadRepository importReadRepository,
+      ImportMutationRepository importMutationRepository,
       FetchTcgService fetchTcgService,
       PricingService pricingService,
       QueueClient<ImportMessage> importsQueue,
       Clock clock) {
-    var importTable =
-        dynamoDbEnhancedClient.table(tableName, TableSchema.fromBean(ImportItem.class));
-    var importRowTable =
-        dynamoDbEnhancedClient.table(tableName, TableSchema.fromBean(ImportRowItem.class));
-    var importReadRepository = new ImportReadRepository(importTable, importRowTable);
-    var importMutationRepository = new ImportMutationRepository(dynamoDbClient, tableName);
     var cardMatcher = new FetchTcgCardMatcher(fetchTcgService);
     var resolver = new MagicTheGatheringAppraisalResolver(fetchTcgService, cardMatcher);
     var resolverFactory = new AppraisalResolverFactory(resolver);
@@ -139,19 +144,11 @@ public class ImportsModule {
   @Provides
   @Singleton
   ImportConfirmationMessageHandler importConfirmationMessageHandler(
-      DynamoDbEnhancedClient dynamoDbEnhancedClient,
-      DynamoDbClient dynamoDbClient,
-      @Named("tcgInventoryTableName") String tableName,
+      ImportReadRepository importReadRepository,
+      ImportMutationRepository importMutationRepository,
       InventoryService inventoryService,
       Clock clock) {
-    var importTable =
-        dynamoDbEnhancedClient.table(tableName, TableSchema.fromBean(ImportItem.class));
-    var importRowTable =
-        dynamoDbEnhancedClient.table(tableName, TableSchema.fromBean(ImportRowItem.class));
     return new ImportConfirmationMessageHandler(
-        new ImportReadRepository(importTable, importRowTable),
-        new ImportMutationRepository(dynamoDbClient, tableName),
-        inventoryService,
-        clock);
+        importReadRepository, importMutationRepository, inventoryService, clock);
   }
 }

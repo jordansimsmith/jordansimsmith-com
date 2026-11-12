@@ -8,6 +8,8 @@ import com.jordansimsmith.tcginventory.catalog.client.CatalogService;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
 import com.jordansimsmith.tcginventory.games.client.GamesService;
 import com.jordansimsmith.tcginventory.imports.client.ImportService;
+import com.jordansimsmith.tcginventory.imports.server.AppraisalMessageHandler;
+import com.jordansimsmith.tcginventory.imports.server.ImportConfirmationMessageHandler;
 import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
 import com.jordansimsmith.tcginventory.listings.client.ListingService;
 import com.jordansimsmith.tcginventory.orders.client.OrderService;
@@ -66,6 +68,10 @@ public interface TcgInventoryFactory {
   InventoryService inventoryService();
 
   ImportService importService();
+
+  AppraisalMessageHandler appraisalMessageHandler();
+
+  ImportConfirmationMessageHandler importConfirmationMessageHandler();
 
   ListingService listingService();
 

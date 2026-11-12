@@ -16,6 +16,7 @@ import com.jordansimsmith.tcginventory.games.client.FakeGamesService;
 import com.jordansimsmith.tcginventory.games.client.GamesService;
 import com.jordansimsmith.tcginventory.imports.ImportItem;
 import com.jordansimsmith.tcginventory.imports.ImportRowItem;
+import com.jordansimsmith.tcginventory.imports.server.ImportMessage;
 import com.jordansimsmith.tcginventory.imports.server.ImportsModule;
 import com.jordansimsmith.tcginventory.inventory.client.FakeInventoryService;
 import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
@@ -199,6 +200,18 @@ public class TcgInventoryTestModule {
   @Singleton
   QueueClient<FulfillmentMessage> ordersQueue(FakeQueueClient<FulfillmentMessage> fakeOrdersQueue) {
     return fakeOrdersQueue;
+  }
+
+  @Provides
+  @Singleton
+  FakeQueueClient<ImportMessage> fakeImportsQueue() {
+    return new FakeQueueClient<>();
+  }
+
+  @Provides
+  @Singleton
+  QueueClient<ImportMessage> importsQueue(FakeQueueClient<ImportMessage> fakeImportsQueue) {
+    return fakeImportsQueue;
   }
 
   @Provides

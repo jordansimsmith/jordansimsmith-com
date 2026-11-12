@@ -38,6 +38,7 @@ locals {
     "tcg_inventory_pricing_dlq.fifo",
     "tcg_inventory_publish_dlq.fifo",
     "tcg_inventory_orders_dlq.fifo",
+    "tcg_inventory_imports_dlq.fifo",
     "auction_tracker_jobs_dlq.fifo",
     "price_tracker_jobs_dlq.fifo",
   ]

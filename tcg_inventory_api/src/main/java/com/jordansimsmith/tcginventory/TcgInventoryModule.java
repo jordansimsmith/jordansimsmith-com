@@ -12,6 +12,7 @@ import com.jordansimsmith.secrets.SecretsModule;
 import com.jordansimsmith.tcginventory.catalog.server.CatalogModule;
 import com.jordansimsmith.tcginventory.fetchtcg.server.FetchTcgModule;
 import com.jordansimsmith.tcginventory.games.server.GamesModule;
+import com.jordansimsmith.tcginventory.imports.server.ImportMessage;
 import com.jordansimsmith.tcginventory.imports.server.ImportsModule;
 import com.jordansimsmith.tcginventory.inventory.server.InventoryModule;
 import com.jordansimsmith.tcginventory.listings.server.ListingsModule;
@@ -69,6 +70,8 @@ public class TcgInventoryModule {
 
   static final String ORDERS_QUEUE_NAME = "tcg_inventory_orders.fifo";
 
+  static final String IMPORTS_QUEUE_NAME = "tcg_inventory_imports.fifo";
+
   @Provides
   @Singleton
   @Named("tcgInventoryTableName")
@@ -102,6 +105,13 @@ public class TcgInventoryModule {
   @Named("ordersQueueName")
   String ordersQueueName() {
     return ORDERS_QUEUE_NAME;
+  }
+
+  @Provides
+  @Singleton
+  @Named("importsQueueName")
+  String importsQueueName() {
+    return IMPORTS_QUEUE_NAME;
   }
 
   @Provides
@@ -183,6 +193,13 @@ public class TcgInventoryModule {
   @Singleton
   QueueClient<FulfillmentMessage> ordersQueue(
       ObjectMapper objectMapper, SqsClient sqsClient, @Named("ordersQueueName") String queueName) {
+    return SqsQueueClient.create(sqsClient, objectMapper, queueName);
+  }
+
+  @Provides
+  @Singleton
+  QueueClient<ImportMessage> importsQueue(
+      ObjectMapper objectMapper, SqsClient sqsClient, @Named("importsQueueName") String queueName) {
     return SqsQueueClient.create(sqsClient, objectMapper, queueName);
   }
 }

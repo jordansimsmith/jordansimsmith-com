@@ -141,6 +141,7 @@
         "create_reprice": "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/api:create-repricing-handler_deploy.jar",
         "get_reprice": "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/api:get-repricing-handler_deploy.jar",
         "create_import": "//tcg_inventory_api:create-import-handler_deploy.jar",
+        "imports_worker": "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/imports/worker:imports-worker-handler_deploy.jar",
         "find_imports": "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/imports/api:find-imports-handler_deploy.jar",
         "get_import": "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/imports/api:get-import-handler_deploy.jar",
         "delete_import": "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/imports/api:delete-import-handler_deploy.jar",

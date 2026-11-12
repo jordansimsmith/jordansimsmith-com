@@ -5,7 +5,9 @@ java_library(
     srcs = glob(["*.java"]),
     visibility = [
         "//tcg_inventory_api:__pkg__",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/imports/worker:__pkg__",
         "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/imports/server:__pkg__",
+        "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/imports/worker:__pkg__",
     ],
     deps = [
         "//lib/dynamodb:lib",

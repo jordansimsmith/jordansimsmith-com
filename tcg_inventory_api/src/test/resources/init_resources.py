@@ -100,6 +100,10 @@ queue_configs = {
         "name": "tcg_inventory_orders.fifo",
         "visibility_timeout": 960,
     },
+    "imports": {
+        "name": "tcg_inventory_imports.fifo",
+        "visibility_timeout": 960,
+    },
 }
 
 queue_urls = {}
@@ -309,6 +313,14 @@ lambdas = {
         "handler": "com.jordansimsmith.tcginventory.orders.worker.OrdersWorkerHandler",
         "zip_file": "orders-worker-handler_deploy.jar",
         "timeout": 900,
+    },
+    "imports_worker": {
+        "handler": "com.jordansimsmith.tcginventory.imports.worker.ImportsWorkerHandler",
+        "zip_file": "imports-worker-handler_deploy.jar",
+        "timeout": 900,
+        "environment": {
+            "FETCHTCG_BASE_URL": os.environ.get("FETCHTCG_BASE_URL", ""),
+        },
     },
     "find_skus": {
         "handler": "com.jordansimsmith.tcginventory.inventory.api.FindSkusHandler",
@@ -632,6 +644,13 @@ lambda_client.create_event_source_mapping(
 lambda_client.create_event_source_mapping(
     EventSourceArn=queue_arns["orders"],
     FunctionName="orders_worker",
+    BatchSize=1,
+    MaximumBatchingWindowInSeconds=0,
+)
+
+lambda_client.create_event_source_mapping(
+    EventSourceArn=queue_arns["imports"],
+    FunctionName="imports_worker",
     BatchSize=1,
     MaximumBatchingWindowInSeconds=0,
 )
