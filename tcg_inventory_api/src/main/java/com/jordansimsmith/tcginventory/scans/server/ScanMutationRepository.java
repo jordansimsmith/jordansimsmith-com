@@ -11,6 +11,7 @@ import software.amazon.awssdk.services.dynamodb.model.DeleteItemRequest;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItem;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItemsRequest;
 import software.amazon.awssdk.services.dynamodb.model.Update;
+import software.amazon.awssdk.services.dynamodb.model.UpdateItemRequest;
 
 public class ScanMutationRepository {
   private final DynamoDbTable<ScanItem> scanTable;
@@ -48,6 +49,25 @@ public class ScanMutationRepository {
                 .tableName(tableName)
                 .item(scanTable.tableSchema().itemToMap(scanItem, true))
                 .conditionExpression("attribute_not_exists(" + ScanItem.PK + ")"));
+  }
+
+  public void startScanIdentification(String user, String scanId) {
+    dynamoDbClient.updateItem(
+        UpdateItemRequest.builder()
+            .tableName(tableName)
+            .key(
+                Map.of(
+                    ScanItem.PK, AttributeValue.fromS(ScanItem.formatPk(user)),
+                    ScanItem.SK, AttributeValue.fromS(ScanItem.formatSk(scanId))))
+            .updateExpression("SET #status = :identifying, updated_at = :now")
+            .conditionExpression("attribute_exists(" + ScanItem.PK + ") AND #status = :uploading")
+            .expressionAttributeNames(Map.of("#status", ScanItem.STATUS))
+            .expressionAttributeValues(
+                Map.of(
+                    ":identifying", AttributeValue.fromS("identifying"),
+                    ":uploading", AttributeValue.fromS("uploading"),
+                    ":now", AttributeValue.fromN(Long.toString(clock.now().getEpochSecond()))))
+            .build());
   }
 
   public void deleteScanRow(String user, String scanId, int scanPosition) {

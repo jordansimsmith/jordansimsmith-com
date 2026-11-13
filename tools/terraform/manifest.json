@@ -148,7 +148,7 @@
         "create_scan": "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/scans/api:create-scan-handler_deploy.jar",
         "find_scans": "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/scans/api:find-scans-handler_deploy.jar",
         "get_scan": "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/scans/api:get-scan-handler_deploy.jar",
-        "identify_scan": "//tcg_inventory_api:identify-scan-handler_deploy.jar",
+        "identify_scan": "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/scans/api:identify-scan-handler_deploy.jar",
         "confirm_scan": "//tcg_inventory_api:confirm-scan-handler_deploy.jar",
         "delete_scan_row": "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/scans/api:delete-scan-row-handler_deploy.jar",
         "delete_scan": "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/scans/api:delete-scan-handler_deploy.jar",

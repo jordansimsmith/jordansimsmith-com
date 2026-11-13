@@ -29,11 +29,10 @@ import com.jordansimsmith.tcginventory.pricing.server.RepricingMessage;
 import com.jordansimsmith.tcginventory.publish.server.PublishMessage;
 import com.jordansimsmith.tcginventory.publish.server.PublishModule;
 import com.jordansimsmith.tcginventory.reports.server.ReportsModule;
-import com.jordansimsmith.tcginventory.scans.ScanImages;
 import com.jordansimsmith.tcginventory.scans.ScanItem;
-import com.jordansimsmith.tcginventory.scans.ScanMessage;
 import com.jordansimsmith.tcginventory.scans.ScanRepository;
 import com.jordansimsmith.tcginventory.scans.ScanRowItem;
+import com.jordansimsmith.tcginventory.scans.server.ScanImages;
 import com.jordansimsmith.tcginventory.scans.server.ScansModule;
 import com.jordansimsmith.time.Clock;
 import dagger.Module;
@@ -225,18 +224,6 @@ public class TcgInventoryTestModule {
   @Singleton
   QueueClient<ImportMessage> importsQueue(FakeQueueClient<ImportMessage> fakeImportsQueue) {
     return fakeImportsQueue;
-  }
-
-  @Provides
-  @Singleton
-  FakeQueueClient<ScanMessage> fakeScanQueue() {
-    return new FakeQueueClient<>();
-  }
-
-  @Provides
-  @Singleton
-  QueueClient<ScanMessage> scanQueue(FakeQueueClient<ScanMessage> fakeScanQueue) {
-    return fakeScanQueue;
   }
 
   @Provides

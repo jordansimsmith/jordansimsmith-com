@@ -11,6 +11,9 @@ public interface ScanService {
 
   GetScanResponse getScan(RequestContext ctx, GetScanRequest request) throws ServiceException;
 
+  IdentifyScanResponse identifyScan(RequestContext ctx, IdentifyScanRequest request)
+      throws ServiceException;
+
   DeleteScanRowResponse deleteScanRow(RequestContext ctx, DeleteScanRowRequest request)
       throws ServiceException;
 

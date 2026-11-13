@@ -22,6 +22,8 @@ import com.jordansimsmith.tcginventory.scans.client.FindScansRequest;
 import com.jordansimsmith.tcginventory.scans.client.FindScansResponse;
 import com.jordansimsmith.tcginventory.scans.client.GetScanRequest;
 import com.jordansimsmith.tcginventory.scans.client.GetScanResponse;
+import com.jordansimsmith.tcginventory.scans.client.IdentifyScanRequest;
+import com.jordansimsmith.tcginventory.scans.client.IdentifyScanResponse;
 import com.jordansimsmith.tcginventory.scans.client.ScanFile;
 import com.jordansimsmith.tcginventory.scans.client.ScanRow;
 import com.jordansimsmith.tcginventory.scans.client.ScanRowStatus;
@@ -45,6 +47,7 @@ class ScanHandlersTest {
   private CreateScanHandler createScanHandler;
   private DeleteScanHandler deleteScanHandler;
   private DeleteScanRowHandler deleteScanRowHandler;
+  private IdentifyScanHandler identifyScanHandler;
 
   @BeforeEach
   void setUp() {
@@ -62,6 +65,7 @@ class ScanHandlersTest {
     createScanHandler = new CreateScanHandler(factory);
     deleteScanHandler = new DeleteScanHandler(factory);
     deleteScanRowHandler = new DeleteScanRowHandler(factory);
+    identifyScanHandler = new IdentifyScanHandler(factory);
   }
 
   @Test
@@ -224,6 +228,37 @@ class ScanHandlersTest {
     assertThat(response.getStatusCode()).isEqualTo(404);
     assertThat(objectMapper.readTree(response.getBody()).get("message").asText())
         .isEqualTo("Not Found");
+  }
+
+  @Test
+  void identifyScanShouldReturnBodylessAcceptedAndMapPathParameter() throws Exception {
+    // arrange
+    when(scanService.identifyScan(any(), any())).thenReturn(new IdentifyScanResponse());
+
+    // act
+    var response =
+        identifyScanHandler.handleRequest(event(Map.of(), Map.of("scan_id", "scan-1")), null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(202);
+    assertThat(response.getBody()).isNull();
+    verify(scanService)
+        .identifyScan(new RequestContext("jordan"), new IdentifyScanRequest("scan-1"));
+  }
+
+  @Test
+  void identifyScanShouldUseSharedServiceErrorMapping() throws Exception {
+    // arrange
+    when(scanService.identifyScan(any(), any()))
+        .thenThrow(new BadRequestException("scan_id is required"));
+
+    // act
+    var response = identifyScanHandler.handleRequest(event(Map.of(), Map.of()), null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(400);
+    assertThat(objectMapper.readTree(response.getBody()).get("message").asText())
+        .isEqualTo("scan_id is required");
   }
 
   private static APIGatewayV2HTTPEvent event(

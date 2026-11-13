@@ -11,26 +11,23 @@ import com.jordansimsmith.tcginventory.scans.client.ScanRowStatus;
 import com.jordansimsmith.tcginventory.scans.client.ScanSuggestion;
 import java.util.List;
 import javax.annotation.Nullable;
-import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
-import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
-import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 
 public class GetScanService {
   private final ScanReadRepository scanRepository;
-  private final S3Client s3Client;
+  private final ScanUploadVerifier scanUploadVerifier;
   private final S3Presigner s3Presigner;
   private final String bucket;
 
   public GetScanService(
       ScanReadRepository scanRepository,
-      S3Client s3Client,
+      ScanUploadVerifier scanUploadVerifier,
       S3Presigner s3Presigner,
       String bucket) {
     this.scanRepository = scanRepository;
-    this.s3Client = s3Client;
+    this.scanUploadVerifier = scanUploadVerifier;
     this.s3Presigner = s3Presigner;
     this.bucket = bucket;
   }
@@ -65,19 +62,7 @@ public class GetScanService {
     var sizeBytes = row.getSizeBytes() == null ? 0 : row.getSizeBytes();
     var uploaded = true;
     if ("uploading".equals(scan.getStatus())) {
-      try {
-        var head =
-            s3Client.headObject(
-                HeadObjectRequest.builder().bucket(bucket).key(row.getS3Key()).build());
-        uploaded =
-            head.contentLength() == sizeBytes && ScanImages.CONTENT_TYPE.equals(head.contentType());
-      } catch (S3Exception e) {
-        if (e.statusCode() == 404) {
-          uploaded = false;
-        } else {
-          throw e;
-        }
-      }
+      uploaded = scanUploadVerifier.isUploaded(row);
     }
     var sourceUrl = uploaded ? sourceUrl(row.getS3Key()) : null;
     var status = publicStatus(row.getStatus());

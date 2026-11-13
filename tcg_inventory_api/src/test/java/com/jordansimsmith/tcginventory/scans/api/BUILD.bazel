@@ -16,6 +16,7 @@ java_test_suite(
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/scans/api:delete-scan-row-handler",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/scans/api:find-scans-handler",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/scans/api:get-scan-handler",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/scans/api:identify-scan-handler",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/scans/client",
         "@maven//:com_amazonaws_aws_lambda_java_core",
         "@maven//:com_amazonaws_aws_lambda_java_events",

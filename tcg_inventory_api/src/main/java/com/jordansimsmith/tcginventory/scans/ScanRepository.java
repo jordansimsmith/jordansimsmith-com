@@ -54,35 +54,6 @@ public class ScanRepository {
         TransactWriteItemsRequest.builder().transactItems(List.of(buildScanPut(scanItem))).build());
   }
 
-  public boolean transitionScanToIdentifying(String user, String scanId) {
-    try {
-      dynamoDbClient.updateItem(
-          UpdateItemRequest.builder()
-              .tableName(tableName)
-              .key(
-                  Map.of(
-                      ScanItem.PK,
-                      AttributeValue.builder().s(ScanItem.formatPk(user)).build(),
-                      ScanItem.SK,
-                      AttributeValue.builder().s(ScanItem.formatSk(scanId)).build()))
-              .updateExpression("SET #status = :identifying, updated_at = :now")
-              .conditionExpression("attribute_exists(" + ScanItem.PK + ") AND #status = :uploading")
-              .expressionAttributeNames(Map.of("#status", ScanItem.STATUS))
-              .expressionAttributeValues(
-                  Map.of(
-                      ":identifying", AttributeValue.builder().s("identifying").build(),
-                      ":uploading", AttributeValue.builder().s("uploading").build(),
-                      ":now",
-                          AttributeValue.builder()
-                              .n(String.valueOf(clock.now().getEpochSecond()))
-                              .build()))
-              .build());
-      return true;
-    } catch (ConditionalCheckFailedException e) {
-      return false;
-    }
-  }
-
   public void updateScanRowSelection(
       String user, String scanId, int scanPosition, String externalId) {
     dynamoDbClient.updateItem(

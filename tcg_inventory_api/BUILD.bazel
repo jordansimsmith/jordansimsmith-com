@@ -265,30 +265,6 @@ java_binary(
 )
 
 java_binary(
-    name = "identify-scan-handler",
-    srcs = ["src/main/java/com/jordansimsmith/tcginventory/scans/IdentifyScanHandler.java"],
-    create_executable = False,
-    resources = [
-        "src/main/resources/logback.xml",
-    ],
-    deps = [
-        ":lib",
-        ":scan-lib",
-        "//lib/http:lib",
-        "//lib/queue:lib",
-        "@maven//:ch_qos_logback_logback_classic",
-        "@maven//:ch_qos_logback_logback_core",
-        "@maven//:com_amazonaws_aws_lambda_java_core",
-        "@maven//:com_amazonaws_aws_lambda_java_events",
-        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
-        "@maven//:com_google_code_findbugs_jsr305",
-        "@maven//:com_google_guava_guava",
-        "@maven//:org_slf4j_slf4j_api",
-        "@maven//:software_amazon_awssdk_s3",
-    ],
-)
-
-java_binary(
     name = "confirm-scan-handler",
     srcs = ["src/main/java/com/jordansimsmith/tcginventory/scans/ConfirmScanHandler.java"],
     create_executable = False,
@@ -531,7 +507,6 @@ java_test_suite(
         ":find-catalog-alternatives-handler",
         ":find-catalog-cards-handler",
         ":get-catalog-card-handler",
-        ":identify-scan-handler",
         ":jobs-handler",
         ":lib",
         ":scan-lib",
@@ -616,7 +591,7 @@ localstack_image(
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/orders/api:update-order-settings-handler_deploy.jar",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/inventory/api:get-sku-handler_deploy.jar",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/scans/api:get-scan-handler_deploy.jar",
-        ":identify-scan-handler_deploy.jar",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/scans/api:identify-scan-handler_deploy.jar",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/inventory/api:delete-unit-handler_deploy.jar",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/imports/api:delete-import-row-handler_deploy.jar",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/imports/api:delete-import-row-photo-handler_deploy.jar",

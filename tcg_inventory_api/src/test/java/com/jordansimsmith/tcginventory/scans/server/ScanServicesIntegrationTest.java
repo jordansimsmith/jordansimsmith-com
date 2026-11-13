@@ -9,11 +9,13 @@ import static org.mockito.Mockito.when;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
+import com.jordansimsmith.queue.FakeQueueClient;
 import com.jordansimsmith.s3.S3Container;
 import com.jordansimsmith.service.BadRequestException;
 import com.jordansimsmith.service.ConflictException;
 import com.jordansimsmith.service.NotFoundException;
 import com.jordansimsmith.service.RequestContext;
+import com.jordansimsmith.service.ServiceException;
 import com.jordansimsmith.tcginventory.games.client.Finish;
 import com.jordansimsmith.tcginventory.games.client.Game;
 import com.jordansimsmith.tcginventory.games.client.GamesService;
@@ -23,12 +25,14 @@ import com.jordansimsmith.tcginventory.scans.client.DeleteScanRequest;
 import com.jordansimsmith.tcginventory.scans.client.DeleteScanRowRequest;
 import com.jordansimsmith.tcginventory.scans.client.FindScansRequest;
 import com.jordansimsmith.tcginventory.scans.client.GetScanRequest;
+import com.jordansimsmith.tcginventory.scans.client.IdentifyScanRequest;
 import com.jordansimsmith.tcginventory.scans.client.ScanFile;
 import com.jordansimsmith.tcginventory.scans.client.ScanRowStatus;
 import com.jordansimsmith.tcginventory.scans.client.ScanStatus;
 import com.jordansimsmith.tcginventory.scans.client.ScanSuggestion;
 import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -74,6 +78,9 @@ class ScanServicesIntegrationTest {
   private DeleteScanRowService deleteScanRowService;
   private DeleteScanService deleteScanService;
   private ScanMutationRepository scanMutationRepository;
+  private IdentifyScanService identifyScanService;
+  private FakeQueueClient<ScanMessage> scanQueue;
+  private ObjectMapper objectMapper;
 
   @BeforeAll
   static void setUpBeforeClass() {
@@ -120,11 +127,17 @@ class ScanServicesIntegrationTest {
       s3Client.deleteObject(request -> request.bucket(BUCKET).key(object.key()));
     }
     var readRepository = new ScanReadRepository(scanTable, scanRowTable);
+    objectMapper = new ObjectMapper();
+    scanQueue = new FakeQueueClient<>();
     scanMutationRepository =
         new ScanMutationRepository(
             scanTable, scanRowTable, dynamoDbClient, () -> CREATED_AT, TABLE_NAME);
-    findScansService = new FindScansService(readRepository, new ObjectMapper());
-    getScanService = new GetScanService(readRepository, s3Client, s3Presigner, BUCKET);
+    findScansService = new FindScansService(readRepository, objectMapper);
+    var scanUploadVerifier = new ScanUploadVerifier(s3Client, BUCKET);
+    getScanService = new GetScanService(readRepository, scanUploadVerifier, s3Presigner, BUCKET);
+    identifyScanService =
+        new IdentifyScanService(
+            readRepository, scanMutationRepository, scanUploadVerifier, scanQueue);
     var gamesService = mock(GamesService.class);
     when(gamesService.getGame(any(), any()))
         .thenReturn(
@@ -549,6 +562,133 @@ class ScanServicesIntegrationTest {
         .hasMessage("Not Found");
   }
 
+  @Test
+  void identifyScanShouldVerifyUploadsAndQueueOnePythonCompatibleMessage() throws Exception {
+    // arrange
+    putScan("alice", "identify", "uploading", 1);
+    putRow("alice", "identify", 1, "card.jpg", "users/alice/scans/identify/000001.jpg", 10);
+    putObject("users/alice/scans/identify/000001.jpg", 10, "image/jpeg");
+
+    // act
+    var first =
+        identifyScanService.identifyScan(
+            new RequestContext("alice"), new IdentifyScanRequest("identify"));
+    var repeated =
+        identifyScanService.identifyScan(
+            new RequestContext("alice"), new IdentifyScanRequest("identify"));
+
+    // assert
+    assertThat(first).isEqualTo(repeated);
+    assertThat(scanTable.getItem(scanKey("alice", "identify")).getStatus())
+        .isEqualTo("identifying");
+    assertThat(scanQueue.getSends()).hasSize(1);
+    var send = scanQueue.getSends().getFirst();
+    assertThat(objectMapper.writeValueAsString(send.message()))
+        .isEqualTo("{\"user\":\"alice\",\"scan_id\":\"identify\"}");
+    assertThat(send.messageGroupId()).isEqualTo("identify");
+    assertThat(send.messageDeduplicationId()).isEqualTo("identify#0");
+  }
+
+  @Test
+  void identifyScanShouldRejectMissingOrMismatchedUploadsWithoutTransition() {
+    // arrange
+    putScan("alice", "missing", "uploading", 1);
+    putRow("alice", "missing", 1, "missing.jpg", "missing", 10);
+    putScan("alice", "wrong-size", "uploading", 1);
+    putRow("alice", "wrong-size", 1, "wrong-size.jpg", "wrong-size", 10);
+    putObject("wrong-size", 9, "image/jpeg");
+    putScan("alice", "wrong-type", "uploading", 1);
+    putRow("alice", "wrong-type", 1, "wrong-type.jpg", "wrong-type", 10);
+    putObject("wrong-type", 10, "image/png");
+
+    // act / assert
+    for (var scanId : List.of("missing", "wrong-size", "wrong-type")) {
+      assertThatThrownBy(
+              () ->
+                  identifyScanService.identifyScan(
+                      new RequestContext("alice"), new IdentifyScanRequest(scanId)))
+          .isInstanceOf(ConflictException.class)
+          .hasMessage("all scan files must be uploaded before identification");
+      assertThat(scanTable.getItem(scanKey("alice", scanId)).getStatus()).isEqualTo("uploading");
+    }
+    assertThat(scanQueue.getMessages()).isEmpty();
+  }
+
+  @Test
+  void identifyScanShouldAcknowledgeLaterStatesWithoutQueueOrUploadChecks() throws Exception {
+    // arrange
+    for (var status : List.of("identifying", "reviewing", "confirming", "confirmed")) {
+      putScan("alice", status, status, 1);
+      putRow("alice", status, 1, "missing.jpg", "missing-" + status, 10);
+    }
+
+    // act / assert
+    for (var status : List.of("identifying", "reviewing", "confirming", "confirmed")) {
+      assertThat(
+              identifyScanService.identifyScan(
+                  new RequestContext("alice"), new IdentifyScanRequest(status)))
+          .isNotNull();
+    }
+    assertThat(scanQueue.getMessages()).isEmpty();
+  }
+
+  @Test
+  void identifyScanShouldReturnNotFoundForForeignOrMissingScanAndRejectBlankId() {
+    // arrange
+    putScan("alice", "private", "uploading", 0);
+
+    // act / assert
+    assertThatThrownBy(
+            () ->
+                identifyScanService.identifyScan(
+                    new RequestContext("alice"), new IdentifyScanRequest(" ")))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("scan_id is required");
+    assertThatThrownBy(
+            () ->
+                identifyScanService.identifyScan(
+                    new RequestContext("bob"), new IdentifyScanRequest("private")))
+        .isInstanceOf(NotFoundException.class)
+        .hasMessage("Not Found");
+    assertThatThrownBy(
+            () ->
+                identifyScanService.identifyScan(
+                    new RequestContext("alice"), new IdentifyScanRequest("missing")))
+        .isInstanceOf(NotFoundException.class)
+        .hasMessage("Not Found");
+    assertThat(scanQueue.getMessages()).isEmpty();
+  }
+
+  @Test
+  void identifyScanShouldAdmitConcurrentScansIndependentlyAndQueueOncePerScan() throws Exception {
+    // arrange
+    for (var scanId : List.of("first", "second")) {
+      putScan("alice", scanId, "uploading", 1);
+      putRow(
+          "alice", scanId, 1, "card.jpg", "users/alice/scans/%s/000001.jpg".formatted(scanId), 10);
+      putObject("users/alice/scans/%s/000001.jpg".formatted(scanId), 10, "image/jpeg");
+    }
+
+    // act
+    var firstRequest = CompletableFuture.runAsync(() -> identifyScan("first"));
+    var competingFirstRequest = CompletableFuture.runAsync(() -> identifyScan("first"));
+    var concurrentFailure =
+        CompletableFuture.allOf(firstRequest, competingFirstRequest)
+            .handle((ignored, failure) -> failure)
+            .join();
+    if (concurrentFailure != null) {
+      assertThat(concurrentFailure).hasRootCauseInstanceOf(ConditionalCheckFailedException.class);
+    }
+    identifyScanService.identifyScan(
+        new RequestContext("alice"), new IdentifyScanRequest("second"));
+
+    // assert
+    assertThat(scanQueue.getSends()).hasSize(2);
+    assertThat(scanQueue.getSends())
+        .extracting(send -> send.messageGroupId())
+        .containsExactlyInAnyOrder("first", "second");
+  }
+
   private static ScanItem scan(String user, String scanId, String status, int rowCount) {
     var scan = ScanItem.create(user, "mtg", scanId, "NM", "normal", rowCount, CREATED_AT);
     scan.setStatus(status);
@@ -589,5 +729,14 @@ class ScanServicesIntegrationTest {
     s3Client.putObject(
         PutObjectRequest.builder().bucket(BUCKET).key(key).contentType(contentType).build(),
         RequestBody.fromBytes(new byte[sizeBytes]));
+  }
+
+  private void identifyScan(String scanId) {
+    try {
+      identifyScanService.identifyScan(
+          new RequestContext("alice"), new IdentifyScanRequest(scanId));
+    } catch (ServiceException e) {
+      throw new RuntimeException(e);
+    }
   }
 }

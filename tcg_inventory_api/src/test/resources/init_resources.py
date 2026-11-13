@@ -255,7 +255,7 @@ lambdas = {
         "zip_file": "get-scan-handler_deploy.jar",
     },
     "identify_scan": {
-        "handler": "com.jordansimsmith.tcginventory.scans.IdentifyScanHandler",
+        "handler": "com.jordansimsmith.tcginventory.scans.api.IdentifyScanHandler",
         "zip_file": "identify-scan-handler_deploy.jar",
     },
     "confirm_scan": {

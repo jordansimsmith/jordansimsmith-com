@@ -9,6 +9,7 @@ java_library(
     ],
     deps = [
         "//lib/dynamodb:lib",
+        "//lib/queue:lib",
         "//lib/service",
         "//lib/time:lib",
         "//lib/ulid:lib",
@@ -16,11 +17,13 @@ java_library(
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/inventory/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/scans/client",
         "//third_party/dagger",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
         "@maven//:com_fasterxml_jackson_core_jackson_databind",
         "@maven//:com_google_code_findbugs_jsr305",
         "@maven//:software_amazon_awssdk_dynamodb",
         "@maven//:software_amazon_awssdk_dynamodb_enhanced",
         "@maven//:software_amazon_awssdk_s3",
         "@maven//:software_amazon_awssdk_sdk_core",
+        "@maven//:software_amazon_awssdk_sqs",
     ],
 )

@@ -189,6 +189,10 @@ public class TcgInventoryE2ETest {
     assertThat(scanDetail.get("scan_id").asText()).isEqualTo(scanId);
     assertThat(scanDetail.get("rows")).hasSize(1);
     assertThat(scanDetail.get("rows").get(0).has("upload_url")).isFalse();
+    var identifyScanResponse = sendAsUser("POST", "/scans/" + scanId + "/identify", "", scanUser);
+    assertThat(identifyScanResponse.statusCode()).isEqualTo(409);
+    assertThat(objectMapper.readTree(identifyScanResponse.body()).get("message").asText())
+        .isEqualTo("all scan files must be uploaded before identification");
 
     var catalogCardResponse = get("/catalog/cards/" + SCRYFALL_ID + "?game=mtg");
     assertThat(catalogCardResponse.statusCode()).isEqualTo(200);

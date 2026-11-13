@@ -30,7 +30,6 @@ import com.jordansimsmith.tcginventory.publish.server.PublishMessageHandler;
 import com.jordansimsmith.tcginventory.reports.client.ReportService;
 import com.jordansimsmith.tcginventory.reports.server.ReportMessageHandler;
 import com.jordansimsmith.tcginventory.scans.ScanItem;
-import com.jordansimsmith.tcginventory.scans.ScanMessage;
 import com.jordansimsmith.tcginventory.scans.ScanRepository;
 import com.jordansimsmith.tcginventory.scans.ScanRowItem;
 import com.jordansimsmith.time.ClockTestModule;
@@ -69,8 +68,6 @@ public interface TcgInventoryTestFactory extends CatalogFactory {
   FakeUlidGenerator fakeUlidGenerator();
 
   FakeQueueClient<JobMessage> fakeJobsQueue();
-
-  FakeQueueClient<ScanMessage> fakeScanQueue();
 
   FakeQueueClient<RepricingMessage> fakePricingQueue();
 

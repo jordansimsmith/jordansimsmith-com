@@ -4,12 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
-import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPResponse;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.queue.FakeQueueClient;
-import com.jordansimsmith.s3.S3Container;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobMessage;
@@ -25,7 +22,6 @@ import com.jordansimsmith.tcginventory.imports.client.ImportStatus;
 import com.jordansimsmith.time.FakeClock;
 import com.jordansimsmith.ulid.FakeUlidGenerator;
 import java.nio.charset.StandardCharsets;
-import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
@@ -37,33 +33,23 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.TransactionCanceledException;
-import software.amazon.awssdk.services.s3.S3Client;
 
 @Testcontainers
 public class ScansHandlerIntegrationTest {
   @Container private static final DynamoDbContainer dynamoDbContainer = new DynamoDbContainer();
-  @Container private static final S3Container s3Container = new S3Container();
-
-  private static final byte[] JPEG_BYTES =
-      new byte[] {(byte) 0xFF, (byte) 0xD8, 0x01, (byte) 0xFF, (byte) 0xD9};
 
   private TcgInventoryTestFactory factory;
   private FakeClock fakeClock;
   private FakeUlidGenerator fakeUlidGenerator;
   private FakeQueueClient<JobMessage> fakeJobsQueue;
-  private FakeQueueClient<ScanMessage> fakeScanQueue;
   private FakeCardCatalogs fakeCardCatalogs;
-  private ObjectMapper objectMapper;
   private DynamoDbTable<ScanItem> scanTable;
   private DynamoDbTable<ScanRowItem> scanRowTable;
   private DynamoDbTable<JobItem> jobTable;
-  private S3Client s3Client;
-  private IdentifyScanHandler identifyScanHandler;
   private ConfirmScanHandler confirmScanHandler;
   private FakeImportService fakeImportService;
   private ScanConfirmationJobProcessor scanConfirmationJobProcessor;
@@ -71,34 +57,25 @@ public class ScansHandlerIntegrationTest {
   @BeforeAll
   static void setUpBeforeClass() {
     var factory =
-        TcgInventoryTestFactory.create(dynamoDbContainer.getEndpoint(), s3Container.getEndpoint());
+        TcgInventoryTestFactory.create(
+            dynamoDbContainer.getEndpoint(), TcgInventoryTestFactory.UNUSED_S3_ENDPOINT);
     DynamoDbUtils.createTable(factory.dynamoDbClient(), factory.tableDefinition());
-    factory.s3Client().createBucket(request -> request.bucket(ScanImages.BUCKET));
   }
 
   @BeforeEach
   void setUp() {
     factory =
-        TcgInventoryTestFactory.create(dynamoDbContainer.getEndpoint(), s3Container.getEndpoint());
+        TcgInventoryTestFactory.create(
+            dynamoDbContainer.getEndpoint(), TcgInventoryTestFactory.UNUSED_S3_ENDPOINT);
     fakeClock = factory.fakeClock();
     fakeUlidGenerator = factory.fakeUlidGenerator();
     fakeJobsQueue = factory.fakeJobsQueue();
-    fakeScanQueue = factory.fakeScanQueue();
-    objectMapper = factory.objectMapper();
     scanTable = factory.scanTable();
     scanRowTable = factory.scanRowTable();
     jobTable = factory.jobTable();
-    s3Client = factory.s3Client();
-    for (var object :
-        s3Client.listObjectsV2(request -> request.bucket(ScanImages.BUCKET)).contents()) {
-      s3Client.deleteObject(request -> request.bucket(ScanImages.BUCKET).key(object.key()));
-    }
-
     DynamoDbUtils.reset(factory.dynamoDbClient());
     fakeUlidGenerator.reset();
     fakeJobsQueue.reset();
-    fakeScanQueue.reset();
-    identifyScanHandler = new IdentifyScanHandler(factory, factory.fakeScanQueue());
     fakeCardCatalogs = factory.fakeCardCatalogs();
     fakeImportService = new FakeImportService(factory.photosService());
     fakeCardCatalogs.addCard(
@@ -128,153 +105,6 @@ public class ScansHandlerIntegrationTest {
             factory.catalogs(),
             factory.gamesService(),
             fakeImportService);
-  }
-
-  @Test
-  void identifyScanShouldVerifyUploadsTransitionOnceAndEnqueueMessage() throws Exception {
-    // arrange
-    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    var scanId = createScanWithFiles("jordan", 2);
-    s3Client.putObject(
-        request ->
-            request
-                .bucket(ScanImages.BUCKET)
-                .key("users/jordan/scans/%s/000001.jpg".formatted(scanId))
-                .contentType(ScanImages.CONTENT_TYPE),
-        RequestBody.fromBytes(JPEG_BYTES));
-    s3Client.putObject(
-        request ->
-            request
-                .bucket(ScanImages.BUCKET)
-                .key("users/jordan/scans/%s/000002.jpg".formatted(scanId))
-                .contentType(ScanImages.CONTENT_TYPE),
-        RequestBody.fromBytes(new byte[] {1, 2, 3, 4, 5}));
-    fakeClock.setTime(Instant.ofEpochSecond(1700000100));
-
-    // act
-    var firstResponse =
-        identifyScanHandler.handleRequest(
-            buildEventWithPath("jordan", Map.of("scan_id", scanId)), null);
-    var secondResponse =
-        identifyScanHandler.handleRequest(
-            buildEventWithPath("jordan", Map.of("scan_id", scanId)), null);
-
-    // assert
-    assertThat(firstResponse.getStatusCode()).isEqualTo(202);
-    assertThat(objectMapper.readTree(firstResponse.getBody()))
-        .isEqualTo(
-            objectMapper.readTree(
-                "{\"scan_id\":\"%s\",\"status\":\"identifying\"}".formatted(scanId)));
-    assertThat(secondResponse.getStatusCode()).isEqualTo(202);
-    assertThat(objectMapper.readTree(secondResponse.getBody()))
-        .isEqualTo(
-            objectMapper.readTree(
-                "{\"scan_id\":\"%s\",\"status\":\"identifying\"}".formatted(scanId)));
-    assertThat(fakeScanQueue.getMessages()).containsExactly(new ScanMessage("jordan", scanId));
-    assertThat(fakeScanQueue.getSends()).hasSize(1);
-    assertThat(fakeScanQueue.getSends().get(0).messageGroupId()).isEqualTo(scanId);
-    assertThat(fakeScanQueue.getSends().get(0).messageDeduplicationId()).isEqualTo(scanId + "#0");
-    var scanItem =
-        scanTable.getItem(
-            Key.builder()
-                .partitionValue(ScanItem.formatPk("jordan"))
-                .sortValue(ScanItem.formatSk(scanId))
-                .build());
-    assertThat(scanItem.getStatus()).isEqualTo("identifying");
-    assertThat(scanItem.getUpdatedAt()).isEqualTo(Instant.ofEpochSecond(1700000100));
-  }
-
-  @Test
-  void identifyScanShouldRejectIncompleteUploadsWithoutTransitioning() throws Exception {
-    // arrange
-    var missingScanId = createScan("jordan", "missing.jpg", 5);
-    var wrongSizeScanId = createScan("jordan", "wrong-size.jpg", 5);
-    s3Client.putObject(
-        request ->
-            request
-                .bucket(ScanImages.BUCKET)
-                .key("users/jordan/scans/%s/000001.jpg".formatted(wrongSizeScanId))
-                .contentType(ScanImages.CONTENT_TYPE),
-        RequestBody.fromBytes(new byte[] {1, 2, 3, 4}));
-    var wrongTypeScanId = createScan("jordan", "wrong-type.jpg", 5);
-    s3Client.putObject(
-        request ->
-            request
-                .bucket(ScanImages.BUCKET)
-                .key("users/jordan/scans/%s/000001.jpg".formatted(wrongTypeScanId))
-                .contentType("image/png"),
-        RequestBody.fromBytes(JPEG_BYTES));
-
-    // act
-    var missingResponse = identify(missingScanId);
-    var wrongSizeResponse = identify(wrongSizeScanId);
-    var wrongTypeResponse = identify(wrongTypeScanId);
-
-    // assert
-    for (var response : List.of(missingResponse, wrongSizeResponse, wrongTypeResponse)) {
-      assertThat(response.getStatusCode()).isEqualTo(409);
-      assertThat(response.getBody())
-          .contains("all scan files must be uploaded before identification");
-    }
-    assertThat(fakeScanQueue.getMessages()).isEmpty();
-    assertThat(getScanItem("jordan", missingScanId).getStatus()).isEqualTo("uploading");
-    assertThat(getScanItem("jordan", wrongSizeScanId).getStatus()).isEqualTo("uploading");
-    assertThat(getScanItem("jordan", wrongTypeScanId).getStatus()).isEqualTo("uploading");
-  }
-
-  @Test
-  void identifyScanShouldReturnCurrentStateForLaterStates() throws Exception {
-    // arrange
-    var scanId = createScan("jordan", "001.jpg", 5);
-    var scanItem = getScanItem("jordan", scanId);
-    scanItem.setStatus("identifying");
-    scanTable.putItem(scanItem);
-    var identifyingResponse = identify(scanId);
-    scanItem.setStatus("reviewing");
-    scanTable.putItem(scanItem);
-    var reviewingResponse = identify(scanId);
-    scanItem.setStatus("confirmed");
-    scanTable.putItem(scanItem);
-
-    // act
-    var confirmedResponse = identify(scanId);
-
-    // assert
-    assertThat(identifyingResponse.getStatusCode()).isEqualTo(202);
-    assertThat(objectMapper.readTree(identifyingResponse.getBody()).get("status").asText())
-        .isEqualTo("identifying");
-    assertThat(reviewingResponse.getStatusCode()).isEqualTo(202);
-    assertThat(objectMapper.readTree(reviewingResponse.getBody()).get("status").asText())
-        .isEqualTo("reviewing");
-    assertThat(confirmedResponse.getStatusCode()).isEqualTo(202);
-    assertThat(objectMapper.readTree(confirmedResponse.getBody()).get("status").asText())
-        .isEqualTo("confirmed");
-    assertThat(fakeScanQueue.getMessages()).isEmpty();
-  }
-
-  @Test
-  void identifyScanShouldRejectMissingAndForeignScans() throws Exception {
-    // arrange
-    var scanId = createScan("alice", "001.jpg", 5);
-    scanTable.deleteItem(
-        Key.builder()
-            .partitionValue(ScanItem.formatPk("alice"))
-            .sortValue(ScanItem.formatSk(scanId))
-            .build());
-
-    // act
-    var deletedResponse =
-        identifyScanHandler.handleRequest(
-            buildEventWithPath("alice", Map.of("scan_id", scanId)), null);
-    var foreignScanId = createScan("alice", "002.jpg", 5);
-    var foreignResponse =
-        identifyScanHandler.handleRequest(
-            buildEventWithPath("bob", Map.of("scan_id", foreignScanId)), null);
-
-    // assert
-    assertThat(deletedResponse.getStatusCode()).isEqualTo(404);
-    assertThat(foreignResponse.getStatusCode()).isEqualTo(404);
-    assertThat(fakeScanQueue.getMessages()).isEmpty();
   }
 
   @Test
@@ -597,10 +427,6 @@ public class ScansHandlerIntegrationTest {
     return "{\"rows\":[" + rows + "]}";
   }
 
-  private String createScan(String user, String filename, int sizeBytes) {
-    return createScanWithFiles(user, List.of(new ScanFileForTest(filename, sizeBytes)));
-  }
-
   private String createScanWithFiles(String user, int fileCount) {
     var files =
         IntStream.rangeClosed(1, fileCount)
@@ -673,11 +499,6 @@ public class ScansHandlerIntegrationTest {
             .partitionValue(JobItem.formatPk(user))
             .sortValue(JobItem.formatSk(jobId))
             .build());
-  }
-
-  private APIGatewayV2HTTPResponse identify(String scanId) {
-    return identifyScanHandler.handleRequest(
-        buildEventWithPath("jordan", Map.of("scan_id", scanId)), null);
   }
 
   private APIGatewayV2HTTPEvent buildEventWithPathAndBody(

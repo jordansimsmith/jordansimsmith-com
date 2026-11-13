@@ -1,6 +1,8 @@
 package com.jordansimsmith.tcginventory.scans.server;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jordansimsmith.queue.QueueClient;
+import com.jordansimsmith.queue.SqsQueueClient;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceException;
 import com.jordansimsmith.tcginventory.games.client.GamesService;
@@ -14,6 +16,8 @@ import com.jordansimsmith.tcginventory.scans.client.FindScansRequest;
 import com.jordansimsmith.tcginventory.scans.client.FindScansResponse;
 import com.jordansimsmith.tcginventory.scans.client.GetScanRequest;
 import com.jordansimsmith.tcginventory.scans.client.GetScanResponse;
+import com.jordansimsmith.tcginventory.scans.client.IdentifyScanRequest;
+import com.jordansimsmith.tcginventory.scans.client.IdentifyScanResponse;
 import com.jordansimsmith.tcginventory.scans.client.ScanService;
 import com.jordansimsmith.time.Clock;
 import com.jordansimsmith.ulid.UlidGenerator;
@@ -26,6 +30,7 @@ import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
+import software.amazon.awssdk.services.sqs.SqsClient;
 
 @Module
 public class ScansModule {
@@ -41,7 +46,8 @@ public class ScansModule {
       GamesService gamesService,
       S3Client s3Client,
       S3Presigner s3Presigner,
-      @Named("scanImagesBucket") String bucket) {
+      @Named("scanImagesBucket") String bucket,
+      SqsClient sqsClient) {
     var scanTable = enhancedClient.table(tableName, TableSchema.fromBean(ScanItem.class));
     var scanRowTable = enhancedClient.table(tableName, TableSchema.fromBean(ScanRowItem.class));
     var readRepository = new ScanReadRepository(scanTable, scanRowTable);
@@ -51,7 +57,13 @@ public class ScansModule {
         new CreateScanService(
             mutationRepository, clock, ulidGenerator, s3Presigner, gamesService, bucket);
     var findScansService = new FindScansService(readRepository, objectMapper);
-    var getScanService = new GetScanService(readRepository, s3Client, s3Presigner, bucket);
+    var scanUploadVerifier = new ScanUploadVerifier(s3Client, bucket);
+    var getScanService =
+        new GetScanService(readRepository, scanUploadVerifier, s3Presigner, bucket);
+    QueueClient<ScanMessage> scanQueue =
+        SqsQueueClient.create(sqsClient, objectMapper, "tcg_inventory_scan_jobs.fifo");
+    var identifyScanService =
+        new IdentifyScanService(readRepository, mutationRepository, scanUploadVerifier, scanQueue);
     var deleteScanRowService =
         new DeleteScanRowService(readRepository, mutationRepository, s3Client, bucket);
     var deleteScanService =
@@ -73,6 +85,12 @@ public class ScansModule {
       public GetScanResponse getScan(RequestContext ctx, GetScanRequest request)
           throws ServiceException {
         return getScanService.getScan(ctx, request);
+      }
+
+      @Override
+      public IdentifyScanResponse identifyScan(RequestContext ctx, IdentifyScanRequest request)
+          throws ServiceException {
+        return identifyScanService.identifyScan(ctx, request);
       }
 
       @Override
