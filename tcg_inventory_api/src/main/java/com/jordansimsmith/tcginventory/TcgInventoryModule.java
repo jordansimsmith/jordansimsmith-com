@@ -33,9 +33,6 @@ import dagger.Provides;
 import java.net.URI;
 import javax.inject.Named;
 import javax.inject.Singleton;
-import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
-import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
-import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.http.crt.AwsCrtHttpClient;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.sqs.SqsClient;
@@ -63,8 +60,6 @@ import software.amazon.awssdk.services.sqs.SqsClient;
       PublishModule.class
     })
 public class TcgInventoryModule {
-  static final String JOBS_QUEUE_NAME = "tcg_inventory_jobs.fifo";
-
   static final String REPORTS_QUEUE_NAME = "tcg_inventory_reports.fifo";
 
   static final String PRICING_QUEUE_NAME = "tcg_inventory_pricing.fifo";
@@ -179,12 +174,6 @@ public class TcgInventoryModule {
 
   @Provides
   @Singleton
-  DynamoDbTable<JobItem> jobTable(DynamoDbEnhancedClient client) {
-    return client.table(TcgInventoryTable.TABLE_NAME, TableSchema.fromBean(JobItem.class));
-  }
-
-  @Provides
-  @Singleton
   SqsClient sqsClient() {
     var sqsClient =
         SqsClient.builder()
@@ -192,12 +181,6 @@ public class TcgInventoryModule {
             .httpClientBuilder(AwsCrtHttpClient.builder())
             .build();
     return sqsClient;
-  }
-
-  @Provides
-  @Singleton
-  QueueClient<JobMessage> jobsQueue(ObjectMapper objectMapper, SqsClient sqsClient) {
-    return SqsQueueClient.create(sqsClient, objectMapper, JOBS_QUEUE_NAME);
   }
 
   @Provides

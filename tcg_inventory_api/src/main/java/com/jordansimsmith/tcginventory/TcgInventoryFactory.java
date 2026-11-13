@@ -3,7 +3,6 @@ package com.jordansimsmith.tcginventory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
-import com.jordansimsmith.queue.QueueClient;
 import com.jordansimsmith.tcginventory.catalog.client.CatalogService;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
 import com.jordansimsmith.tcginventory.games.client.GamesService;
@@ -28,7 +27,6 @@ import com.jordansimsmith.ulid.UlidGenerator;
 import dagger.Component;
 import javax.inject.Singleton;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
-import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
@@ -47,13 +45,9 @@ public interface TcgInventoryFactory {
 
   DynamoDbEnhancedClient dynamoDbEnhancedClient();
 
-  DynamoDbTable<JobItem> jobTable();
-
   DynamoDbClient dynamoDbClient();
 
   SqsClient sqsClient();
-
-  QueueClient<JobMessage> jobsQueue();
 
   UlidGenerator ulidGenerator();
 

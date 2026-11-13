@@ -30,9 +30,6 @@ import com.jordansimsmith.tcginventory.publish.server.PublishMessage;
 import com.jordansimsmith.tcginventory.publish.server.PublishMessageHandler;
 import com.jordansimsmith.tcginventory.reports.client.ReportService;
 import com.jordansimsmith.tcginventory.reports.server.ReportMessageHandler;
-import com.jordansimsmith.tcginventory.scans.ScanItem;
-import com.jordansimsmith.tcginventory.scans.ScanRepository;
-import com.jordansimsmith.tcginventory.scans.ScanRowItem;
 import com.jordansimsmith.time.ClockTestModule;
 import com.jordansimsmith.time.FakeClock;
 import com.jordansimsmith.ulid.FakeUlidGenerator;
@@ -68,8 +65,6 @@ public interface TcgInventoryTestFactory extends CatalogFactory {
 
   FakeUlidGenerator fakeUlidGenerator();
 
-  FakeQueueClient<JobMessage> fakeJobsQueue();
-
   FakeQueueClient<RepricingMessage> fakePricingQueue();
 
   FakeQueueClient<PublishMessage> fakePublishQueue();
@@ -92,10 +87,6 @@ public interface TcgInventoryTestFactory extends CatalogFactory {
 
   DynamoDbTable<TcgInventoryTableDefinition> tableDefinition();
 
-  DynamoDbTable<ScanItem> scanTable();
-
-  DynamoDbTable<ScanRowItem> scanRowTable();
-
   DynamoDbTable<CatalogSnapshotItem> catalogSnapshotTable();
 
   OrderService orderService();
@@ -103,8 +94,6 @@ public interface TcgInventoryTestFactory extends CatalogFactory {
   ImportService importService();
 
   FulfillmentMessageHandler fulfillmentMessageHandler();
-
-  ScanRepository scanRepository();
 
   PricingService pricingService();
 

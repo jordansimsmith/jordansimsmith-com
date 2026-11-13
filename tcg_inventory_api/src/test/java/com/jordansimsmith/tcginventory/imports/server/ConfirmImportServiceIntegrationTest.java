@@ -20,7 +20,6 @@ import com.jordansimsmith.tcginventory.imports.client.GetImportRequest;
 import com.jordansimsmith.tcginventory.inventory.client.FakeInventoryService;
 import com.jordansimsmith.time.FakeClock;
 import java.time.Instant;
-import java.util.Map;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,9 +30,7 @@ import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
-import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.ConditionalCheckFailedException;
-import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
 
 @Testcontainers
 class ConfirmImportServiceIntegrationTest {
@@ -133,28 +130,6 @@ class ConfirmImportServiceIntegrationTest {
         .isInstanceOf(ConditionalCheckFailedException.class);
     assertThatThrownBy(() -> writes.startConfirmation(USER, "missing", NOW))
         .isInstanceOf(ConditionalCheckFailedException.class);
-  }
-
-  @Test
-  void admissionDoesNotRejectAnUnrelatedActiveJob() throws ServiceException {
-    var parent = ImportItem.create(USER, "mtg", IMPORT_ID, null, 0, NOW);
-    parent.setStatus("review");
-    importTable.putItem(parent);
-    dynamoDbClient.putItem(
-        PutItemRequest.builder()
-            .tableName(TABLE_NAME)
-            .item(
-                Map.of(
-                    "pk", AttributeValue.fromS("USER#" + USER),
-                    "sk", AttributeValue.fromS("JOB#publish-job"),
-                    "status", AttributeValue.fromS("queued")))
-            .build());
-
-    service.confirmImport(new RequestContext(USER), new ConfirmImportRequest(IMPORT_ID));
-
-    assertThat(reads.getImport(USER, IMPORT_ID).getStatus()).isEqualTo("confirming");
-    assertThat(queue.getMessages())
-        .containsExactly(new ImportMessage(USER, IMPORT_ID, ImportMessageType.CONFIRM));
   }
 
   @Test

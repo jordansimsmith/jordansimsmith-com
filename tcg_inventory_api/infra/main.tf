@@ -228,11 +228,6 @@ module "java_api" {
       handler  = "com.jordansimsmith.tcginventory.orders.api.ConfirmOrderHandler"
       artifact = var.artifacts["confirm_order"]
     }
-    jobs_handler = {
-      handler  = "com.jordansimsmith.tcginventory.JobsHandler"
-      artifact = var.artifacts["jobs_handler"]
-      timeout  = 900
-    }
     reports_worker = {
       handler  = "com.jordansimsmith.tcginventory.reports.worker.ReportWorkerHandler"
       artifact = var.artifacts["report_worker"]
@@ -324,7 +319,6 @@ module "java_api" {
   # snapstart snapshot init resolves worker queues, dynamodb table, and s3
   # bucket at startup, so they must exist before any lambda version is published
   depends_on = [
-    aws_sqs_queue.jobs,
     aws_sqs_queue.scan_jobs,
     aws_sqs_queue.reports,
     aws_sqs_queue.pricing,
@@ -443,34 +437,6 @@ resource "aws_dynamodb_table" "tcg_inventory" {
   }
 
   deletion_protection_enabled = true
-}
-
-# content-based deduplication is disabled because job slice messages are
-# byte-identical; senders set an explicit deduplication id of
-# <job_id>#<continuation> and a send missing one fails loudly
-resource "aws_sqs_queue" "jobs_dlq" {
-  name                        = "tcg_inventory_jobs_dlq.fifo"
-  fifo_queue                  = true
-  content_based_deduplication = false
-}
-
-resource "aws_sqs_queue" "jobs" {
-  name                        = "tcg_inventory_jobs.fifo"
-  fifo_queue                  = true
-  content_based_deduplication = false
-  visibility_timeout_seconds  = 960
-
-  redrive_policy = jsonencode({
-    deadLetterTargetArn = aws_sqs_queue.jobs_dlq.arn
-    maxReceiveCount     = 5
-  })
-}
-
-resource "aws_lambda_event_source_mapping" "jobs" {
-  event_source_arn                   = aws_sqs_queue.jobs.arn
-  function_name                      = module.java_api.lambda_functions["jobs_handler"].qualified_arn
-  batch_size                         = 1
-  maximum_batching_window_in_seconds = 0
 }
 
 resource "aws_sqs_queue" "reports_dlq" {
@@ -707,7 +673,6 @@ data "aws_iam_policy_document" "lambda_sqs" {
     effect = "Allow"
 
     resources = [
-      aws_sqs_queue.jobs.arn,
       aws_sqs_queue.reports.arn,
       aws_sqs_queue.pricing.arn,
       aws_sqs_queue.publish.arn,

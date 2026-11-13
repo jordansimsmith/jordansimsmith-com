@@ -29,12 +29,8 @@ import com.jordansimsmith.tcginventory.pricing.server.RepricingMessage;
 import com.jordansimsmith.tcginventory.publish.server.PublishMessage;
 import com.jordansimsmith.tcginventory.publish.server.PublishModule;
 import com.jordansimsmith.tcginventory.reports.server.ReportsModule;
-import com.jordansimsmith.tcginventory.scans.ScanItem;
-import com.jordansimsmith.tcginventory.scans.ScanRepository;
-import com.jordansimsmith.tcginventory.scans.ScanRowItem;
 import com.jordansimsmith.tcginventory.scans.server.ScanImages;
 import com.jordansimsmith.tcginventory.scans.server.ScansModule;
-import com.jordansimsmith.time.Clock;
 import dagger.Module;
 import dagger.Provides;
 import java.net.URI;
@@ -44,7 +40,6 @@ import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.regions.Region;
-import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.sqs.SqsClient;
 
 @Module(
@@ -126,35 +121,6 @@ public class TcgInventoryTestModule {
 
   @Provides
   @Singleton
-  DynamoDbTable<ScanItem> scanTable(DynamoDbEnhancedClient client) {
-    return client.table(TcgInventoryTable.TABLE_NAME, TableSchema.fromBean(ScanItem.class));
-  }
-
-  @Provides
-  @Singleton
-  DynamoDbTable<ScanRowItem> scanRowTable(DynamoDbEnhancedClient client) {
-    return client.table(TcgInventoryTable.TABLE_NAME, TableSchema.fromBean(ScanRowItem.class));
-  }
-
-  @Provides
-  @Singleton
-  ScanRepository scanRepository(
-      DynamoDbTable<ScanItem> scanTable,
-      DynamoDbTable<ScanRowItem> scanRowTable,
-      DynamoDbClient dynamoDbClient,
-      Clock clock) {
-    return new ScanRepository(
-        scanTable, scanRowTable, dynamoDbClient, clock, TcgInventoryTable.TABLE_NAME);
-  }
-
-  @Provides
-  @Singleton
-  DynamoDbTable<JobItem> jobTable(DynamoDbEnhancedClient client) {
-    return client.table(TcgInventoryTable.TABLE_NAME, TableSchema.fromBean(JobItem.class));
-  }
-
-  @Provides
-  @Singleton
   DynamoDbTable<CatalogSnapshotItem> catalogSnapshotTable(DynamoDbEnhancedClient client) {
     return client.table(
         TcgInventoryTable.TABLE_NAME, TableSchema.fromBean(CatalogSnapshotItem.class));
@@ -164,18 +130,6 @@ public class TcgInventoryTestModule {
   @Singleton
   SqsClient sqsClient() {
     return SqsClient.builder().region(Region.of("ap-southeast-2")).build();
-  }
-
-  @Provides
-  @Singleton
-  FakeQueueClient<JobMessage> fakeJobsQueue() {
-    return new FakeQueueClient<>();
-  }
-
-  @Provides
-  @Singleton
-  QueueClient<JobMessage> jobsQueue(FakeQueueClient<JobMessage> fakeJobsQueue) {
-    return fakeJobsQueue;
   }
 
   @Provides

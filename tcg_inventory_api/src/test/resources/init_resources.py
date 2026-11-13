@@ -82,7 +82,6 @@ while True:
     time.sleep(1)
 
 queue_configs = {
-    "jobs": {"name": "tcg_inventory_jobs.fifo"},
     "scan_jobs": {"name": "tcg_inventory_scan_jobs.fifo"},
     "scans": {
         "name": "tcg_inventory_scans.fifo",
@@ -281,16 +280,6 @@ lambdas = {
     "get_publish": {
         "handler": "com.jordansimsmith.tcginventory.publish.api.GetPublishHandler",
         "zip_file": "get-publish-handler_deploy.jar",
-    },
-    "jobs_handler": {
-        "handler": "com.jordansimsmith.tcginventory.JobsHandler",
-        "zip_file": "jobs-handler_deploy.jar",
-        "timeout": 900,
-        "environment": {
-            "JOBS_QUEUE_URL": queue_urls["jobs"],
-            "FETCHTCG_BASE_URL": os.environ.get("FETCHTCG_BASE_URL", ""),
-            "FIREBASE_TOKEN_URL": os.environ.get("FIREBASE_TOKEN_URL", ""),
-        },
     },
     "reports_worker": {
         "handler": "com.jordansimsmith.tcginventory.reports.worker.ReportWorkerHandler",
@@ -624,12 +613,6 @@ for function_name, config in lambdas.items():
     if "environment" in config:
         create_kwargs["Environment"] = {"Variables": config["environment"]}
     lambda_client.create_function(**create_kwargs)
-
-lambda_client.create_event_source_mapping(
-    EventSourceArn=queue_arns["jobs"],
-    FunctionName="jobs_handler",
-    BatchSize=1,
-)
 
 lambda_client.create_event_source_mapping(
     EventSourceArn=queue_arns["reports"],

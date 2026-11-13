@@ -6,11 +6,9 @@ import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
-import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.TcgInventoryFactory;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
-import java.time.Instant;
 import java.util.Base64;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeAll;
@@ -111,21 +109,6 @@ public class PricingConfigurationHandlerIntegrationTest {
         .isEqualTo("price_floor must be a nonnegative decimal with at most two places");
     assertThat(factory.dynamoDbClient().getItem(getPricingItemRequest("jordan")).item())
         .containsEntry("price_floor", AttributeValue.fromS("0.50"));
-  }
-
-  @Test
-  void updatePricingShouldAllowWritesWhileJobIsActivePendingJobsIntegration() throws Exception {
-    // arrange
-    var job = JobItem.create("jordan", "job1", "publish", Instant.ofEpochSecond(1700000000));
-    job.setStatus("running");
-    factory.jobTable().putItem(job);
-
-    // act
-    var response =
-        updatePricingHandler.handleRequest(buildEvent("jordan", "{\"price_floor\":0}"), null);
-
-    // assert
-    assertPriceFloor(response.getBody(), "0.00");
   }
 
   @Test
