@@ -5,7 +5,9 @@ import com.jordansimsmith.queue.QueueClient;
 import com.jordansimsmith.queue.SqsQueueClient;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceException;
+import com.jordansimsmith.tcginventory.catalog.client.CatalogService;
 import com.jordansimsmith.tcginventory.games.client.GamesService;
+import com.jordansimsmith.tcginventory.imports.client.ImportService;
 import com.jordansimsmith.tcginventory.scans.client.CreateScanRequest;
 import com.jordansimsmith.tcginventory.scans.client.CreateScanResponse;
 import com.jordansimsmith.tcginventory.scans.client.DeleteScanRequest;
@@ -34,6 +36,24 @@ import software.amazon.awssdk.services.sqs.SqsClient;
 
 @Module
 public class ScansModule {
+  @Provides
+  @Singleton
+  ScanConfirmationMessageHandler scanConfirmationMessageHandler(
+      DynamoDbEnhancedClient enhancedClient,
+      DynamoDbClient dynamoDbClient,
+      @Named("tcgInventoryTableName") String tableName,
+      Clock clock,
+      CatalogService catalogService,
+      ImportService importService) {
+    var scanTable = enhancedClient.table(tableName, TableSchema.fromBean(ScanItem.class));
+    var scanRowTable = enhancedClient.table(tableName, TableSchema.fromBean(ScanRowItem.class));
+    var readRepository = new ScanReadRepository(scanTable, scanRowTable);
+    var mutationRepository =
+        new ScanMutationRepository(scanTable, scanRowTable, dynamoDbClient, clock, tableName);
+    return new ScanConfirmationMessageHandler(
+        readRepository, mutationRepository, catalogService, importService);
+  }
+
   @Provides
   @Singleton
   ScanService scanService(

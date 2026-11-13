@@ -70,6 +70,28 @@ public class ScanMutationRepository {
             .build());
   }
 
+  public void completeScanConfirmation(String user, String scanId, String importId) {
+    dynamoDbClient.updateItem(
+        request ->
+            request
+                .tableName(tableName)
+                .key(
+                    Map.of(
+                        ScanItem.PK, AttributeValue.fromS(ScanItem.formatPk(user)),
+                        ScanItem.SK, AttributeValue.fromS(ScanItem.formatSk(scanId))))
+                .updateExpression(
+                    "SET #status = :confirmed, import_id = :importId, updated_at = :now")
+                .conditionExpression("#status = :confirming")
+                .expressionAttributeNames(Map.of("#status", ScanItem.STATUS))
+                .expressionAttributeValues(
+                    Map.of(
+                        ":confirmed", AttributeValue.fromS("confirmed"),
+                        ":confirming", AttributeValue.fromS("confirming"),
+                        ":importId", AttributeValue.fromS(importId),
+                        ":now",
+                            AttributeValue.fromN(Long.toString(clock.now().getEpochSecond())))));
+  }
+
   public void deleteScanRow(String user, String scanId, int scanPosition) {
     var scanKey =
         Map.of(

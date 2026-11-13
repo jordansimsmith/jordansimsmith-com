@@ -84,6 +84,10 @@ while True:
 queue_configs = {
     "jobs": {"name": "tcg_inventory_jobs.fifo"},
     "scan_jobs": {"name": "tcg_inventory_scan_jobs.fifo"},
+    "scans": {
+        "name": "tcg_inventory_scans.fifo",
+        "visibility_timeout": 960,
+    },
     "reports": {
         "name": "tcg_inventory_reports.fifo",
         "visibility_timeout": 960,
@@ -314,6 +318,12 @@ lambdas = {
         "handler": "com.jordansimsmith.tcginventory.orders.worker.OrdersWorkerHandler",
         "zip_file": "orders-worker-handler_deploy.jar",
         "timeout": 900,
+    },
+    "scans_worker": {
+        "handler": "com.jordansimsmith.tcginventory.scans.worker.ScanWorkerHandler",
+        "zip_file": "scan-worker-handler_deploy.jar",
+        "timeout": 900,
+        "environment": {"SCRYFALL_BASE_URL": os.environ.get("SCRYFALL_BASE_URL", "")},
     },
     "imports_worker": {
         "handler": "com.jordansimsmith.tcginventory.imports.worker.ImportsWorkerHandler",
@@ -652,6 +662,13 @@ lambda_client.create_event_source_mapping(
 lambda_client.create_event_source_mapping(
     EventSourceArn=queue_arns["imports"],
     FunctionName="imports_worker",
+    BatchSize=1,
+    MaximumBatchingWindowInSeconds=0,
+)
+
+lambda_client.create_event_source_mapping(
+    EventSourceArn=queue_arns["scans"],
+    FunctionName="scans_worker",
     BatchSize=1,
     MaximumBatchingWindowInSeconds=0,
 )

@@ -25,6 +25,7 @@ filegroup(
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/reports/api:__pkg__",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/reports/worker:__pkg__",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/scans/api:__pkg__",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/scans/worker:__pkg__",
     ],
 )
 
@@ -127,6 +128,7 @@ java_library(
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/reports/api:__pkg__",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/reports/worker:__pkg__",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/scans/api:__pkg__",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/scans/worker:__pkg__",
         "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/catalog/api:__pkg__",
         "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/imports/api:__pkg__",
         "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/imports/worker:__pkg__",
@@ -364,6 +366,7 @@ java_library(
     visibility = [
         "//tcg_inventory_api:__pkg__",
         "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/orders/server:__pkg__",
+        "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/scans/server:__pkg__",
     ],
     deps = [
         ":catalog-lib",
@@ -607,6 +610,7 @@ localstack_image(
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/api:create-repricing-handler_deploy.jar",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/api:get-repricing-handler_deploy.jar",
         ":jobs-handler_deploy.jar",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/scans/worker:scan-worker-handler_deploy.jar",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/reports/worker:report-worker-handler_deploy.jar",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/worker:pricing-worker-handler_deploy.jar",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/publish/worker:publish-worker-handler_deploy.jar",
