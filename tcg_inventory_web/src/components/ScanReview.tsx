@@ -634,10 +634,6 @@ export function ScanReview({
       return {
         scan_position: row.scan_position,
         external_id: selection.card.external_id,
-        name: selection.card.name,
-        set_code: selection.card.set_code,
-        set_name: selection.card.set_name,
-        collector_number: selection.card.collector_number,
       };
     });
 

@@ -281,6 +281,9 @@ describe('ScanDetailPage', () => {
     await user.click(screen.getByRole('button', { name: 'Confirm scan' }));
 
     expect(confirmScan).toHaveBeenCalledTimes(1);
+    expect(confirmScan).toHaveBeenCalledWith('scan-identifying', {
+      rows: [{ scan_position: 1, external_id: suggestedProduct.external_id }],
+    });
     expect(
       await screen.findByRole('region', { name: 'Scan confirmation' }),
     ).toBeDefined();

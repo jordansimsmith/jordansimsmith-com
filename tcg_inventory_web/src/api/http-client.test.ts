@@ -896,10 +896,6 @@ describe('http client scans', () => {
         {
           scan_position: 1,
           external_id: 'card-1',
-          name: 'Opt',
-          set_code: 'dom',
-          set_name: 'Dominaria',
-          collector_number: '60',
         },
       ],
     };
@@ -913,6 +909,9 @@ describe('http client scans', () => {
     );
     expect(fetchSpy.mock.calls[0][1].method).toBe('POST');
     expect(fetchSpy.mock.calls[0][1].body).toBe(JSON.stringify(request));
+    expect(fetchSpy.mock.calls[0][1].headers.Authorization).toBe(
+      `Basic ${btoa('alice:pw')}`,
+    );
     expect(json).not.toHaveBeenCalled();
   });
 

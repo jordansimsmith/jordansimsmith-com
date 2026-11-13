@@ -422,10 +422,6 @@ describe('ScanReview', () => {
       {
         scan_position: 1,
         external_id: firstCard.external_id,
-        name: firstCard.name,
-        set_code: firstCard.set_code,
-        set_name: firstCard.set_name,
-        collector_number: firstCard.collector_number,
       },
     ]);
   });
@@ -554,18 +550,10 @@ describe('ScanReview', () => {
       {
         scan_position: 1,
         external_id: 'product-1',
-        name: 'Lightning Bolt',
-        set_code: '2x2',
-        set_name: 'Double Masters 2022',
-        collector_number: '117',
       },
       {
         scan_position: 2,
         external_id: 'product-2',
-        name: 'Lightning Bolt',
-        set_code: 'm11',
-        set_name: 'Magic 2011',
-        collector_number: '149',
       },
     ]);
   });

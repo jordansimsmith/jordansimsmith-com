@@ -1663,22 +1663,37 @@ export function createFakeClient(): ApiClient {
     if (scan.status !== 'confirming' || !orderedRows) {
       return;
     }
+    const importRows: FakeImportRow[] = orderedRows.map((row, index) => {
+      const card = FAKE_CATALOG_CARDS.find(
+        (candidate) =>
+          candidate.game === scan.game &&
+          candidate.external_id === row.external_id,
+      );
+      if (!card) {
+        throw new Error(`catalog printing not found: ${row.external_id}`);
+      }
+      if (!card.available_finishes.includes(scan.finish)) {
+        throw new Error(
+          `catalog printing does not support finish ${scan.finish}: ${row.external_id}`,
+        );
+      }
+      return {
+        position: index + 1,
+        name: card.name,
+        set_code: card.set_code,
+        set_name: card.set_name,
+        collector_number: card.collector_number,
+        finish: scan.finish,
+        condition: scan.condition,
+        external_id: row.external_id,
+        decision: 'keep',
+        decision_reason: null,
+        ...appraisePrices('keep', index + 1),
+        photos: [],
+      };
+    });
     importCounter += 1;
     const importId = `fake-import-${importCounter}`;
-    const importRows: FakeImportRow[] = orderedRows.map((row, index) => ({
-      position: index + 1,
-      name: row.name,
-      set_code: row.set_code,
-      set_name: row.set_name,
-      collector_number: row.collector_number,
-      finish: scan.finish,
-      condition: scan.condition,
-      external_id: row.external_id,
-      decision: 'keep',
-      decision_reason: null,
-      ...appraisePrices('keep', index + 1),
-      photos: [],
-    }));
     importRecords.push({
       import_id: importId,
       game: scan.game,
@@ -2321,11 +2336,7 @@ export function createFakeClient(): ApiClient {
           return (
             source === undefined ||
             row.scan_position !== source.scan_position ||
-            !row.external_id ||
-            !row.name ||
-            !row.set_code ||
-            !row.set_name ||
-            !row.collector_number
+            !row.external_id
           );
         })
       ) {

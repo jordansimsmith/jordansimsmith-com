@@ -222,10 +222,6 @@ export interface ScanRowUpload extends ScanFile {
 export interface ScanConfirmationRow {
   scan_position: number;
   external_id: string;
-  name: string;
-  set_code: string;
-  set_name: string;
-  collector_number: string;
 }
 
 export interface ScanRow extends ScanFile {

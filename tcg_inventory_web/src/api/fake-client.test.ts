@@ -808,15 +808,17 @@ describe('createFakeClient scans', () => {
 
   it('confirms a reviewing scan once and creates rows in scan order', async () => {
     const client = createFakeClient();
-    const scan = await client.getScan('fake-scan-reviewing');
-    const rows: ScanConfirmationRow[] = scan.rows.map((row, index) => ({
-      scan_position: row.scan_position,
-      external_id: row.suggestions[0].external_id,
-      name: row.suggestions[0].name,
-      set_code: index === 0 ? 'mh2' : 'dom',
-      set_name: index === 0 ? 'Modern Horizons 2' : 'Dominaria',
-      collector_number: String(index + 1),
-    }));
+    await client.deleteScanRow('fake-scan-reviewing', 2);
+    const rows: ScanConfirmationRow[] = [
+      {
+        scan_position: 3,
+        external_id: '4f616706-ec97-4923-bb1e-11a69fbaa1f8',
+      },
+      {
+        scan_position: 1,
+        external_id: 'f29ba16f-c8fb-42fe-aabf-87089cb214a8',
+      },
+    ];
 
     await expect(
       client.confirmScan('fake-scan-reviewing', { rows }),
@@ -828,12 +830,57 @@ describe('createFakeClient scans', () => {
     await expect(
       client.confirmScan('fake-scan-reviewing', { rows }),
     ).resolves.toBeUndefined();
+    const repeatedScan = await client.getScan('fake-scan-reviewing');
     const imported = await client.getImport(confirmedScan.import_id!);
 
     expect(confirmedScan.status).toBe('confirmed');
-    expect(imported.rows.map((row) => row.name)).toEqual(
-      rows.map((row) => row.name),
-    );
+    expect(confirmedScan.row_count).toBe(3);
+    expect(confirmedScan.rows.map((row) => row.scan_position)).toEqual([1, 3]);
+    expect(repeatedScan.import_id).toBe(confirmedScan.import_id);
+    expect(imported.rows).toMatchObject([
+      {
+        position: 1,
+        name: 'Lightning Bolt',
+        set_code: '2xm',
+        set_name: 'Double Masters',
+        collector_number: '132',
+        finish: 'etched',
+        condition: 'MP',
+        external_id: 'f29ba16f-c8fb-42fe-aabf-87089cb214a8',
+      },
+      {
+        position: 2,
+        name: 'Counterspell',
+        set_code: 'mh2',
+        set_name: 'Modern Horizons 2',
+        collector_number: '267',
+        finish: 'etched',
+        condition: 'MP',
+        external_id: '4f616706-ec97-4923-bb1e-11a69fbaa1f8',
+      },
+    ]);
+  });
+
+  it('fails fake confirmation for missing or finish-ineligible printings', async () => {
+    for (const externalId of [
+      'missing',
+      '323db259-d35e-467d-9a46-4adcb2fc107c',
+    ]) {
+      const client = createFakeClient();
+      await client.confirmScan('fake-scan-reviewing', {
+        rows: [
+          { scan_position: 1, external_id: externalId },
+          { scan_position: 2, external_id: externalId },
+          { scan_position: 3, external_id: externalId },
+        ],
+      });
+
+      await expect(client.getScan('fake-scan-reviewing')).rejects.toThrow(
+        externalId === 'missing'
+          ? 'catalog printing not found'
+          : 'catalog printing does not support finish etched',
+      );
+    }
   });
 
   it('keeps scan positions stable when a reviewing row is deleted', async () => {
