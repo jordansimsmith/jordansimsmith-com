@@ -924,7 +924,6 @@ interface FakeScanRow extends ScanFile {
   needs_review: boolean;
   suggestions: ScanSuggestion[];
   source_url: string | null;
-  error: string | null;
   deleted: boolean;
 }
 
@@ -935,7 +934,6 @@ interface FakeScan {
   status: ScanStatus;
   condition: Condition;
   finish: Finish;
-  error: string | null;
   import_id: string | null;
   created_at_ms: number;
   identifying_started_at_ms: number | null;
@@ -970,7 +968,6 @@ function createFakeScanRow(
   uploaded: boolean,
   status: ScanRowStatus | null = null,
   suggestions: ScanSuggestion[] = [],
-  error: string | null = null,
 ): FakeScanRow {
   return {
     scan_position: scanPosition,
@@ -985,7 +982,6 @@ function createFakeScanRow(
     needs_review: status === 'needs_review',
     suggestions: suggestions.map((suggestion) => ({ ...suggestion })),
     source_url: uploaded ? fakeScanSourceUrl(scanId, scanPosition) : null,
-    error,
     deleted: false,
   };
 }
@@ -1019,7 +1015,6 @@ function createSeedScans(): FakeScan[] {
       status: 'uploading',
       condition: 'NM',
       finish: 'normal',
-      error: null,
       import_id: null,
       created_at_ms: now - 15 * 60 * 1000,
       identifying_started_at_ms: null,
@@ -1035,7 +1030,6 @@ function createSeedScans(): FakeScan[] {
       status: 'identifying',
       condition: 'LP',
       finish: 'foil',
-      error: null,
       import_id: null,
       created_at_ms: now - 30 * 60 * 1000,
       identifying_started_at_ms: now - 1_000,
@@ -1058,7 +1052,6 @@ function createSeedScans(): FakeScan[] {
             true,
             'needs_review',
             [opt],
-            'multiple close matches require manual review',
           ),
         },
         createFakeScanRow('fake-scan-identifying', 3, '003.jpg', true),
@@ -1071,7 +1064,6 @@ function createSeedScans(): FakeScan[] {
       status: 'reviewing',
       condition: 'MP',
       finish: 'etched',
-      error: 'one image needs a manual printing choice',
       import_id: null,
       created_at_ms: now - 24 * 60 * 60 * 1000,
       identifying_started_at_ms: null,
@@ -1091,7 +1083,6 @@ function createSeedScans(): FakeScan[] {
           true,
           'needs_review',
           [opt],
-          'recognition was inconclusive',
         ),
         createFakeScanRow(
           'fake-scan-reviewing',
@@ -1109,7 +1100,6 @@ function createSeedScans(): FakeScan[] {
       status: 'confirmed',
       condition: 'NM',
       finish: 'normal',
-      error: null,
       import_id: 'fake-import-1',
       created_at_ms: now - 2 * 24 * 60 * 60 * 1000,
       identifying_started_at_ms: null,
@@ -1170,7 +1160,6 @@ function progressFakeScan(scan: FakeScan): void {
     }
     row.status = index % 3 === 1 ? 'needs_review' : 'suggested';
     row.needs_review = row.status === 'needs_review';
-    row.error = row.needs_review ? 'recognition needs manual review' : null;
     row.suggestions = [
       scanSuggestion(
         index % 2 === 0
@@ -1196,7 +1185,6 @@ function toScanSummary(scan: FakeScan): ScanSummary {
     condition: scan.condition,
     finish: scan.finish,
     row_count: scan.rows.length,
-    error: scan.error,
     import_id: scan.import_id,
     created_at: Math.floor(scan.created_at_ms / 1000),
   };
@@ -1219,13 +1207,10 @@ function toScanRow(row: FakeScanRow): ScanRow {
     filename: row.filename,
     size_bytes: row.size_bytes,
     uploaded: row.uploaded,
-    upload_url: row.upload_url,
-    upload_headers: row.upload_headers ? { ...row.upload_headers } : null,
     status: row.status,
     needs_review: row.needs_review,
     suggestions: row.suggestions.map((suggestion) => ({ ...suggestion })),
     source_url: row.source_url,
-    error: row.error,
   };
 }
 
@@ -2155,7 +2140,6 @@ export function createFakeClient(): ApiClient {
         status: 'uploading',
         condition: request.condition,
         finish: request.finish,
-        error: null,
         import_id: null,
         created_at_ms: Date.now(),
         identifying_started_at_ms: null,
@@ -2291,7 +2275,6 @@ export function createFakeClient(): ApiClient {
         row.status = null;
         row.needs_review = false;
         row.suggestions = [];
-        row.error = null;
       }
       return { scan_id: scan.scan_id, status: scan.status };
     },
@@ -2353,7 +2336,6 @@ export function createFakeClient(): ApiClient {
         );
       }
       scan.pending_confirmation_rows = orderedRows;
-      scan.error = null;
       scan.status = 'confirming';
     },
 

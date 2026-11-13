@@ -24,6 +24,8 @@ import com.jordansimsmith.tcginventory.pricing.server.RepricingMessage;
 import com.jordansimsmith.tcginventory.publish.server.PublishMessage;
 import com.jordansimsmith.tcginventory.publish.server.PublishModule;
 import com.jordansimsmith.tcginventory.reports.server.ReportsModule;
+import com.jordansimsmith.tcginventory.scans.server.ScanImages;
+import com.jordansimsmith.tcginventory.scans.server.ScansModule;
 import com.jordansimsmith.time.ClockModule;
 import com.jordansimsmith.ulid.UlidModule;
 import dagger.Module;
@@ -53,6 +55,7 @@ import software.amazon.awssdk.services.sqs.SqsClient;
       ImportsModule.class,
       ListingsModule.class,
       CatalogModule.class,
+      ScansModule.class,
       PricingModule.class,
       PhotosModule.class,
       OrdersModule.class,
@@ -126,6 +129,13 @@ public class TcgInventoryModule {
   @Named("catalogSnapshotBucket")
   String catalogSnapshotBucket() {
     return "api.tcg-inventory.jordansimsmith.com";
+  }
+
+  @Provides
+  @Singleton
+  @Named("scanImagesBucket")
+  String scanImagesBucket() {
+    return ScanImages.BUCKET;
   }
 
   @Provides

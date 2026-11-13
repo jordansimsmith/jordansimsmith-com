@@ -164,6 +164,32 @@ public class TcgInventoryE2ETest {
                 {"games":[{"id":"mtg","display_name":"Magic: The Gathering","external_source":"scryfall","scanning_enabled":true,"csv_import_enabled":true,"finishes":[{"id":"normal","display_name":"Normal"},{"id":"foil","display_name":"Foil"},{"id":"etched","display_name":"Etched"}],"scan_review_image_regions":[{"id":"set_code","display_name":"Set code","x":0.0,"y":0.9,"width":0.25,"height":0.1},{"id":"set_symbol","display_name":"Set symbol","x":0.75,"y":0.535,"width":0.25,"height":0.1}]},{"id":"pokemon","display_name":"Pokémon (EN)","external_source":"tcgplayer","scanning_enabled":false,"csv_import_enabled":false,"finishes":[{"id":"normal","display_name":"Normal"},{"id":"holofoil","display_name":"Holofoil"},{"id":"reverse_holofoil","display_name":"Reverse Holofoil"}],"scan_review_image_regions":[{"id":"set_and_number","display_name":"Set and number","x":0.0,"y":0.88,"width":0.5,"height":0.12},{"id":"artwork_stamps_left","display_name":"Left artwork stamps","x":0.0,"y":0.32,"width":0.45,"height":0.22},{"id":"artwork_stamps_right","display_name":"Right artwork stamps","x":0.55,"y":0.32,"width":0.45,"height":0.22}]}]}
                 """));
 
+    // arrange / act - create and read a scan through the existing scan routes
+    var scanUser = "scan-read-e2e";
+    var createScanResponse =
+        sendAsUser(
+            "POST",
+            "/scans",
+            """
+            {"game":"mtg","condition":"NM","finish":"normal","files":[{"filename":"001.jpg","size_bytes":5}]}
+            """,
+            scanUser);
+    assertThat(createScanResponse.statusCode()).isEqualTo(201);
+    var scanId = objectMapper.readTree(createScanResponse.body()).get("scan_id").asText();
+    var scansResponse = sendAsUser("GET", "/scans", "", scanUser);
+    var scanDetailResponse = sendAsUser("GET", "/scans/" + scanId, "", scanUser);
+
+    // assert
+    assertThat(scansResponse.statusCode()).isEqualTo(200);
+    var scans = objectMapper.readTree(scansResponse.body()).get("scans");
+    assertThat(scans).hasSize(1);
+    assertThat(scans.get(0).get("scan_id").asText()).isEqualTo(scanId);
+    assertThat(scanDetailResponse.statusCode()).isEqualTo(200);
+    var scanDetail = objectMapper.readTree(scanDetailResponse.body());
+    assertThat(scanDetail.get("scan_id").asText()).isEqualTo(scanId);
+    assertThat(scanDetail.get("rows")).hasSize(1);
+    assertThat(scanDetail.get("rows").get(0).has("upload_url")).isFalse();
+
     var catalogCardResponse = get("/catalog/cards/" + SCRYFALL_ID + "?game=mtg");
     assertThat(catalogCardResponse.statusCode()).isEqualTo(200);
     var catalogCard = objectMapper.readTree(catalogCardResponse.body());

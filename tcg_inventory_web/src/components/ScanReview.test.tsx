@@ -92,8 +92,6 @@ function row(overrides: Partial<ScanRow> = {}): ScanRow {
     filename: '001.jpg',
     size_bytes: 4,
     uploaded: true,
-    upload_url: null,
-    upload_headers: null,
     status: 'suggested',
     needs_review: false,
     suggestions: [
@@ -104,7 +102,6 @@ function row(overrides: Partial<ScanRow> = {}): ScanRow {
       },
     ],
     source_url: 'data:image/svg+xml,source',
-    error: null,
     ...overrides,
   };
 }
@@ -117,7 +114,6 @@ function scan(rows: ScanRow[]): ScanDetail {
     condition: 'NM',
     finish: 'normal',
     row_count: rows.length,
-    error: null,
     import_id: null,
     created_at: 1765420932,
     rows,
@@ -258,7 +254,6 @@ describe('ScanReview', () => {
       suggestions: [],
       needs_review: true,
       status: 'needs_review',
-      error: 'recognition was inconclusive',
     });
 
     renderReview(scan([noSuggestion]));

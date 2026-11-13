@@ -39,7 +39,8 @@ public class DeleteScanRowHandler
             TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ScanItem.class),
             TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ScanRowItem.class),
             factory.dynamoDbClient(),
-            factory.clock());
+            factory.clock(),
+            TcgInventoryTable.TABLE_NAME);
     this.s3Client = factory.s3Client();
   }
 

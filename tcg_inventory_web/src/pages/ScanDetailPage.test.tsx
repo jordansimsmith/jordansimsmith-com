@@ -36,17 +36,23 @@ function row(scanPosition: number, status: ScanRow['status']): ScanRow {
     filename: `${String(scanPosition).padStart(3, '0')}.jpg`,
     size_bytes: 4,
     uploaded: true,
-    upload_url: null,
-    upload_headers: null,
     status,
     needs_review: status === 'needs_review',
     suggestions: [],
     source_url: 'data:image/svg+xml,source',
-    error: null,
   };
 }
 
 function detail(overrides: Partial<ScanDetail> = {}): ScanDetail {
+  const {
+    rows = [
+      row(1, 'suggested'),
+      row(2, 'needs_review'),
+      row(3, null),
+      row(4, null),
+    ],
+    ...summaryOverrides
+  } = overrides;
   return {
     scan_id: 'scan-identifying',
     game: 'mtg',
@@ -54,16 +60,10 @@ function detail(overrides: Partial<ScanDetail> = {}): ScanDetail {
     condition: 'LP',
     finish: 'foil',
     row_count: 4,
-    error: null,
     import_id: null,
     created_at: 1765420932,
-    rows: [
-      row(1, 'suggested'),
-      row(2, 'needs_review'),
-      row(3, null),
-      row(4, null),
-    ],
-    ...overrides,
+    ...summaryOverrides,
+    rows,
   };
 }
 
@@ -290,14 +290,12 @@ describe('ScanDetailPage', () => {
     expect(getScan).toHaveBeenCalledTimes(3);
   });
 
-  it('keeps review selections when asynchronous confirmation returns to review', async () => {
+  it('keeps review selections when confirmation returns to review', async () => {
     const user = userEvent.setup();
     vi.spyOn(clientModule.apiClient, 'getScan')
       .mockResolvedValueOnce(reviewableDetail())
       .mockResolvedValueOnce(reviewableDetail({ status: 'confirming' }))
-      .mockResolvedValue(
-        reviewableDetail({ error: 'selected card was not found' }),
-      );
+      .mockResolvedValue(reviewableDetail());
     vi.spyOn(clientModule.apiClient, 'getCatalogCard').mockResolvedValue(
       suggestedProduct,
     );
@@ -325,7 +323,6 @@ describe('ScanDetailPage', () => {
       ),
     ).toBeDefined();
     expect(screen.getByText('1 of 1 confirmed')).toBeDefined();
-    expect(screen.getByText('selected card was not found')).toBeDefined();
   });
 
   it('keeps polling after a transient error during a reloaded confirmation', async () => {

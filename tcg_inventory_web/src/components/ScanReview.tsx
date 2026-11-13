@@ -135,15 +135,6 @@ function ReviewSummary({
             {confirmError}
           </Text>
         )}
-        {scan.error && (
-          <Text
-            c={scan.status === 'reviewing' ? 'orange.8' : 'red.7'}
-            size="sm"
-            role="alert"
-          >
-            {scan.error}
-          </Text>
-        )}
       </Stack>
     </Paper>
   );
@@ -816,7 +807,6 @@ export function ScanReview({
                 rowSelection.card.available_finishes.includes(scan.finish);
               const attention =
                 row.needs_review ||
-                row.error !== null ||
                 rowSuggestion === undefined ||
                 rowErrors.has(row.scan_position) ||
                 (rowSelection !== undefined &&

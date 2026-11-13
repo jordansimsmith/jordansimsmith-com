@@ -141,11 +141,11 @@ module "java_api" {
       artifact = var.artifacts["create_scan"]
     }
     find_scans = {
-      handler  = "com.jordansimsmith.tcginventory.scans.FindScansHandler"
+      handler  = "com.jordansimsmith.tcginventory.scans.api.FindScansHandler"
       artifact = var.artifacts["find_scans"]
     }
     get_scan = {
-      handler  = "com.jordansimsmith.tcginventory.scans.GetScanHandler"
+      handler  = "com.jordansimsmith.tcginventory.scans.api.GetScanHandler"
       artifact = var.artifacts["get_scan"]
     }
     identify_scan = {

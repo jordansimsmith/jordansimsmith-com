@@ -29,10 +29,12 @@ import com.jordansimsmith.tcginventory.pricing.server.RepricingMessage;
 import com.jordansimsmith.tcginventory.publish.server.PublishMessage;
 import com.jordansimsmith.tcginventory.publish.server.PublishModule;
 import com.jordansimsmith.tcginventory.reports.server.ReportsModule;
+import com.jordansimsmith.tcginventory.scans.ScanImages;
 import com.jordansimsmith.tcginventory.scans.ScanItem;
 import com.jordansimsmith.tcginventory.scans.ScanMessage;
 import com.jordansimsmith.tcginventory.scans.ScanRepository;
 import com.jordansimsmith.tcginventory.scans.ScanRowItem;
+import com.jordansimsmith.tcginventory.scans.server.ScansModule;
 import com.jordansimsmith.time.Clock;
 import dagger.Module;
 import dagger.Provides;
@@ -54,7 +56,8 @@ import software.amazon.awssdk.services.sqs.SqsClient;
       ListingsModule.class,
       ReportsModule.class,
       PublishModule.class,
-      ImportsModule.class
+      ImportsModule.class,
+      ScansModule.class
     })
 public class TcgInventoryTestModule {
   @Provides
@@ -69,6 +72,13 @@ public class TcgInventoryTestModule {
   @Named("catalogSnapshotBucket")
   String catalogSnapshotBucket() {
     return CatalogSnapshotStore.BUCKET;
+  }
+
+  @Provides
+  @Singleton
+  @Named("scanImagesBucket")
+  String scanImagesBucket() {
+    return ScanImages.BUCKET;
   }
 
   @Provides
@@ -129,6 +139,17 @@ public class TcgInventoryTestModule {
 
   @Provides
   @Singleton
+  ScanRepository scanRepository(
+      DynamoDbTable<ScanItem> scanTable,
+      DynamoDbTable<ScanRowItem> scanRowTable,
+      DynamoDbClient dynamoDbClient,
+      Clock clock) {
+    return new ScanRepository(
+        scanTable, scanRowTable, dynamoDbClient, clock, TcgInventoryTable.TABLE_NAME);
+  }
+
+  @Provides
+  @Singleton
   DynamoDbTable<JobItem> jobTable(DynamoDbEnhancedClient client) {
     return client.table(TcgInventoryTable.TABLE_NAME, TableSchema.fromBean(JobItem.class));
   }
@@ -144,16 +165,6 @@ public class TcgInventoryTestModule {
   @Singleton
   SqsClient sqsClient() {
     return SqsClient.builder().region(Region.of("ap-southeast-2")).build();
-  }
-
-  @Provides
-  @Singleton
-  ScanRepository scanRepository(
-      DynamoDbTable<ScanItem> scanTable,
-      DynamoDbTable<ScanRowItem> scanRowTable,
-      DynamoDbClient dynamoDbClient,
-      Clock clock) {
-    return new ScanRepository(scanTable, scanRowTable, dynamoDbClient, clock);
   }
 
   @Provides

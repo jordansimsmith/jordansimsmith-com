@@ -72,8 +72,6 @@ public class ScansHandlerIntegrationTest {
   private DynamoDbTable<JobItem> jobTable;
   private S3Client s3Client;
   private CreateScanHandler createScanHandler;
-  private FindScansHandler findScansHandler;
-  private GetScanHandler getScanHandler;
   private IdentifyScanHandler identifyScanHandler;
   private ConfirmScanHandler confirmScanHandler;
   private FakeImportService fakeImportService;
@@ -112,8 +110,6 @@ public class ScansHandlerIntegrationTest {
     fakeJobsQueue.reset();
     fakeScanQueue.reset();
     createScanHandler = new CreateScanHandler(factory);
-    findScansHandler = new FindScansHandler(factory);
-    getScanHandler = new GetScanHandler(factory);
     identifyScanHandler = new IdentifyScanHandler(factory, factory.fakeScanQueue());
     fakeCardCatalogs = factory.fakeCardCatalogs();
     fakeImportService = new FakeImportService(factory.photosService());
@@ -209,65 +205,10 @@ public class ScansHandlerIntegrationTest {
     assertThat(firstRow.getS3Key()).isEqualTo("users/jordan/scans/%s/000001.jpg".formatted(scanId));
     assertThat(firstRow.getSizeBytes()).isEqualTo(10485760L);
     assertThat(scanItem.getUpdatedAt()).isEqualTo(Instant.ofEpochSecond(1700000000));
-
-    var reread =
-        new GetScanHandler(factory)
-            .handleRequest(buildEventWithPath("jordan", Map.of("scan_id", scanId)), null);
-    assertThat(reread.getStatusCode()).isEqualTo(200);
-    assertThat(objectMapper.readTree(reread.getBody()).get("rows").get(0).get("filename").asText())
-        .isEqualTo("1.jpg");
-    assertThat(
-            objectMapper.readTree(reread.getBody()).get("rows").get(0).get("upload_url").isNull())
-        .isTrue();
-    assertThat(objectMapper.readTree(reread.getBody()).get("game").asText()).isEqualTo("mtg");
   }
 
   @Test
-  void scanDetailShouldVerifyPresignedUploadAndServeFreshGetUrl()
-      throws IOException, InterruptedException {
-    // arrange
-    var response =
-        createScanHandler.handleRequest(
-            buildEventWithBody(
-                "jordan",
-                "{\"game\":\"mtg\",\"condition\":\"NM\",\"finish\":\"normal\",\"files\":[{\"filename\":\"001.jpg\",\"size_bytes\":5}]}"),
-            null);
-    var body = objectMapper.readTree(response.getBody());
-    var row = body.get("rows").get(0);
-    var headers = row.get("upload_headers");
-    var httpClient = HttpClient.newHttpClient();
-
-    // act
-    var putResponse =
-        httpClient.send(
-            HttpRequest.newBuilder(URI.create(row.get("upload_url").asText()))
-                .header("Content-Type", headers.get("Content-Type").asText())
-                .header("If-None-Match", headers.get("If-None-Match").asText())
-                .PUT(HttpRequest.BodyPublishers.ofByteArray(JPEG_BYTES))
-                .build(),
-            HttpResponse.BodyHandlers.ofByteArray());
-    var detailResponse =
-        getScanHandler.handleRequest(
-            buildEventWithPath("jordan", Map.of("scan_id", body.get("scan_id").asText())), null);
-    var detailRow = objectMapper.readTree(detailResponse.getBody()).get("rows").get(0);
-    var getResponse =
-        httpClient.send(
-            HttpRequest.newBuilder(URI.create(detailRow.get("source_url").asText())).GET().build(),
-            HttpResponse.BodyHandlers.ofByteArray());
-
-    // assert
-    assertThat(putResponse.statusCode()).isEqualTo(200);
-    assertThat(detailRow.get("uploaded").asBoolean()).isTrue();
-    assertThat(detailRow.get("source_url").asText()).isNotBlank();
-    assertThat(detailRow.get("upload_url").isNull()).isTrue();
-    assertThat(detailRow.get("upload_headers").isNull()).isTrue();
-    assertThat(getResponse.statusCode()).isEqualTo(200);
-    assertThat(getResponse.body()).isEqualTo(JPEG_BYTES);
-  }
-
-  @Test
-  void scanDetailShouldRejectReplacementAndInvalidHeadMetadata()
-      throws IOException, InterruptedException {
+  void createScanShouldRejectReplacementUpload() throws IOException, InterruptedException {
     // arrange
     var response =
         createScanHandler.handleRequest(
@@ -296,50 +237,9 @@ public class ScansHandlerIntegrationTest {
                 .PUT(HttpRequest.BodyPublishers.ofByteArray(new byte[] {1, 2, 3, 4, 5}))
                 .build(),
             HttpResponse.BodyHandlers.discarding());
-    var invalidScanId = createScan("jordan", "002.jpg");
-    s3Client.putObject(
-        request ->
-            request
-                .bucket(ScanImages.BUCKET)
-                .key("users/jordan/scans/%s/000001.jpg".formatted(invalidScanId))
-                .contentType("image/png"),
-        RequestBody.fromBytes(new byte[] {1}));
-    var invalidDetail =
-        getScanHandler.handleRequest(
-            buildEventWithPath("jordan", Map.of("scan_id", invalidScanId)), null);
-
     // assert
     assertThat(firstPut.statusCode()).isEqualTo(200);
     assertThat(replacementPut.statusCode()).isEqualTo(412);
-    var invalidRow = objectMapper.readTree(invalidDetail.getBody()).get("rows").get(0);
-    assertThat(invalidRow.get("uploaded").asBoolean()).isFalse();
-    assertThat(invalidRow.get("source_url").isNull()).isTrue();
-    assertThat(invalidRow.get("upload_url").isNull()).isTrue();
-
-    // arrange
-    var wrongSizeScanId = createScan("jordan", "003.jpg", 2);
-    s3Client.putObject(
-        request ->
-            request
-                .bucket(ScanImages.BUCKET)
-                .key("users/jordan/scans/%s/000001.jpg".formatted(wrongSizeScanId))
-                .contentType("image/jpeg"),
-        RequestBody.fromBytes(new byte[] {1}));
-
-    // act
-    var wrongSizeDetail =
-        getScanHandler.handleRequest(
-            buildEventWithPath("jordan", Map.of("scan_id", wrongSizeScanId)), null);
-
-    // assert
-    assertThat(
-            objectMapper
-                .readTree(wrongSizeDetail.getBody())
-                .get("rows")
-                .get(0)
-                .get("uploaded")
-                .asBoolean())
-        .isFalse();
   }
 
   @Test
@@ -501,69 +401,6 @@ public class ScansHandlerIntegrationTest {
   }
 
   @Test
-  void scanDetailShouldExposePersistedRecognitionResults() throws Exception {
-    // arrange
-    var createResponse =
-        createScanHandler.handleRequest(
-            buildEventWithBody(
-                "jordan",
-                "{\"game\":\"mtg\",\"condition\":\"NM\",\"finish\":\"normal\",\"files\":["
-                    + "{\"filename\":\"001.jpg\",\"size_bytes\":5},"
-                    + "{\"filename\":\"002.jpg\",\"size_bytes\":5}]}"),
-            null);
-    var scanId = objectMapper.readTree(createResponse.getBody()).get("scan_id").asText();
-    var scanItem = getScanItem("jordan", scanId);
-    scanItem.setStatus("identifying");
-    scanItem.setError("one row needs manual review");
-    scanTable.putItem(scanItem);
-    var row =
-        scanRowTable.getItem(
-            Key.builder()
-                .partitionValue(ScanRowItem.formatPk("jordan", scanId))
-                .sortValue(ScanRowItem.formatSk(1))
-                .build());
-    row.setStatus("suggested");
-    row.setSuggestions(
-        List.of(
-            ScanRowItem.ScanSuggestion.create(
-                "a9738cda-adb1-47fb-9f4c-ecd930228c4d", "Ragavan, Nimble Pilferer", 0.8300001)));
-    row.setNeedsReview(false);
-    scanRowTable.putItem(row);
-    var reviewRow =
-        scanRowTable.getItem(
-            Key.builder()
-                .partitionValue(ScanRowItem.formatPk("jordan", scanId))
-                .sortValue(ScanRowItem.formatSk(2))
-                .build());
-    reviewRow.setStatus("needs_review");
-    reviewRow.setNeedsReview(true);
-    reviewRow.setError("corrupt JPEG");
-    scanRowTable.putItem(reviewRow);
-
-    // act
-    var response =
-        getScanHandler.handleRequest(buildEventWithPath("jordan", Map.of("scan_id", scanId)), null);
-
-    // assert
-    var body = objectMapper.readTree(response.getBody());
-    assertThat(response.getStatusCode()).isEqualTo(200);
-    assertThat(body.has("processed_count")).isFalse();
-    assertThat(body.get("error").asText()).isEqualTo("one row needs manual review");
-    assertThat(body.get("rows").get(0).get("status").asText()).isEqualTo("suggested");
-    assertThat(body.get("rows").get(0).get("needs_review").asBoolean()).isFalse();
-    assertThat(body.get("rows").get(0).get("suggestions").get(0).get("score").asDouble())
-        .isEqualTo(0.8300001);
-    assertThat(body.get("game").asText()).isEqualTo("mtg");
-    assertThat(body.get("rows").get(0).get("suggestions").get(0).has("external_source")).isFalse();
-    assertThat(body.get("rows").get(0).get("suggestions").get(0).get("external_id").asText())
-        .isEqualTo("a9738cda-adb1-47fb-9f4c-ecd930228c4d");
-    assertThat(body.get("rows").get(0).get("suggestions").get(0).has("scryfall_id")).isFalse();
-    assertThat(body.get("rows").get(1).get("status").asText()).isEqualTo("needs_review");
-    assertThat(body.get("rows").get(1).get("needs_review").asBoolean()).isTrue();
-    assertThat(body.get("rows").get(1).get("error").asText()).isEqualTo("corrupt JPEG");
-  }
-
-  @Test
   void createScanShouldRejectNonAsciiFilenames() throws Exception {
     // arrange
     var request =
@@ -576,9 +413,7 @@ public class ScansHandlerIntegrationTest {
     // assert
     assertThat(response.getStatusCode()).isEqualTo(400);
     assertThat(response.getBody()).contains("ASCII");
-    var scans =
-        objectMapper.readTree(findScansHandler.handleRequest(buildEvent("jordan"), null).getBody());
-    assertThat(scans.get("scans")).isEmpty();
+    assertThat(findScans("jordan")).isEmpty();
   }
 
   @Test
@@ -605,9 +440,7 @@ public class ScansHandlerIntegrationTest {
     }
 
     // assert
-    var response = findScansHandler.handleRequest(buildEvent("jordan"), null);
-    assertThat(response.getStatusCode()).isEqualTo(200);
-    assertThat(objectMapper.readTree(response.getBody()).get("scans")).hasSize(15);
+    assertThat(findScans("jordan")).hasSize(15);
   }
 
   @Test
@@ -646,9 +479,7 @@ public class ScansHandlerIntegrationTest {
 
     // assert
     assertThat(emptyBodyResponse.getStatusCode()).isEqualTo(400);
-    var scans =
-        objectMapper.readTree(findScansHandler.handleRequest(buildEvent("jordan"), null).getBody());
-    assertThat(scans.get("scans")).isEmpty();
+    assertThat(findScans("jordan")).isEmpty();
   }
 
   @Test
@@ -664,67 +495,7 @@ public class ScansHandlerIntegrationTest {
     assertThat(response.getStatusCode()).isEqualTo(400);
     assertThat(objectMapper.readTree(response.getBody()).get("message").asText())
         .isEqualTo("scanning is unavailable for game");
-    var scans =
-        objectMapper.readTree(findScansHandler.handleRequest(buildEvent("jordan"), null).getBody());
-    assertThat(scans.get("scans")).isEmpty();
-  }
-
-  @Test
-  void findScansShouldReturnNewestFirstAndSupportContinuation() throws Exception {
-    // arrange
-    createScan("jordan", "first.jpg");
-    createScan("jordan", "second.jpg");
-    createScan("jordan", "third.jpg");
-
-    // act
-    var firstResponse =
-        findScansHandler.handleRequest(buildEventWithQuery("jordan", Map.of("limit", "2")), null);
-
-    // assert
-    assertThat(firstResponse.getStatusCode()).isEqualTo(200);
-    var firstPage = objectMapper.readTree(firstResponse.getBody());
-    assertThat(firstPage.get("scans").get(0).get("scan_id").asText())
-        .isEqualTo("FAKE_ULID_0000000003");
-    assertThat(firstPage.get("scans").get(1).get("scan_id").asText())
-        .isEqualTo("FAKE_ULID_0000000002");
-    var continuation = firstPage.get("next_continuation").asText();
-
-    // act
-    var secondResponse =
-        findScansHandler.handleRequest(
-            buildEventWithQuery("jordan", Map.of("continuation", continuation, "limit", "2")),
-            null);
-
-    // assert
-    assertThat(secondResponse.getStatusCode()).isEqualTo(200);
-    var secondPage = objectMapper.readTree(secondResponse.getBody());
-    assertThat(secondPage.get("scans")).hasSize(1);
-    assertThat(secondPage.get("scans").get(0).get("scan_id").asText())
-        .isEqualTo("FAKE_ULID_0000000001");
-    assertThat(secondPage.get("next_continuation").isNull()).isTrue();
-  }
-
-  @Test
-  void scanReadsShouldBeScopedToAuthenticatedUser() throws Exception {
-    // arrange
-    var createResponse =
-        createScanHandler.handleRequest(buildEventWithBody("alice", validBody()), null);
-    var scanId = objectMapper.readTree(createResponse.getBody()).get("scan_id").asText();
-
-    // act
-    var listResponse = findScansHandler.handleRequest(buildEvent("bob"), null);
-    var detailResponse =
-        getScanHandler.handleRequest(buildEventWithPath("bob", Map.of("scan_id", scanId)), null);
-    var unknownResponse =
-        getScanHandler.handleRequest(
-            buildEventWithPath("alice", Map.of("scan_id", "missing")), null);
-
-    // assert
-    assertThat(listResponse.getStatusCode()).isEqualTo(200);
-    assertThat(objectMapper.readTree(listResponse.getBody()).get("scans")).isEmpty();
-    assertThat(detailResponse.getStatusCode()).isEqualTo(404);
-    assertThat(detailResponse.getBody()).contains("Not Found");
-    assertThat(unknownResponse.getStatusCode()).isEqualTo(404);
+    assertThat(findScans("jordan")).isEmpty();
   }
 
   @Test
@@ -751,14 +522,10 @@ public class ScansHandlerIntegrationTest {
 
     // assert
     assertThat(response.getStatusCode()).isEqualTo(204);
-    var detail =
-        objectMapper.readTree(
-            getScanHandler
-                .handleRequest(buildEventWithPath("jordan", Map.of("scan_id", scanId)), null)
-                .getBody());
-    assertThat(detail.get("row_count").asInt()).isEqualTo(3);
-    assertThat(detail.has("processed_count")).isFalse();
-    assertThat(detail.get("rows").findValuesAsText("scan_position")).containsExactly("1", "3");
+    assertThat(getScanItem("jordan", scanId).getRowCount()).isEqualTo(3);
+    assertThat(factory.scanRepository().findScanRows("jordan", scanId))
+        .extracting(ScanRowItem::getScanPosition)
+        .containsExactly(1, 3);
     assertThat(
             scanRowTable.getItem(
                 Key.builder()
@@ -959,14 +726,6 @@ public class ScansHandlerIntegrationTest {
     assertThat(getScanRow(user, scanId, 2).getSelectedExternalId())
         .isEqualTo("4ced112a-e775-4f97-97b3-74877e9dce12");
     assertNoCreatedImports(user);
-    var scanDetail =
-        objectMapper.readTree(
-            getScanHandler
-                .handleRequest(buildEventWithPath(user, Map.of("scan_id", scanId)), null)
-                .getBody());
-    assertThat(scanDetail.has("job_id")).isFalse();
-    assertThat(scanDetail.get("rows").get(0).has("selected_external_id")).isFalse();
-    assertThat(scanDetail.get("rows").get(0).has("selected_external_source")).isFalse();
     assertThat(
             deleteScanRowHandler
                 .handleRequest(
@@ -1014,14 +773,6 @@ public class ScansHandlerIntegrationTest {
     assertThat(retryResponse.getStatusCode()).isEqualTo(204);
     assertThat(retryResponse.getBody()).isNull();
     assertThat(fakeJobsQueue.getSends()).hasSize(1);
-    assertThat(
-            objectMapper
-                .readTree(
-                    getScanHandler
-                        .handleRequest(buildEventWithPath(user, Map.of("scan_id", scanId)), null)
-                        .getBody())
-                .has("confirmed_rows"))
-        .isFalse();
     assertThat(fakeCardCatalogs.lookupRequests()).hasSize(1);
     assertThat(fakeCardCatalogs.lookupRequests().getFirst())
         .containsExactly(
@@ -1085,7 +836,7 @@ public class ScansHandlerIntegrationTest {
     assertThat(getScanItem(user, scanId).getStatus()).isEqualTo("confirming");
     processScanConfirmation(user);
     assertThat(getScanItem(user, scanId).getStatus()).isEqualTo("confirmed");
-    assertThat(getScanItem(user, scanId).getError()).isNull();
+    assertThat(getScanError(user, scanId)).isNull();
     assertThat(fakeCardCatalogs.lookupRequests())
         .containsExactly(List.of("a9738cda-adb1-47fb-9f4c-ecd930228c4d"));
   }
@@ -1109,7 +860,7 @@ public class ScansHandlerIntegrationTest {
     assertThat(response.getStatusCode()).isEqualTo(202);
     processScanConfirmation(user);
     assertThat(getScanItem(user, scanId).getStatus()).isEqualTo("reviewing");
-    assertThat(getScanItem(user, scanId).getError()).contains("scan position 1");
+    assertThat(getScanError(user, scanId)).contains("scan position 1");
     assertNoCreatedImports(user);
     assertThat(fakeCardCatalogs.lookupRequests()).containsExactly(List.of(missingId));
   }
@@ -1143,7 +894,7 @@ public class ScansHandlerIntegrationTest {
     assertThat(response.getStatusCode()).isEqualTo(202);
     processScanConfirmation(user);
     assertThat(getScanItem(user, scanId).getStatus()).isEqualTo("reviewing");
-    assertThat(getScanItem(user, scanId).getError()).contains("scan position 1");
+    assertThat(getScanError(user, scanId)).contains("scan position 1");
     assertNoCreatedImports(user);
   }
 
@@ -1171,7 +922,7 @@ public class ScansHandlerIntegrationTest {
         .isInstanceOf(CatalogException.Unavailable.class)
         .hasMessageContaining("stub unavailable");
     assertThat(getScanItem(user, scanId).getStatus()).isEqualTo("confirming");
-    assertThat(getScanItem(user, scanId).getError()).isNull();
+    assertThat(getScanError(user, scanId)).isNull();
     assertNoCreatedImports(user);
 
     // arrange: the catalog has recovered before SQS redelivery
@@ -1208,10 +959,6 @@ public class ScansHandlerIntegrationTest {
     assertThat(getScanItem("jordan", scanId).getStatus()).isEqualTo("reviewing");
     assertThat(fakeJobsQueue.getSends()).isEmpty();
     assertNoCreatedImports("jordan");
-  }
-
-  private String createScan(String user, String filename) throws IOException {
-    return createScan(user, filename, 1);
   }
 
   private void processScanConfirmation(String user) throws Exception {
@@ -1285,6 +1032,33 @@ public class ScansHandlerIntegrationTest {
             .build());
   }
 
+  private List<ScanItem> findScans(String user) {
+    return scanTable.scan().items().stream()
+        .filter(scan -> ScanItem.formatPk(user).equals(scan.getPk()))
+        .toList();
+  }
+
+  @Nullable
+  private String getScanError(String user, String scanId) {
+    var response =
+        factory
+            .dynamoDbClient()
+            .getItem(
+                request ->
+                    request
+                        .tableName(TcgInventoryTable.TABLE_NAME)
+                        .key(scanKey(user, scanId))
+                        .consistentRead(true));
+    var value = response.item().get("error");
+    return value == null ? null : value.s();
+  }
+
+  private Map<String, AttributeValue> scanKey(String user, String scanId) {
+    return Map.of(
+        ScanItem.PK, AttributeValue.fromS(ScanItem.formatPk(user)),
+        ScanItem.SK, AttributeValue.fromS(ScanItem.formatSk(scanId)));
+  }
+
   private ScanRowItem getScanRow(String user, String scanId, int scanPosition) {
     return scanRowTable.getItem(
         Key.builder()
@@ -1311,18 +1085,6 @@ public class ScansHandlerIntegrationTest {
     var event = buildEventWithPath(user, pathParams);
     event.setBody(body);
     return event;
-  }
-
-  private String validBody() {
-    return "{\"game\":\"mtg\",\"condition\":\"NM\",\"finish\":\"normal\",\"files\":[{\"filename\":\"001.jpg\",\"size_bytes\":1}]}";
-  }
-
-  private APIGatewayV2HTTPEvent buildEvent(String user) {
-    return buildEvent(user, Map.of(), Map.of());
-  }
-
-  private APIGatewayV2HTTPEvent buildEventWithQuery(String user, Map<String, String> queryParams) {
-    return buildEvent(user, Map.of(), queryParams);
   }
 
   private APIGatewayV2HTTPEvent buildEventWithPath(String user, Map<String, String> pathParams) {

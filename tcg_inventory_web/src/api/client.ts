@@ -228,12 +228,13 @@ export interface ScanConfirmationRow {
   collector_number: string;
 }
 
-export interface ScanRow extends ScanUploadSlot {
+export interface ScanRow extends ScanFile {
+  scan_position: number;
+  uploaded: boolean;
   status: ScanRowStatus | null;
   needs_review: boolean;
   suggestions: ScanSuggestion[];
   source_url: string | null;
-  error: string | null;
 }
 
 export interface ScanSummary {
@@ -243,7 +244,6 @@ export interface ScanSummary {
   condition: Condition;
   finish: Finish;
   row_count: number;
-  error: string | null;
   import_id: string | null;
   created_at: number;
 }

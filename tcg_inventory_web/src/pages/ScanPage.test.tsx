@@ -14,7 +14,13 @@ import { ScanPage } from './ScanPage';
 import { GamesProvider } from '../GamesProvider';
 import * as clientModule from '../api/client';
 import * as uploaderModule from '../api/scan-uploader';
-import type { Game, ScanDetail, ScanRow, ScanSummary } from '../api/client';
+import type {
+  CreateScanResponse,
+  Game,
+  ScanDetail,
+  ScanRow,
+  ScanSummary,
+} from '../api/client';
 
 const REGISTERED_GAMES = [
   {
@@ -39,7 +45,6 @@ const scanFixtures: ScanSummary[] = [
     condition: 'NM',
     finish: 'normal',
     row_count: 100,
-    error: 'one image needs a manual printing choice',
     import_id: null,
     created_at: 1765420932,
   },
@@ -50,7 +55,6 @@ const scanFixtures: ScanSummary[] = [
     condition: 'LP',
     finish: 'foil',
     row_count: 48,
-    error: null,
     import_id: 'import-7',
     created_at: 1764816132,
   },
@@ -62,27 +66,42 @@ function scanRow(overrides: Partial<ScanRow> = {}): ScanRow {
     filename: '001.jpg',
     size_bytes: 4,
     uploaded: false,
-    upload_url: 'fake://scan-created/000001',
-    upload_headers: { 'Content-Type': 'image/jpeg' },
     status: null,
     needs_review: false,
     suggestions: [],
     source_url: null,
-    error: null,
     ...overrides,
   };
 }
 
-function scanDetail(overrides: Partial<ScanDetail> = {}): ScanDetail {
+function scanDetail(
+  overrides: Partial<ScanSummary> & { rows?: ScanRow[] } = {},
+): ScanDetail {
+  const { rows = [scanRow()], ...summaryOverrides } = overrides;
   return {
     ...scanFixtures[0],
     scan_id: 'scan-created',
     status: 'uploading',
     row_count: 1,
-    error: null,
     import_id: null,
-    rows: [scanRow()],
-    ...overrides,
+    ...summaryOverrides,
+    rows,
+  };
+}
+
+function createScanResponse(): CreateScanResponse {
+  return {
+    scan_id: 'scan-created',
+    rows: [
+      {
+        scan_position: 1,
+        filename: '001.jpg',
+        size_bytes: 4,
+        uploaded: false,
+        upload_url: 'fake://scan-created/000001',
+        upload_headers: { 'Content-Type': 'image/jpeg' },
+      },
+    ],
   };
 }
 
@@ -214,18 +233,15 @@ describe('ScanPage', () => {
   });
 
   it('refreshes the table then uploads, verifies, identifies, and navigates', async () => {
-    const created = scanDetail();
+    const created = createScanResponse();
     const verified = scanDetail({
-      rows: [
-        scanRow({ uploaded: true, upload_url: null, upload_headers: null }),
-      ],
+      rows: [scanRow({ uploaded: true })],
     });
     const refreshedScan: ScanSummary = {
       ...scanFixtures[0],
       scan_id: 'scan-created',
       status: 'uploading',
       row_count: 1,
-      error: null,
     };
     const findScans = vi
       .spyOn(clientModule.apiClient, 'findScans')
@@ -306,13 +322,12 @@ describe('ScanPage', () => {
   });
 
   it('retains the files and leaves a failed job without retry controls', async () => {
-    const created = scanDetail();
+    const created = createScanResponse();
     const failedSummary: ScanSummary = {
       ...scanFixtures[0],
       scan_id: 'scan-created',
       status: 'uploading',
       row_count: 1,
-      error: null,
     };
     vi.spyOn(clientModule.apiClient, 'createScan').mockResolvedValue(created);
     vi.spyOn(clientModule.apiClient, 'findScans')

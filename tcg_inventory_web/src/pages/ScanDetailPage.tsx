@@ -107,15 +107,6 @@ function ScanSummary({ scan }: { scan: ScanDetail }) {
             This scan is confirmed and read-only.
           </Text>
         )}
-        {scan.error && (
-          <Text
-            size="sm"
-            c={scan.status === 'reviewing' ? 'orange.8' : 'red.7'}
-            role="alert"
-          >
-            {scan.error}
-          </Text>
-        )}
       </Stack>
     </Paper>
   );
@@ -324,7 +315,7 @@ export function ScanDetailPage() {
                       rows,
                     });
                     confirmationPending.current = true;
-                    setScan({ ...scan, status: 'confirming', error: null });
+                    setScan({ ...scan, status: 'confirming' });
                     pollScan.current?.();
                   } catch (e) {
                     pollScan.current?.();

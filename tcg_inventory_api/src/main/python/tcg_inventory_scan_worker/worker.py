@@ -192,10 +192,8 @@ class DynamoScanStore:
         status: str,
         needs_review: bool,
         suggestions: list[dict] | None,
-        error: str | None,
     ) -> bool:
         set_parts = ["#status = :status", "#needs_review = :needs_review"]
-        remove_parts: list[str] = []
         values: dict = {
             ":status": {"S": status},
             ":needs_review": {"BOOL": needs_review},
@@ -204,26 +202,16 @@ class DynamoScanStore:
             "#pk": "pk",
             "#status": "status",
             "#needs_review": "needs_review",
-            "#suggestions": "suggestions",
-            "#error": "error",
         }
-        if suggestions is None:
-            remove_parts.append("#suggestions")
-        else:
+        if suggestions is not None:
             set_parts.append("#suggestions = :suggestions")
+            names["#suggestions"] = "suggestions"
             values[":suggestions"] = {
                 "L": [
                     self._suggestion_attribute(suggestion) for suggestion in suggestions
                 ]
             }
-        if error is None:
-            remove_parts.append("#error")
-        else:
-            set_parts.append("#error = :error")
-            values[":error"] = {"S": error}
         expression = "SET " + ", ".join(set_parts)
-        if remove_parts:
-            expression += " REMOVE " + ", ".join(remove_parts)
 
         try:
             self._client.transact_write_items(
@@ -394,7 +382,6 @@ class RecognitionWorker:
             detection = profile.detector.detect(image_bgr)
             if not detection.card_present:
                 candidates = []
-                error = "no card detected"
             else:
                 card = detection.dewarp(image_bgr)
                 searches = [
@@ -410,31 +397,25 @@ class RecognitionWorker:
                     ),
                 )
                 candidates = profile.convert_suggestions(records, scan.finish)
-                error = "no eligible recognition candidates" if not candidates else None
-            if not candidates:
-                status = "needs_review"
-                needs_review = True
-                suggestions = None
-            else:
-                status = "suggested"
-                needs_review = False
-                suggestions = candidates
-                error = None
         except Exception:
             self._logger.exception(
                 "scan row recognition failed",
                 extra={"scan_id": row.scan_id, "scan_position": row.scan_position},
             )
+            raise
+        if not candidates:
             status = "needs_review"
             needs_review = True
             suggestions = None
-            error = "unable to decode or recognize image"
+        else:
+            status = "suggested"
+            needs_review = False
+            suggestions = candidates
         return self._store.write_result(
             row,
             status=status,
             needs_review=needs_review,
             suggestions=suggestions,
-            error=error,
         )
 
     def _reconcile(self, scan: Scan) -> None:

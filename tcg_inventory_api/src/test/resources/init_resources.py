@@ -247,11 +247,11 @@ lambdas = {
         "zip_file": "create-scan-handler_deploy.jar",
     },
     "find_scans": {
-        "handler": "com.jordansimsmith.tcginventory.scans.FindScansHandler",
+        "handler": "com.jordansimsmith.tcginventory.scans.api.FindScansHandler",
         "zip_file": "find-scans-handler_deploy.jar",
     },
     "get_scan": {
-        "handler": "com.jordansimsmith.tcginventory.scans.GetScanHandler",
+        "handler": "com.jordansimsmith.tcginventory.scans.api.GetScanHandler",
         "zip_file": "get-scan-handler_deploy.jar",
     },
     "identify_scan": {

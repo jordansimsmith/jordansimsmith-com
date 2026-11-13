@@ -81,7 +81,6 @@ class FakeStore:
         status: str,
         needs_review: bool,
         suggestions: list[dict] | None,
-        error: str | None,
     ) -> bool:
         if self.scan is None or self.scan.status != "identifying":
             return False
@@ -457,37 +456,40 @@ def test_runtime_fails_before_catalog_loading_when_game_has_no_catalog():
     assert runtime._catalog is None
 
 
-def test_corrupt_image_becomes_manual_review():
+def test_corrupt_image_failure_propagates_without_marking_row_finished():
     store = FakeStore(_scan_rows(1))
-    _worker(store, images=FakeImages(b"not a jpeg")).handle_message(
-        {"user": "jordan", "scan_id": "scan-1"}
-    )
+    with pytest.raises(ValueError, match="unsupported image format"):
+        _worker(store, images=FakeImages(b"not a jpeg")).handle_message(
+            {"user": "jordan", "scan_id": "scan-1"}
+        )
 
-    assert store.rows[0].status == "needs_review"
-    assert store.results == [(1, "needs_review")]
+    assert store.rows[0].status == "pending"
+    assert store.results == []
 
 
-def test_truncated_jpeg_becomes_manual_review():
+def test_truncated_jpeg_failure_propagates_without_marking_row_finished():
     store = FakeStore(_scan_rows(1))
-    _worker(store, images=FakeImages(b"\xff\xd8\xff\xe0broken")).handle_message(
-        {"user": "jordan", "scan_id": "scan-1"}
-    )
+    with pytest.raises(ValueError, match="unable to decode image"):
+        _worker(store, images=FakeImages(b"\xff\xd8\xff\xe0broken")).handle_message(
+            {"user": "jordan", "scan_id": "scan-1"}
+        )
 
-    assert store.rows[0].status == "needs_review"
-    assert store.results == [(1, "needs_review")]
+    assert store.rows[0].status == "pending"
+    assert store.results == []
 
 
-def test_unsupported_image_format_becomes_manual_review():
+def test_unsupported_image_failure_propagates_without_marking_row_finished():
     output = io.BytesIO()
     Image.new("RGB", (2, 2), color=(10, 20, 30)).save(output, format="PNG")
     store = FakeStore(_scan_rows(1))
 
-    _worker(store, images=FakeImages(output.getvalue())).handle_message(
-        {"user": "jordan", "scan_id": "scan-1"}
-    )
+    with pytest.raises(ValueError, match="unsupported image format"):
+        _worker(store, images=FakeImages(output.getvalue())).handle_message(
+            {"user": "jordan", "scan_id": "scan-1"}
+        )
 
-    assert store.rows[0].status == "needs_review"
-    assert store.results == [(1, "needs_review")]
+    assert store.rows[0].status == "pending"
+    assert store.results == []
 
 
 def test_image_store_failure_propagates_without_marking_row_finished():

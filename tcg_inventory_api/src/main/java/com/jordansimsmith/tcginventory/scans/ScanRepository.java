@@ -1,7 +1,6 @@
 package com.jordansimsmith.tcginventory.scans;
 
 import com.jordansimsmith.tcginventory.JobItem;
-import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.time.Clock;
 import java.util.List;
 import java.util.Map;
@@ -28,22 +27,23 @@ public class ScanRepository {
   private static final int MAX_TRANSACT_ITEMS = 100;
   private static final TableSchema<JobItem> JOB_ITEM_SCHEMA = TableSchema.fromBean(JobItem.class);
 
-  public record ScanPage(List<ScanItem> items, Map<String, AttributeValue> lastEvaluatedKey) {}
-
   private final DynamoDbTable<ScanItem> scanTable;
   private final DynamoDbTable<ScanRowItem> scanRowTable;
   private final DynamoDbClient dynamoDbClient;
   private final Clock clock;
+  private final String tableName;
 
   public ScanRepository(
       DynamoDbTable<ScanItem> scanTable,
       DynamoDbTable<ScanRowItem> scanRowTable,
       DynamoDbClient dynamoDbClient,
-      Clock clock) {
+      Clock clock,
+      String tableName) {
     this.scanTable = scanTable;
     this.scanRowTable = scanRowTable;
     this.dynamoDbClient = dynamoDbClient;
     this.clock = clock;
+    this.tableName = tableName;
   }
 
   public void createScan(ScanItem scanItem, List<ScanRowItem> rowItems) {
@@ -58,34 +58,11 @@ public class ScanRepository {
         TransactWriteItemsRequest.builder().transactItems(List.of(buildScanPut(scanItem))).build());
   }
 
-  public ScanPage findScans(
-      String user, int limit, @Nullable Map<String, AttributeValue> exclusiveStartKey) {
-    var requestBuilder =
-        QueryEnhancedRequest.builder()
-            .queryConditional(
-                QueryConditional.sortBeginsWith(
-                    Key.builder()
-                        .partitionValue(ScanItem.formatPk(user))
-                        .sortValue(ScanItem.SCAN_PREFIX)
-                        .build()))
-            .scanIndexForward(false)
-            .limit(limit);
-    if (exclusiveStartKey != null && !exclusiveStartKey.isEmpty()) {
-      requestBuilder.exclusiveStartKey(exclusiveStartKey);
-    }
-
-    var page = scanTable.query(requestBuilder.build()).stream().findFirst().orElse(null);
-    if (page == null) {
-      return new ScanPage(List.of(), Map.of());
-    }
-    return new ScanPage(page.items(), page.lastEvaluatedKey());
-  }
-
   public boolean transitionScanToIdentifying(String user, String scanId) {
     try {
       dynamoDbClient.updateItem(
           UpdateItemRequest.builder()
-              .tableName(TcgInventoryTable.TABLE_NAME)
+              .tableName(tableName)
               .key(
                   Map.of(
                       ScanItem.PK,
@@ -110,6 +87,24 @@ public class ScanRepository {
     }
   }
 
+  public void updateScanRowSelection(
+      String user, String scanId, int scanPosition, String externalId) {
+    dynamoDbClient.updateItem(
+        UpdateItemRequest.builder()
+            .tableName(tableName)
+            .key(
+                Map.of(
+                    ScanRowItem.PK,
+                    AttributeValue.builder().s(ScanRowItem.formatPk(user, scanId)).build(),
+                    ScanRowItem.SK,
+                    AttributeValue.builder().s(ScanRowItem.formatSk(scanPosition)).build()))
+            .updateExpression("SET " + ScanRowItem.SELECTED_EXTERNAL_ID + " = :externalId")
+            .conditionExpression("attribute_exists(" + ScanRowItem.PK + ")")
+            .expressionAttributeValues(
+                Map.of(":externalId", AttributeValue.builder().s(externalId).build()))
+            .build());
+  }
+
   public boolean startScanConfirmation(String user, String scanId, JobItem jobItem) {
     var scanKey =
         Map.of(
@@ -124,7 +119,7 @@ public class ScanRepository {
                   TransactWriteItem.builder()
                       .update(
                           Update.builder()
-                              .tableName(TcgInventoryTable.TABLE_NAME)
+                              .tableName(tableName)
                               .key(scanKey)
                               .updateExpression(
                                   "SET #status = :confirming, updated_at = :now REMOVE #error")
@@ -147,7 +142,7 @@ public class ScanRepository {
                   TransactWriteItem.builder()
                       .put(
                           Put.builder()
-                              .tableName(TcgInventoryTable.TABLE_NAME)
+                              .tableName(tableName)
                               .item(JOB_ITEM_SCHEMA.itemToMap(jobItem, true))
                               .conditionExpression("attribute_not_exists(" + JobItem.PK + ")")
                               .build())
@@ -159,29 +154,11 @@ public class ScanRepository {
     }
   }
 
-  public void updateScanRowSelection(
-      String user, String scanId, int scanPosition, String externalId) {
-    dynamoDbClient.updateItem(
-        UpdateItemRequest.builder()
-            .tableName(TcgInventoryTable.TABLE_NAME)
-            .key(
-                Map.of(
-                    ScanRowItem.PK,
-                    AttributeValue.builder().s(ScanRowItem.formatPk(user, scanId)).build(),
-                    ScanRowItem.SK,
-                    AttributeValue.builder().s(ScanRowItem.formatSk(scanPosition)).build()))
-            .updateExpression("SET " + ScanRowItem.SELECTED_EXTERNAL_ID + " = :externalId")
-            .conditionExpression("attribute_exists(" + ScanRowItem.PK + ")")
-            .expressionAttributeValues(
-                Map.of(":externalId", AttributeValue.builder().s(externalId).build()))
-            .build());
-  }
-
   public boolean failScanConfirmation(String user, String scanId, String error) {
     try {
       dynamoDbClient.updateItem(
           UpdateItemRequest.builder()
-              .tableName(TcgInventoryTable.TABLE_NAME)
+              .tableName(tableName)
               .key(
                   Map.of(
                       ScanItem.PK,
@@ -213,7 +190,7 @@ public class ScanRepository {
     try {
       dynamoDbClient.updateItem(
           UpdateItemRequest.builder()
-              .tableName(TcgInventoryTable.TABLE_NAME)
+              .tableName(tableName)
               .key(
                   Map.of(
                       ScanItem.PK,
@@ -265,7 +242,7 @@ public class ScanRepository {
                       TransactWriteItem.builder()
                           .conditionCheck(
                               ConditionCheck.builder()
-                                  .tableName(TcgInventoryTable.TABLE_NAME)
+                                  .tableName(tableName)
                                   .key(scanKey)
                                   .conditionExpression(
                                       "attribute_exists("
@@ -281,7 +258,7 @@ public class ScanRepository {
                       TransactWriteItem.builder()
                           .delete(
                               Delete.builder()
-                                  .tableName(TcgInventoryTable.TABLE_NAME)
+                                  .tableName(tableName)
                                   .key(rowKey)
                                   .conditionExpression("attribute_exists(" + ScanRowItem.PK + ")")
                                   .build())
@@ -297,7 +274,7 @@ public class ScanRepository {
     try {
       dynamoDbClient.deleteItem(
           DeleteItemRequest.builder()
-              .tableName(TcgInventoryTable.TABLE_NAME)
+              .tableName(tableName)
               .key(
                   Map.of(
                       ScanItem.PK,
@@ -361,7 +338,7 @@ public class ScanRepository {
     return TransactWriteItem.builder()
         .put(
             Put.builder()
-                .tableName(TcgInventoryTable.TABLE_NAME)
+                .tableName(tableName)
                 .item(scanTable.tableSchema().itemToMap(item, true))
                 .conditionExpression("attribute_not_exists(" + ScanItem.PK + ")")
                 .build())
@@ -372,7 +349,7 @@ public class ScanRepository {
     return TransactWriteItem.builder()
         .put(
             Put.builder()
-                .tableName(TcgInventoryTable.TABLE_NAME)
+                .tableName(tableName)
                 .item(scanRowTable.tableSchema().itemToMap(item, true))
                 .conditionExpression("attribute_not_exists(" + ScanRowItem.PK + ")")
                 .build())
@@ -383,7 +360,7 @@ public class ScanRepository {
     return TransactWriteItem.builder()
         .delete(
             Delete.builder()
-                .tableName(TcgInventoryTable.TABLE_NAME)
+                .tableName(tableName)
                 .key(
                     Map.of(
                         ScanRowItem.PK, AttributeValue.builder().s(item.getPk()).build(),

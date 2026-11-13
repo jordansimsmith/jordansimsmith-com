@@ -46,7 +46,8 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
                 TcgInventoryTable.table(enhancedClient, ScanItem.class),
                 TcgInventoryTable.table(enhancedClient, ScanRowItem.class),
                 factory.dynamoDbClient(),
-                factory.clock()),
+                factory.clock(),
+                TcgInventoryTable.TABLE_NAME),
             factory.catalogs(),
             factory.gamesService(),
             factory.importService());

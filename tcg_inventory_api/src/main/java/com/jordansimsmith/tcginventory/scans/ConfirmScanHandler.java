@@ -65,7 +65,8 @@ public class ConfirmScanHandler
             TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ScanItem.class),
             TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ScanRowItem.class),
             factory.dynamoDbClient(),
-            factory.clock());
+            factory.clock(),
+            TcgInventoryTable.TABLE_NAME);
     this.activeJob = new ActiveJob(factory.jobTable());
     this.jobsQueue = factory.jobsQueue();
     this.ulidGenerator = factory.ulidGenerator();

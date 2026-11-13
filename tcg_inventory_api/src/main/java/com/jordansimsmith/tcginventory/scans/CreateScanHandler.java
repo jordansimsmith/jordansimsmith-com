@@ -87,7 +87,8 @@ public class CreateScanHandler
             TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ScanItem.class),
             TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ScanRowItem.class),
             factory.dynamoDbClient(),
-            factory.clock());
+            factory.clock(),
+            TcgInventoryTable.TABLE_NAME);
     this.ulidGenerator = factory.ulidGenerator();
     this.s3Presigner = factory.s3Presigner();
     this.gamesService = factory.gamesService();

@@ -21,6 +21,7 @@ import com.jordansimsmith.tcginventory.publish.client.PublishService;
 import com.jordansimsmith.tcginventory.publish.server.PublishMessageHandler;
 import com.jordansimsmith.tcginventory.reports.client.ReportService;
 import com.jordansimsmith.tcginventory.reports.server.ReportMessageHandler;
+import com.jordansimsmith.tcginventory.scans.client.ScanService;
 import com.jordansimsmith.time.Clock;
 import com.jordansimsmith.ulid.UlidGenerator;
 import dagger.Component;
@@ -60,6 +61,8 @@ public interface TcgInventoryFactory {
   GamesService gamesService();
 
   CatalogService catalogService();
+
+  ScanService scanService();
 
   PricingService pricingService();
 

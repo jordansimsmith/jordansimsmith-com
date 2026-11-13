@@ -264,7 +264,6 @@ export function ScanReviewPanels({
   const candidateImage = selection?.card.image_urls.normal ?? null;
   const needsReview =
     selectedRow.needs_review ||
-    selectedRow.error !== null ||
     suggestion === undefined ||
     error !== undefined ||
     (selection !== undefined && !finishAvailable);
@@ -289,17 +288,12 @@ export function ScanReviewPanels({
             <Text size="sm" c="dimmed">
               {selection
                 ? `${selection.card.set_name} · ${selection.card.set_code.toUpperCase()} #${selection.card.collector_number}`
-                : selectedRow.needs_review || selectedRow.error !== null
+                : selectedRow.needs_review
                   ? 'This card needs a manual printing choice.'
                   : suggestion
                     ? 'Suggested match · advisory only'
                     : 'Choose a product with card search.'}
             </Text>
-            {selectedRow.error && (
-              <Text size="sm" c="red.7" role="alert">
-                {selectedRow.error}
-              </Text>
-            )}
           </Box>
           <Badge color={needsReview ? 'orange' : 'gray'} variant="light">
             {selection?.confirmed
