@@ -6,6 +6,7 @@ import java.util.Map;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
+import software.amazon.awssdk.services.dynamodb.model.ConditionCheck;
 import software.amazon.awssdk.services.dynamodb.model.Delete;
 import software.amazon.awssdk.services.dynamodb.model.DeleteItemRequest;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItem;
@@ -70,6 +71,94 @@ public class ScanMutationRepository {
             .build());
   }
 
+  public void claimScanConfirmation(String user, String scanId, long version) {
+    dynamoDbClient.updateItem(
+        request ->
+            request
+                .tableName(tableName)
+                .key(
+                    Map.of(
+                        ScanItem.PK, AttributeValue.fromS(ScanItem.formatPk(user)),
+                        ScanItem.SK, AttributeValue.fromS(ScanItem.formatSk(scanId))))
+                .updateExpression("SET #version = :nextVersion")
+                .conditionExpression(
+                    "#status = :reviewing AND (#version = :version OR "
+                        + "(attribute_not_exists(#version) AND :version = :zero))")
+                .expressionAttributeNames(
+                    Map.of("#status", ScanItem.STATUS, "#version", ScanItem.VERSION))
+                .expressionAttributeValues(
+                    Map.of(
+                        ":reviewing", AttributeValue.fromS("reviewing"),
+                        ":version", AttributeValue.fromN(Long.toString(version)),
+                        ":zero", AttributeValue.fromN("0"),
+                        ":nextVersion", AttributeValue.fromN(Long.toString(version + 1)))));
+  }
+
+  public void updateScanRowSelection(
+      String user, String scanId, long version, int scanPosition, String externalId) {
+    dynamoDbClient.transactWriteItems(
+        request ->
+            request.transactItems(
+                TransactWriteItem.builder()
+                    .conditionCheck(
+                        ConditionCheck.builder()
+                            .tableName(tableName)
+                            .key(
+                                Map.of(
+                                    ScanItem.PK, AttributeValue.fromS(ScanItem.formatPk(user)),
+                                    ScanItem.SK, AttributeValue.fromS(ScanItem.formatSk(scanId))))
+                            .conditionExpression("#status = :reviewing AND #version = :version")
+                            .expressionAttributeNames(
+                                Map.of("#status", ScanItem.STATUS, "#version", ScanItem.VERSION))
+                            .expressionAttributeValues(
+                                Map.of(
+                                    ":reviewing", AttributeValue.fromS("reviewing"),
+                                    ":version", AttributeValue.fromN(Long.toString(version))))
+                            .build())
+                    .build(),
+                TransactWriteItem.builder()
+                    .update(
+                        Update.builder()
+                            .tableName(tableName)
+                            .key(
+                                Map.of(
+                                    ScanRowItem.PK,
+                                        AttributeValue.fromS(ScanRowItem.formatPk(user, scanId)),
+                                    ScanRowItem.SK,
+                                        AttributeValue.fromS(ScanRowItem.formatSk(scanPosition))))
+                            .updateExpression("SET " + ScanRowItem.SELECTED_EXTERNAL_ID + " = :id")
+                            .conditionExpression("attribute_exists(" + ScanRowItem.PK + ")")
+                            .expressionAttributeValues(
+                                Map.of(":id", AttributeValue.fromS(externalId)))
+                            .build())
+                    .build()));
+  }
+
+  public void startScanConfirmation(String user, String scanId, long version) {
+    dynamoDbClient.updateItem(
+        request ->
+            request
+                .tableName(tableName)
+                .key(
+                    Map.of(
+                        ScanItem.PK, AttributeValue.fromS(ScanItem.formatPk(user)),
+                        ScanItem.SK, AttributeValue.fromS(ScanItem.formatSk(scanId))))
+                .updateExpression("SET #status = :confirming, updated_at = :now")
+                .conditionExpression(
+                    "#status = :reviewing AND (#version = :version OR "
+                        + "(attribute_not_exists(#version) AND :version = :zero))")
+                .expressionAttributeNames(
+                    Map.of("#status", ScanItem.STATUS, "#version", ScanItem.VERSION))
+                .expressionAttributeValues(
+                    Map.of(
+                        ":reviewing", AttributeValue.fromS("reviewing"),
+                        ":version", AttributeValue.fromN(Long.toString(version)),
+                        ":zero", AttributeValue.fromN("0"),
+                        ":confirming", AttributeValue.fromS("confirming"),
+                        ":now",
+                            AttributeValue.fromN(Long.toString(clock.now().getEpochSecond())))));
+  }
+
   public void completeScanConfirmation(String user, String scanId, String importId) {
     dynamoDbClient.updateItem(
         request ->
@@ -93,10 +182,6 @@ public class ScanMutationRepository {
   }
 
   public void deleteScanRow(String user, String scanId, int scanPosition) {
-    var scanKey =
-        Map.of(
-            ScanItem.PK, AttributeValue.fromS(ScanItem.formatPk(user)),
-            ScanItem.SK, AttributeValue.fromS(ScanItem.formatSk(scanId)));
     var rowKey =
         Map.of(
             ScanRowItem.PK, AttributeValue.fromS(ScanRowItem.formatPk(user, scanId)),
@@ -109,7 +194,11 @@ public class ScanMutationRepository {
                         .update(
                             Update.builder()
                                 .tableName(tableName)
-                                .key(scanKey)
+                                .key(
+                                    Map.of(
+                                        ScanItem.PK, AttributeValue.fromS(ScanItem.formatPk(user)),
+                                        ScanItem.SK,
+                                            AttributeValue.fromS(ScanItem.formatSk(scanId))))
                                 .updateExpression(
                                     "SET #version = if_not_exists(#version, :zero) + :one, "
                                         + "updated_at = :now")

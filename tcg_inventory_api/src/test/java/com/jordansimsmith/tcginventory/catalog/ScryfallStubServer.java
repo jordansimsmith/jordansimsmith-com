@@ -1,12 +1,15 @@
 package com.jordansimsmith.tcginventory.catalog;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 
 public class ScryfallStubServer {
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final String CARD_ID = "4eaac4fd-95f5-4f38-b593-0101e79a20f9";
   private static final String ALTERNATE_ID = "c83275d7-0d4e-4e25-b8b8-433e9d2a9290";
   private static final String ORACLE_ID = "4457ed35-7c10-48c8-9776-456485fdf070";
@@ -21,6 +24,29 @@ public class ScryfallStubServer {
 
   private static void handleCards(HttpExchange exchange) throws IOException {
     var path = exchange.getRequestURI().getPath();
+    if (path.equals("/cards/collection")) {
+      var identifiers = OBJECT_MAPPER.readTree(exchange.getRequestBody()).get("identifiers");
+      var found = new ArrayList<String>();
+      var missing = new ArrayList<String>();
+      for (var identifier : identifiers) {
+        var id = identifier.get("id").asText();
+        if (CARD_ID.equals(id)) {
+          found.add(card(id, "Lightning Bolt", "sta", "42"));
+        } else if (ALTERNATE_ID.equals(id)) {
+          found.add(card(id, "Lightning Bolt", "2xm", "117"));
+        } else {
+          missing.add(identifier.toString());
+        }
+      }
+      respond(
+          exchange,
+          200,
+          """
+          {"data":[%s],"not_found":[%s]}
+          """
+              .formatted(String.join(",", found), String.join(",", missing)));
+      return;
+    }
     if (path.equals("/cards/search")) {
       respond(
           exchange,

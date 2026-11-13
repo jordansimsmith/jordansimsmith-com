@@ -14,6 +14,9 @@ public interface ScanService {
   IdentifyScanResponse identifyScan(RequestContext ctx, IdentifyScanRequest request)
       throws ServiceException;
 
+  ConfirmScanResponse confirmScan(RequestContext ctx, ConfirmScanRequest request)
+      throws ServiceException;
+
   DeleteScanRowResponse deleteScanRow(RequestContext ctx, DeleteScanRowRequest request)
       throws ServiceException;
 

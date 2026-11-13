@@ -17,12 +17,16 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Base64;
+import java.util.Map;
 import java.util.stream.StreamSupport;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.Network;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
+import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
 public class TcgInventoryE2ETest {
   private static final String AUTH_HEADER =
@@ -71,6 +75,7 @@ public class TcgInventoryE2ETest {
   private static final TcgInventoryContainer tcgInventoryContainer =
       new TcgInventoryContainer()
           .withNetwork(NETWORK)
+          .withEnv("LAMBDA_KEEPALIVE_MS", "30000")
           .withEnv("FETCHTCG_BASE_URL", fetchTcgStubContainer.getEndpoint().toString())
           .withEnv("FIREBASE_TOKEN_URL", firebaseStubContainer.getEndpoint() + "/v1/token")
           .withEnv("SCRYFALL_BASE_URL", scryfallStubContainer.getEndpoint().toString());
@@ -193,6 +198,53 @@ public class TcgInventoryE2ETest {
     assertThat(identifyScanResponse.statusCode()).isEqualTo(409);
     assertThat(objectMapper.readTree(identifyScanResponse.body()).get("message").asText())
         .isEqualTo("all scan files must be uploaded before identification");
+
+    // arrange - seed recognition completion for the Java confirmation flow
+    try (var dynamoDb =
+        DynamoDbClient.builder()
+            .endpointOverride(tcgInventoryContainer.getLocalstackUrl())
+            .region(Region.AP_SOUTHEAST_2)
+            .build()) {
+      dynamoDb.updateItem(
+          request ->
+              request
+                  .tableName("tcg_inventory")
+                  .key(
+                      Map.of(
+                          "pk", AttributeValue.fromS("USER#" + scanUser),
+                          "sk", AttributeValue.fromS("SCAN#" + scanId)))
+                  .updateExpression("SET #status = :reviewing")
+                  .conditionExpression("attribute_exists(pk)")
+                  .expressionAttributeNames(Map.of("#status", "status"))
+                  .expressionAttributeValues(
+                      Map.of(":reviewing", AttributeValue.fromS("reviewing"))));
+    }
+    var confirmPath = "/scans/" + scanId + "/confirm";
+    var selections =
+        """
+        {"rows":[{"scan_position":1,"external_id":"%s"}]}
+        """
+            .formatted(SCRYFALL_ID);
+
+    // act
+    var scanConfirmationResponse = sendAsUser("POST", confirmPath, selections, scanUser);
+
+    // assert
+    assertThat(scanConfirmationResponse.statusCode()).isEqualTo(202);
+    assertThat(scanConfirmationResponse.body()).isEmpty();
+    await()
+        .atMost(Duration.ofMinutes(2))
+        .untilAsserted(
+            () -> {
+              var detail = sendAsUser("GET", "/scans/" + scanId, "", scanUser);
+              assertThat(detail.statusCode()).isEqualTo(200);
+              var scan = objectMapper.readTree(detail.body());
+              assertThat(scan.get("status").asText()).isEqualTo("confirmed");
+              assertThat(scan.get("import_id").asText()).isNotBlank();
+            });
+    var repeatConfirmation = sendAsUser("POST", confirmPath, selections, scanUser);
+    assertThat(repeatConfirmation.statusCode()).isEqualTo(202);
+    assertThat(repeatConfirmation.body()).isEmpty();
 
     var catalogCardResponse = get("/catalog/cards/" + SCRYFALL_ID + "?game=mtg");
     assertThat(catalogCardResponse.statusCode()).isEqualTo(200);

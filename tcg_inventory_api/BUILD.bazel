@@ -267,36 +267,6 @@ java_binary(
 )
 
 java_binary(
-    name = "confirm-scan-handler",
-    srcs = ["src/main/java/com/jordansimsmith/tcginventory/scans/ConfirmScanHandler.java"],
-    create_executable = False,
-    resources = [
-        "src/main/resources/logback.xml",
-    ],
-    deps = [
-        ":catalog-lib",
-        ":lib",
-        ":scan-lib",
-        "//lib/http:lib",
-        "//lib/queue:lib",
-        "//lib/time:lib",
-        "//lib/ulid:lib",
-        "@maven//:ch_qos_logback_logback_classic",
-        "@maven//:ch_qos_logback_logback_core",
-        "@maven//:com_amazonaws_aws_lambda_java_core",
-        "@maven//:com_amazonaws_aws_lambda_java_events",
-        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
-        "@maven//:com_fasterxml_jackson_core_jackson_core",
-        "@maven//:com_fasterxml_jackson_core_jackson_databind",
-        "@maven//:com_google_code_findbugs_jsr305",
-        "@maven//:com_google_guava_guava",
-        "@maven//:org_slf4j_slf4j_api",
-        "@maven//:software_amazon_awssdk_dynamodb",
-        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
-    ],
-)
-
-java_binary(
     name = "jobs-handler",
     srcs = [
         "src/main/java/com/jordansimsmith/tcginventory/JobsHandler.java",
@@ -342,6 +312,7 @@ java_binary(
     testonly = True,
     srcs = ["src/test/java/com/jordansimsmith/tcginventory/catalog/ScryfallStubServer.java"],
     create_executable = False,
+    deps = ["@maven//:com_fasterxml_jackson_core_jackson_databind"],
 )
 
 java_library(
@@ -506,7 +477,6 @@ java_test_suite(
     deps = [
         ":catalog-jobs-handler",
         ":catalog-lib",
-        ":confirm-scan-handler",
         ":find-catalog-alternatives-handler",
         ":find-catalog-cards-handler",
         ":get-catalog-card-handler",
@@ -575,7 +545,7 @@ localstack_image(
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/catalog/api:find-card-images-handler_deploy.jar",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/imports/api:confirm-import-handler_deploy.jar",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/orders/api:confirm-order-handler_deploy.jar",
-        ":confirm-scan-handler_deploy.jar",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/scans/api:confirm-scan-handler_deploy.jar",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/imports/api:create-import-handler_deploy.jar",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/imports/api:create-import-row-photo-handler_deploy.jar",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/reports/api:create-report-handler_deploy.jar",
@@ -667,5 +637,7 @@ java_test_suite(
         "@maven//:org_junit_jupiter_junit_jupiter_api",
         "@maven//:org_slf4j_slf4j_api",
         "@maven//:org_testcontainers_testcontainers",
+        "@maven//:software_amazon_awssdk_dynamodb",
+        "@maven//:software_amazon_awssdk_regions",
     ],
 )

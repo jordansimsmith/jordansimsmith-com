@@ -2,7 +2,7 @@
 
 This document extends the [modular monolith engineering strategy](modular-monolith-strategy.md) with the ownership, execution, and recovery rules for background work. Each vertical may have synchronous service operations and asynchronous processing. Both belong to the same domain owner.
 
-The [service README](../README.md) describes the runtime currently implemented. Imports, Orders, Pricing, Reports, and Publish own their workflow records or lifecycle, messages, and queue adapters. Scan confirmation HTTP admission still publishes through shared Jobs. The Scans Java worker consumes its own confirmation FIFO. Historical Imports and Orders Jobs records remain stored, but their runtime work uses owner-local queues and workers. Do not introduce a generic Jobs vertical.
+The [service README](../README.md) describes the runtime currently implemented. Imports, Orders, Pricing, Reports, and Publish own their workflow records or lifecycle, messages, and queue adapters. Scans owns confirmation admission and dispatch to its Java worker through the Scans FIFO. Historical Imports and Orders Jobs records remain stored, but their runtime work uses owner-local queues and workers. Do not introduce a generic Jobs vertical.
 
 ## Ownership and public contracts
 
@@ -119,7 +119,7 @@ The same limitation applies when one service accepts a follow-up operation befor
 
 ## Cross-vertical workflows
 
-Worker implementations obey the same client-only dependencies as synchronous server operations. Publish calls Orders and Listings services. The Scans Java worker validates all selected printings through `CatalogService` on each attempt before calling `ImportService#createImport`. Both the Scans worker and the legacy Jobs processor use the scan ID as the Imports operation ID and save the returned `import_id` on the scan. Imports owns appraisal and confirmation dispatch on the Imports FIFO. The HTTP scan confirmation route currently publishes to the legacy processor.
+Worker implementations obey the same client-only dependencies as synchronous server operations. Publish calls Orders and Listings services. The Scans Java worker validates all selected printings through `CatalogService` on each attempt before calling `ImportService#createImport`. Both the Scans worker and the legacy Jobs processor use the scan ID as the Imports operation ID and save the returned `import_id` on the scan. Imports owns appraisal and confirmation dispatch on the Imports FIFO. Before switching the confirmation route, provision the Scans worker, verify the Imports FIFO, and pause legacy submissions until queued, in-flight, dead-lettered, and stranded legacy confirmations are resolved. Release the confirmation route with the web payload that sends only positions and printing IDs. Resume submissions through the Scans FIFO and retain the legacy worker until the cutover is verified.
 
 Pass the owning operation's user scope through `RequestContext`. Transactions stay within the owning vertical, and a successful service call commits that owner's work independently. The orchestrator records its own progress without sharing transaction handles or database models.
 

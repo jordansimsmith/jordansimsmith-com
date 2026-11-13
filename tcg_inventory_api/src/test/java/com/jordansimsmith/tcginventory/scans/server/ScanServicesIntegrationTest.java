@@ -3,13 +3,19 @@ package com.jordansimsmith.tcginventory.scans.server;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.queue.FakeQueueClient;
+import com.jordansimsmith.queue.QueueClient;
 import com.jordansimsmith.s3.S3Container;
 import com.jordansimsmith.service.BadRequestException;
 import com.jordansimsmith.service.ConflictException;
@@ -20,6 +26,7 @@ import com.jordansimsmith.tcginventory.games.client.Finish;
 import com.jordansimsmith.tcginventory.games.client.Game;
 import com.jordansimsmith.tcginventory.games.client.GamesService;
 import com.jordansimsmith.tcginventory.games.client.GetGameResponse;
+import com.jordansimsmith.tcginventory.scans.client.ConfirmScanRequest;
 import com.jordansimsmith.tcginventory.scans.client.CreateScanRequest;
 import com.jordansimsmith.tcginventory.scans.client.DeleteScanRequest;
 import com.jordansimsmith.tcginventory.scans.client.DeleteScanRowRequest;
@@ -28,6 +35,7 @@ import com.jordansimsmith.tcginventory.scans.client.GetScanRequest;
 import com.jordansimsmith.tcginventory.scans.client.IdentifyScanRequest;
 import com.jordansimsmith.tcginventory.scans.client.ScanFile;
 import com.jordansimsmith.tcginventory.scans.client.ScanRowStatus;
+import com.jordansimsmith.tcginventory.scans.client.ScanSelection;
 import com.jordansimsmith.tcginventory.scans.client.ScanStatus;
 import com.jordansimsmith.tcginventory.scans.client.ScanSuggestion;
 import java.time.Instant;
@@ -687,6 +695,251 @@ class ScanServicesIntegrationTest {
     assertThat(scanQueue.getSends())
         .extracting(send -> send.messageGroupId())
         .containsExactlyInAnyOrder("first", "second");
+  }
+
+  @Test
+  void confirmScanShouldSaveTwoHundredSelectionsAndSendOnce() throws Exception {
+    // arrange
+    var user = new RequestContext("alice");
+    var queue = new FakeQueueClient<ScanConfirmationMessage>();
+    var service =
+        new ConfirmScanService(
+            new ScanReadRepository(scanTable, scanRowTable), scanMutationRepository, queue);
+    putScan(user.user(), "scan", "reviewing", 200);
+    var selections =
+        IntStream.rangeClosed(1, 200)
+            .mapToObj(position -> new ScanSelection(position, "id"))
+            .toList();
+    for (var selection : selections) {
+      putRow(user.user(), "scan", selection.scanPosition(), "card.jpg", "key", 10);
+    }
+    var request = new ConfirmScanRequest("scan", selections.reversed());
+
+    // act
+    service.confirmScan(user, request);
+    service.confirmScan(user, request);
+    scanMutationRepository.completeScanConfirmation(user.user(), "scan", "import");
+    service.confirmScan(user, request);
+
+    // assert
+    var reads = new ScanReadRepository(scanTable, scanRowTable);
+    assertThat(reads.getScan(user.user(), "scan").getVersion()).isEqualTo(1L);
+    assertThat(reads.findScanRows(user.user(), "scan"))
+        .hasSize(200)
+        .allMatch(row -> "id".equals(row.getSelectedExternalId()));
+    assertThat(queue.getSends()).hasSize(1);
+    var send = queue.getSends().getFirst();
+    assertThat(send.messageGroupId()).isEqualTo("scan");
+    assertThat(send.messageDeduplicationId()).isEqualTo("scan");
+    assertThat(objectMapper.writeValueAsString(send.message()))
+        .isEqualTo("{\"user\":\"alice\",\"scan_id\":\"scan\"}");
+  }
+
+  @Test
+  void confirmScanShouldRejectInvalidSelectionsAndOtherOwners() {
+    // arrange
+    var user = new RequestContext("alice");
+    var queue = new FakeQueueClient<ScanConfirmationMessage>();
+    var service =
+        new ConfirmScanService(
+            new ScanReadRepository(scanTable, scanRowTable), scanMutationRepository, queue);
+    putScan(user.user(), "scan", "reviewing", 3);
+    putRow(user.user(), "scan", 1, "card.jpg", "key", 10);
+    putRow(user.user(), "scan", 3, "card.jpg", "key", 10);
+
+    // act / assert
+    for (var selections :
+        List.of(
+            List.<ScanSelection>of(),
+            List.of(new ScanSelection(1, "id"), new ScanSelection(1, "id")),
+            List.of(new ScanSelection(1, "id"), new ScanSelection(2, "id")),
+            List.of(new ScanSelection(1, "id"), new ScanSelection(3, " ")))) {
+      assertThatThrownBy(
+              () -> service.confirmScan(user, new ConfirmScanRequest("scan", selections)))
+          .isInstanceOf(BadRequestException.class);
+    }
+    assertThatThrownBy(() -> service.confirmScan(new RequestContext("bob"), confirmation("id")))
+        .isInstanceOf(NotFoundException.class);
+    assertThatThrownBy(() -> service.confirmScan(user, new ConfirmScanRequest(" ", List.of())))
+        .isInstanceOf(BadRequestException.class);
+    putScan(user.user(), "uploading", "uploading", 1);
+    assertThatThrownBy(
+            () -> service.confirmScan(user, new ConfirmScanRequest("uploading", List.of())))
+        .isInstanceOf(ConflictException.class);
+    assertThat(queue.getSends()).isEmpty();
+  }
+
+  @Test
+  void confirmScanShouldRewritePartialSelectionsAfterStorageFailure() throws Exception {
+    // arrange
+    var user = new RequestContext("alice");
+    var reads = new ScanReadRepository(scanTable, scanRowTable);
+    var writes = spy(scanMutationRepository);
+    var queue = new FakeQueueClient<ScanConfirmationMessage>();
+    var service = new ConfirmScanService(reads, writes, queue);
+    putScan(user.user(), "scan", "reviewing", 3);
+    putRow(user.user(), "scan", 1, "card.jpg", "key", 10);
+    putRow(user.user(), "scan", 3, "card.jpg", "key", 10);
+    var failure = new IllegalStateException("storage unavailable");
+    doThrow(failure).when(writes).updateScanRowSelection("alice", "scan", 1, 3, "old");
+
+    // act / assert
+    assertThatThrownBy(() -> service.confirmScan(user, confirmation("old"))).isSameAs(failure);
+    assertThat(reads.getScan("alice", "scan").getStatus()).isEqualTo("reviewing");
+    assertThat(reads.findScanRows("alice", "scan"))
+        .extracting(ScanRowItem::getSelectedExternalId)
+        .containsExactly("old", null);
+    assertThat(queue.getSends()).isEmpty();
+
+    service.confirmScan(user, confirmation("new"));
+
+    assertThat(reads.findScanRows("alice", "scan"))
+        .extracting(ScanRowItem::getSelectedExternalId)
+        .containsExactly("new", "new");
+    assertThat(queue.getSends()).hasSize(1);
+    assertThatThrownBy(() -> scanMutationRepository.deleteScanRow("alice", "scan", 1))
+        .isInstanceOf(TransactionCanceledException.class);
+  }
+
+  @Test
+  void confirmScanShouldPreventAnOverlappingRequestFromOverwritingWinningSelections()
+      throws Exception {
+    // arrange
+    var user = new RequestContext("alice");
+    var reads = new ScanReadRepository(scanTable, scanRowTable);
+    var writes = spy(scanMutationRepository);
+    var queue = new FakeQueueClient<ScanConfirmationMessage>();
+    var service = new ConfirmScanService(reads, writes, queue);
+    putScan(user.user(), "scan", "reviewing", 3);
+    putRow(user.user(), "scan", 1, "card.jpg", "key", 10);
+    putRow(user.user(), "scan", 3, "card.jpg", "key", 10);
+    doAnswer(
+            invocation -> {
+              service.confirmScan(user, confirmation("winner"));
+              return invocation.callRealMethod();
+            })
+        .when(writes)
+        .updateScanRowSelection("alice", "scan", 1, 3, "loser");
+
+    // act / assert
+    assertThatThrownBy(() -> service.confirmScan(user, confirmation("loser")))
+        .isInstanceOf(TransactionCanceledException.class);
+    assertThat(reads.findScanRows("alice", "scan"))
+        .extracting(ScanRowItem::getSelectedExternalId)
+        .containsExactly("winner", "winner");
+    assertThat(queue.getSends()).hasSize(1);
+  }
+
+  @Test
+  void confirmScanShouldRejectAReviewChangedByRowDeletion() {
+    // arrange
+    var user = new RequestContext("alice");
+    var reads = new ScanReadRepository(scanTable, scanRowTable);
+    var writes = spy(scanMutationRepository);
+    var queue = new FakeQueueClient<ScanConfirmationMessage>();
+    var service = new ConfirmScanService(reads, writes, queue);
+    putScan(user.user(), "scan", "reviewing", 3);
+    putRow(user.user(), "scan", 1, "card.jpg", "key", 10);
+    putRow(user.user(), "scan", 3, "card.jpg", "key", 10);
+    doAnswer(
+            invocation -> {
+              scanMutationRepository.deleteScanRow("alice", "scan", 3);
+              return invocation.callRealMethod();
+            })
+        .when(writes)
+        .updateScanRowSelection("alice", "scan", 1, 3, "id");
+
+    // act / assert
+    assertThatThrownBy(() -> service.confirmScan(user, confirmation("id")))
+        .isInstanceOf(TransactionCanceledException.class);
+    assertThat(reads.getScan("alice", "scan").getStatus()).isEqualTo("reviewing");
+    assertThat(reads.findScanRows("alice", "scan"))
+        .extracting(ScanRowItem::getScanPosition)
+        .containsExactly(1);
+    assertThat(queue.getSends()).isEmpty();
+  }
+
+  @Test
+  void confirmScanShouldPropagateValidationFailureWhenReviewChangesBeforeRowsAreRead() {
+    // arrange
+    var user = new RequestContext("alice");
+    var reads = spy(new ScanReadRepository(scanTable, scanRowTable));
+    var queue = new FakeQueueClient<ScanConfirmationMessage>();
+    var service = new ConfirmScanService(reads, scanMutationRepository, queue);
+    putScan(user.user(), "scan", "reviewing", 3);
+    putRow(user.user(), "scan", 1, "card.jpg", "key", 10);
+    putRow(user.user(), "scan", 3, "card.jpg", "key", 10);
+    doAnswer(
+            invocation -> {
+              scanMutationRepository.deleteScanRow("alice", "scan", 3);
+              return invocation.callRealMethod();
+            })
+        .when(reads)
+        .findScanRows("alice", "scan");
+
+    // act / assert
+    assertThatThrownBy(() -> service.confirmScan(user, confirmation("id")))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("every retained scan row must be selected exactly once");
+    assertThat(queue.getSends()).isEmpty();
+  }
+
+  @Test
+  void confirmScanShouldPropagateFailedVersionClaim() {
+    // arrange
+    var user = new RequestContext("alice");
+    var reads = new ScanReadRepository(scanTable, scanRowTable);
+    var writes = spy(scanMutationRepository);
+    var queue = new FakeQueueClient<ScanConfirmationMessage>();
+    var service = new ConfirmScanService(reads, writes, queue);
+    putScan(user.user(), "scan", "reviewing", 3);
+    putRow(user.user(), "scan", 1, "card.jpg", "key", 10);
+    putRow(user.user(), "scan", 3, "card.jpg", "key", 10);
+    doAnswer(
+            invocation -> {
+              scanMutationRepository.deleteScanRow("alice", "scan", 3);
+              return invocation.callRealMethod();
+            })
+        .when(writes)
+        .claimScanConfirmation("alice", "scan", 0);
+
+    // act / assert
+    assertThatThrownBy(() -> service.confirmScan(user, confirmation("id")))
+        .isInstanceOf(ConditionalCheckFailedException.class);
+    assertThat(reads.findScanRows("alice", "scan"))
+        .allMatch(row -> row.getSelectedExternalId() == null);
+    assertThat(queue.getSends()).isEmpty();
+  }
+
+  @Test
+  void confirmScanShouldLeaveFailedDispatchForManualEnqueue() throws Exception {
+    // arrange
+    var user = new RequestContext("alice");
+    var reads = new ScanReadRepository(scanTable, scanRowTable);
+    @SuppressWarnings("unchecked")
+    var queue = (QueueClient<ScanConfirmationMessage>) mock(QueueClient.class);
+    var service = new ConfirmScanService(reads, scanMutationRepository, queue);
+    putScan(user.user(), "scan", "reviewing", 3);
+    putRow(user.user(), "scan", 1, "card.jpg", "key", 10);
+    putRow(user.user(), "scan", 3, "card.jpg", "key", 10);
+    var message = new ScanConfirmationMessage("alice", "scan");
+    var failure = new IllegalStateException("queue unavailable");
+    doThrow(failure).when(queue).send(message, "scan", "scan");
+
+    // act / assert
+    assertThatThrownBy(() -> service.confirmScan(user, confirmation("id"))).isSameAs(failure);
+    assertThat(reads.getScan("alice", "scan").getStatus()).isEqualTo("confirming");
+    service.confirmScan(user, confirmation("other"));
+    verify(queue).send(message, "scan", "scan");
+    verifyNoMoreInteractions(queue);
+    assertThat(reads.findScanRows("alice", "scan"))
+        .extracting(ScanRowItem::getSelectedExternalId)
+        .containsExactly("id", "id");
+  }
+
+  private static ConfirmScanRequest confirmation(String externalId) {
+    return new ConfirmScanRequest(
+        "scan", List.of(new ScanSelection(1, externalId), new ScanSelection(3, externalId)));
   }
 
   private static ScanItem scan(String user, String scanId, String status, int rowCount) {

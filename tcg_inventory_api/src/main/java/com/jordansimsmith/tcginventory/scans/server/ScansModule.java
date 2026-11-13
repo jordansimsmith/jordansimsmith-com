@@ -8,6 +8,8 @@ import com.jordansimsmith.service.ServiceException;
 import com.jordansimsmith.tcginventory.catalog.client.CatalogService;
 import com.jordansimsmith.tcginventory.games.client.GamesService;
 import com.jordansimsmith.tcginventory.imports.client.ImportService;
+import com.jordansimsmith.tcginventory.scans.client.ConfirmScanRequest;
+import com.jordansimsmith.tcginventory.scans.client.ConfirmScanResponse;
 import com.jordansimsmith.tcginventory.scans.client.CreateScanRequest;
 import com.jordansimsmith.tcginventory.scans.client.CreateScanResponse;
 import com.jordansimsmith.tcginventory.scans.client.DeleteScanRequest;
@@ -84,6 +86,10 @@ public class ScansModule {
         SqsQueueClient.create(sqsClient, objectMapper, "tcg_inventory_scan_jobs.fifo");
     var identifyScanService =
         new IdentifyScanService(readRepository, mutationRepository, scanUploadVerifier, scanQueue);
+    QueueClient<ScanConfirmationMessage> confirmationQueue =
+        SqsQueueClient.create(sqsClient, objectMapper, "tcg_inventory_scans.fifo");
+    var confirmScanService =
+        new ConfirmScanService(readRepository, mutationRepository, confirmationQueue);
     var deleteScanRowService =
         new DeleteScanRowService(readRepository, mutationRepository, s3Client, bucket);
     var deleteScanService =
@@ -111,6 +117,12 @@ public class ScansModule {
       public IdentifyScanResponse identifyScan(RequestContext ctx, IdentifyScanRequest request)
           throws ServiceException {
         return identifyScanService.identifyScan(ctx, request);
+      }
+
+      @Override
+      public ConfirmScanResponse confirmScan(RequestContext ctx, ConfirmScanRequest request)
+          throws ServiceException {
+        return confirmScanService.confirmScan(ctx, request);
       }
 
       @Override

@@ -1,13 +1,11 @@
 package com.jordansimsmith.tcginventory.scans;
 
-import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.time.Clock;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
-import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
@@ -16,12 +14,10 @@ import software.amazon.awssdk.services.dynamodb.model.ConditionalCheckFailedExce
 import software.amazon.awssdk.services.dynamodb.model.Put;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItem;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItemsRequest;
-import software.amazon.awssdk.services.dynamodb.model.Update;
 import software.amazon.awssdk.services.dynamodb.model.UpdateItemRequest;
 
 public class ScanRepository {
   private static final int MAX_TRANSACT_ITEMS = 100;
-  private static final TableSchema<JobItem> JOB_ITEM_SCHEMA = TableSchema.fromBean(JobItem.class);
 
   private final DynamoDbTable<ScanItem> scanTable;
   private final DynamoDbTable<ScanRowItem> scanRowTable;
@@ -52,79 +48,6 @@ public class ScanRepository {
 
     dynamoDbClient.transactWriteItems(
         TransactWriteItemsRequest.builder().transactItems(List.of(buildScanPut(scanItem))).build());
-  }
-
-  public void updateScanRowSelection(
-      String user, String scanId, int scanPosition, String externalId) {
-    dynamoDbClient.updateItem(
-        UpdateItemRequest.builder()
-            .tableName(tableName)
-            .key(
-                Map.of(
-                    ScanRowItem.PK,
-                    AttributeValue.builder().s(ScanRowItem.formatPk(user, scanId)).build(),
-                    ScanRowItem.SK,
-                    AttributeValue.builder().s(ScanRowItem.formatSk(scanPosition)).build()))
-            .updateExpression("SET " + ScanRowItem.SELECTED_EXTERNAL_ID + " = :externalId")
-            .conditionExpression("attribute_exists(" + ScanRowItem.PK + ")")
-            .expressionAttributeValues(
-                Map.of(":externalId", AttributeValue.builder().s(externalId).build()))
-            .build());
-  }
-
-  public void startScanConfirmation(
-      String user, String scanId, long expectedVersion, JobItem jobItem) {
-    var scanKey =
-        Map.of(
-            ScanItem.PK,
-            AttributeValue.builder().s(ScanItem.formatPk(user)).build(),
-            ScanItem.SK,
-            AttributeValue.builder().s(ScanItem.formatSk(scanId)).build());
-    dynamoDbClient.transactWriteItems(
-        TransactWriteItemsRequest.builder()
-            .transactItems(
-                TransactWriteItem.builder()
-                    .update(
-                        Update.builder()
-                            .tableName(tableName)
-                            .key(scanKey)
-                            .updateExpression(
-                                "SET #status = :confirming, updated_at = :now REMOVE #error")
-                            .conditionExpression(
-                                "attribute_exists("
-                                    + ScanItem.PK
-                                    + ") AND #status = :reviewing AND (#version = :version OR "
-                                    + "(attribute_not_exists(#version) AND :version = :zero))")
-                            .expressionAttributeNames(
-                                Map.of(
-                                    "#status", ScanItem.STATUS,
-                                    "#error", ScanItem.ERROR,
-                                    "#version", ScanItem.VERSION))
-                            .expressionAttributeValues(
-                                Map.of(
-                                    ":confirming",
-                                    AttributeValue.builder().s("confirming").build(),
-                                    ":reviewing",
-                                    AttributeValue.builder().s("reviewing").build(),
-                                    ":now",
-                                    AttributeValue.builder()
-                                        .n(String.valueOf(clock.now().getEpochSecond()))
-                                        .build(),
-                                    ":version",
-                                    AttributeValue.fromN(Long.toString(expectedVersion)),
-                                    ":zero",
-                                    AttributeValue.fromN("0")))
-                            .build())
-                    .build(),
-                TransactWriteItem.builder()
-                    .put(
-                        Put.builder()
-                            .tableName(tableName)
-                            .item(JOB_ITEM_SCHEMA.itemToMap(jobItem, true))
-                            .conditionExpression("attribute_not_exists(" + JobItem.PK + ")")
-                            .build())
-                    .build())
-            .build());
   }
 
   public boolean failScanConfirmation(String user, String scanId, String error) {

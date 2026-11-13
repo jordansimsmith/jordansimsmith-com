@@ -14,6 +14,7 @@ import com.jordansimsmith.service.BadRequestException;
 import com.jordansimsmith.service.NotFoundException;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.tcginventory.TcgInventoryFactory;
+import com.jordansimsmith.tcginventory.scans.client.ConfirmScanRequest;
 import com.jordansimsmith.tcginventory.scans.client.CreateScanRequest;
 import com.jordansimsmith.tcginventory.scans.client.CreateScanResponse;
 import com.jordansimsmith.tcginventory.scans.client.DeleteScanRequest;
@@ -28,6 +29,7 @@ import com.jordansimsmith.tcginventory.scans.client.ScanFile;
 import com.jordansimsmith.tcginventory.scans.client.ScanRow;
 import com.jordansimsmith.tcginventory.scans.client.ScanRowStatus;
 import com.jordansimsmith.tcginventory.scans.client.ScanRowUpload;
+import com.jordansimsmith.tcginventory.scans.client.ScanSelection;
 import com.jordansimsmith.tcginventory.scans.client.ScanService;
 import com.jordansimsmith.tcginventory.scans.client.ScanStatus;
 import com.jordansimsmith.tcginventory.scans.client.ScanSuggestion;
@@ -48,6 +50,7 @@ class ScanHandlersTest {
   private DeleteScanHandler deleteScanHandler;
   private DeleteScanRowHandler deleteScanRowHandler;
   private IdentifyScanHandler identifyScanHandler;
+  private ConfirmScanHandler confirmScanHandler;
 
   @BeforeEach
   void setUp() {
@@ -66,6 +69,7 @@ class ScanHandlersTest {
     deleteScanHandler = new DeleteScanHandler(factory);
     deleteScanRowHandler = new DeleteScanRowHandler(factory);
     identifyScanHandler = new IdentifyScanHandler(factory);
+    confirmScanHandler = new ConfirmScanHandler(factory);
   }
 
   @Test
@@ -259,6 +263,60 @@ class ScanHandlersTest {
     assertThat(response.getStatusCode()).isEqualTo(400);
     assertThat(objectMapper.readTree(response.getBody()).get("message").asText())
         .isEqualTo("scan_id is required");
+  }
+
+  @Test
+  void confirmScanShouldUsePathIdAndReturnBodylessAccepted() throws Exception {
+    // arrange
+    var request =
+        eventWithBody(
+            """
+            {"scan_id":"ignored","rows":[{"scan_position":3,"external_id":"id"}]}
+            """);
+    request.setPathParameters(Map.of("scan_id", "scan-1"));
+
+    // act
+    var response = confirmScanHandler.handleRequest(request, null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(202);
+    assertThat(response.getBody()).isNull();
+    verify(scanService)
+        .confirmScan(
+            new RequestContext("jordan"),
+            new ConfirmScanRequest("scan-1", List.of(new ScanSelection(3, "id"))));
+  }
+
+  @Test
+  void confirmScanShouldRejectUnknownRowFields() {
+    // arrange
+    var request =
+        eventWithBody(
+            """
+            {"rows":[{"scan_position":3,"external_id":"id","name":"legacy"}]}
+            """);
+    request.setPathParameters(Map.of("scan_id", "scan-1"));
+
+    // act
+    var response = confirmScanHandler.handleRequest(request, null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(400);
+    assertThat(response.getBody()).contains("invalid request body");
+  }
+
+  @Test
+  void confirmScanShouldRejectMalformedJsonAndMapServiceErrors() throws Exception {
+    // arrange
+    when(scanService.confirmScan(any(), any())).thenThrow(new NotFoundException("Not Found"));
+
+    // act
+    var malformed = confirmScanHandler.handleRequest(eventWithBody("{"), null);
+    var missing = confirmScanHandler.handleRequest(eventWithBody("{\"rows\":[]}"), null);
+
+    // assert
+    assertThat(malformed.getStatusCode()).isEqualTo(400);
+    assertThat(missing.getStatusCode()).isEqualTo(404);
   }
 
   private static APIGatewayV2HTTPEvent event(

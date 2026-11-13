@@ -153,7 +153,7 @@ module "java_api" {
       artifact = var.artifacts["identify_scan"]
     }
     confirm_scan = {
-      handler  = "com.jordansimsmith.tcginventory.scans.ConfirmScanHandler"
+      handler  = "com.jordansimsmith.tcginventory.scans.api.ConfirmScanHandler"
       artifact = var.artifacts["confirm_scan"]
     }
     delete_scan_row = {
