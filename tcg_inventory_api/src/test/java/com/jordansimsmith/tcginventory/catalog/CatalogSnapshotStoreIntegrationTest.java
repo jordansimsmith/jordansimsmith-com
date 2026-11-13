@@ -7,8 +7,12 @@ import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.s3.S3Container;
+import com.jordansimsmith.service.RequestContext;
+import com.jordansimsmith.service.ServiceUnavailableException;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
+import com.jordansimsmith.tcginventory.catalog.client.CatalogPrinting;
+import com.jordansimsmith.tcginventory.catalog.client.FindCatalogCardsRequest;
 import com.jordansimsmith.tcginventory.games.client.FakeGamesService;
 import com.jordansimsmith.tcginventory.games.client.Game;
 import java.io.ByteArrayOutputStream;
@@ -74,6 +78,41 @@ public class CatalogSnapshotStoreIntegrationTest {
             CatalogSnapshotStore.BUCKET,
             repository,
             new TcgCsvCatalogArtifactCodec(factory.objectMapper()));
+  }
+
+  @Test
+  void findCardsShouldReadSnapshotPublishedByLegacyStore() throws Exception {
+    // arrange
+    store.createSnapshot(snapshot("pokemon", "2026-10-07T20:06:09Z", "Pikachu", 25));
+
+    // act
+    var response =
+        factory
+            .catalogService()
+            .findCards(
+                new RequestContext("alice"),
+                new FindCatalogCardsRequest("pokemon", List.of("25", "025", "25", "missing")));
+
+    // assert
+    assertThat(response.cards())
+        .containsExactly(
+            new CatalogPrinting(
+                "pokemon", "25", "Pikachu", "BASE", "Base Set", "58", List.of("normal")));
+  }
+
+  @Test
+  void findCardsShouldFailWhenNoSnapshotIsPublished() {
+    // arrange
+    var service = factory.catalogService();
+
+    // act / assert
+    assertThatThrownBy(
+            () ->
+                service.findCards(
+                    new RequestContext("alice"),
+                    new FindCatalogCardsRequest("pokemon", List.of("25"))))
+        .isInstanceOf(ServiceUnavailableException.class)
+        .hasMessageContaining("has not been published");
   }
 
   @Test

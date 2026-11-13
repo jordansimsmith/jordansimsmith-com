@@ -123,6 +123,21 @@ public class TcgInventoryModule {
 
   @Provides
   @Singleton
+  @Named("catalogSnapshotBucket")
+  String catalogSnapshotBucket() {
+    return "api.tcg-inventory.jordansimsmith.com";
+  }
+
+  @Provides
+  @Singleton
+  @Named("scryfallBaseUri")
+  URI scryfallBaseUri() {
+    var baseUrl = System.getenv("SCRYFALL_BASE_URL");
+    return URI.create(baseUrl == null || baseUrl.isBlank() ? "https://api.scryfall.com" : baseUrl);
+  }
+
+  @Provides
+  @Singleton
   @Named("firebaseTokenUri")
   URI firebaseTokenUri() {
     var firebaseTokenUrl = System.getenv("FIREBASE_TOKEN_URL");

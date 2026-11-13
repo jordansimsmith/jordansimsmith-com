@@ -9,8 +9,15 @@ java_library(
     ],
     deps = [
         "//lib/service",
+        "//lib/time:lib",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/catalog/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
         "//third_party/dagger",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@maven//:com_google_guava_guava",
+        "@maven//:software_amazon_awssdk_dynamodb",
+        "@maven//:software_amazon_awssdk_s3",
+        "@maven//:software_amazon_awssdk_sdk_core",
     ],
 )

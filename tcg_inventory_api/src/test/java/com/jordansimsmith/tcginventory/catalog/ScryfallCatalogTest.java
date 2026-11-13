@@ -2,13 +2,23 @@ package com.jordansimsmith.tcginventory.catalog;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
 
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.jordansimsmith.service.BadRequestException;
+import com.jordansimsmith.service.NotFoundException;
+import com.jordansimsmith.service.RequestContext;
+import com.jordansimsmith.service.ServiceUnavailableException;
 import com.jordansimsmith.tcginventory.TcgInventoryModule;
+import com.jordansimsmith.tcginventory.catalog.client.CatalogPrinting;
+import com.jordansimsmith.tcginventory.catalog.client.FindCatalogCardsRequest;
+import com.jordansimsmith.tcginventory.catalog.server.FindCatalogCardsService;
+import com.jordansimsmith.tcginventory.catalog.server.MagicTheGatheringPrintingLookup;
+import com.jordansimsmith.tcginventory.catalog.server.PokemonPrintingLookup;
 import com.jordansimsmith.tcginventory.games.client.FakeGamesService;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
@@ -20,7 +30,9 @@ import java.net.URI;
 import java.net.URLDecoder;
 import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -30,6 +42,8 @@ import javax.inject.Singleton;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
+import software.amazon.awssdk.services.s3.S3Client;
 
 public class ScryfallCatalogTest {
   @Singleton
@@ -55,6 +69,8 @@ public class ScryfallCatalogTest {
   private HttpServer server;
   private URI baseUri;
   private int nextStatus;
+  private int secondCollectionStatus = 200;
+  private String secondCollectionBody;
   private String nextBody;
   private String searchBody;
   private String collectionBody;
@@ -83,6 +99,158 @@ public class ScryfallCatalogTest {
   private CatalogFactory createFactory(Catalogs catalogs) {
     return DaggerScryfallCatalogTest_HandlerTestFactory.factory()
         .create(catalogs, new FakeTcgCsvClient());
+  }
+
+  @Test
+  void serviceShouldAcceptOneHundredIdsAndChunkAtSeventyFive() throws Exception {
+    // arrange
+    var service = findCatalogCardsService();
+    var ids = IntStream.range(0, 100).mapToObj(index -> new UUID(0, index).toString()).toList();
+
+    // act
+    var cards =
+        service
+            .findCards(new RequestContext("alice"), new FindCatalogCardsRequest("mtg", ids))
+            .cards();
+
+    // assert
+    assertThat(cards)
+        .extracting(CatalogPrinting::externalId)
+        .containsExactlyInAnyOrderElementsOf(ids);
+    assertThat(collectionRequests)
+        .extracting(request -> request.get("identifiers").size())
+        .containsExactly(75, 25);
+  }
+
+  @Test
+  void serviceShouldValidateBatchBeforeCallingProviders() throws Exception {
+    // arrange
+    var service = findCatalogCardsService();
+    var ctx = new RequestContext("alice");
+
+    // act / assert
+    assertThat(service.findCards(ctx, new FindCatalogCardsRequest("pokemon", List.of())).cards())
+        .isEmpty();
+    assertThatThrownBy(
+            () -> service.findCards(ctx, new FindCatalogCardsRequest("unknown", List.of())))
+        .isInstanceOf(NotFoundException.class);
+    for (var invalid :
+        List.of(
+            new FindCatalogCardsRequest("mtg", Collections.nCopies(101, CARD_ID)),
+            new FindCatalogCardsRequest("mtg", Collections.singletonList(null)),
+            new FindCatalogCardsRequest("mtg", List.of(" ")),
+            new FindCatalogCardsRequest("mtg", null))) {
+      assertThatThrownBy(() -> service.findCards(ctx, invalid))
+          .isInstanceOf(BadRequestException.class);
+    }
+    assertThat(requests).isEmpty();
+  }
+
+  @Test
+  void serviceShouldReturnExactEligiblePrintingsAndDeduplicateIdenticalIds() throws Exception {
+    // arrange
+    var service = findCatalogCardsService();
+    var uppercaseId = CARD_ID.toUpperCase(Locale.ROOT);
+    var noSupportedFinish = ORACLE_ID;
+    var digitalOnly = new UUID(0, 1).toString();
+    var response = objectMapper.createObjectNode();
+    response
+        .putArray("data")
+        .add(cardNode(CARD_ID, "Lightning Bolt", "en", List.of("foil", "nonfoil"), true))
+        .add(cardNode(uppercaseId, "Lightning Bolt", "en", List.of("foil"), true))
+        .add(cardNode(ALT_ID, "Lightning Bolt", "ja", List.of("nonfoil"), true))
+        .add(cardNode(digitalOnly, "Lightning Bolt", "en", List.of("nonfoil"), false))
+        .add(cardNode(noSupportedFinish, "Lightning Bolt", "en", List.of("glossy"), true));
+    response.putArray("not_found").addObject().put("id", TOKEN_ID);
+    collectionBody = response.toString();
+
+    // act
+    var cards =
+        service
+            .findCards(
+                new RequestContext("alice"),
+                new FindCatalogCardsRequest(
+                    "mtg",
+                    List.of(
+                        CARD_ID,
+                        uppercaseId,
+                        CARD_ID,
+                        ALT_ID,
+                        digitalOnly,
+                        noSupportedFinish,
+                        TOKEN_ID,
+                        "missing")))
+            .cards();
+
+    // assert
+    assertThat(cards)
+        .containsExactlyInAnyOrder(
+            new CatalogPrinting(
+                "mtg",
+                CARD_ID,
+                "Lightning Bolt",
+                "sta",
+                "Strixhaven Mystical Archive",
+                "42",
+                List.of("normal", "foil")),
+            new CatalogPrinting(
+                "mtg",
+                uppercaseId,
+                "Lightning Bolt",
+                "sta",
+                "Strixhaven Mystical Archive",
+                "42",
+                List.of("foil")));
+    assertThat(collectionRequests.getFirst().get("identifiers"))
+        .extracting(identifier -> identifier.get("id").asText())
+        .containsExactly(CARD_ID, uppercaseId, ALT_ID, digitalOnly, noSupportedFinish, TOKEN_ID);
+  }
+
+  @Test
+  void serviceShouldFailEntireLookupWhenSecondChunkIsUnavailable() {
+    // arrange
+    secondCollectionStatus = 503;
+    var service = findCatalogCardsService();
+    var ids = IntStream.range(0, 100).mapToObj(index -> new UUID(0, index).toString()).toList();
+
+    // act / assert
+    assertThatThrownBy(
+            () ->
+                service.findCards(
+                    new RequestContext("alice"), new FindCatalogCardsRequest("mtg", ids)))
+        .isInstanceOf(ServiceUnavailableException.class)
+        .hasMessageContaining("503");
+    assertThat(collectionRequests).hasSize(2);
+  }
+
+  @Test
+  void serviceShouldFailEntireLookupWhenSecondChunkIsInconsistent() {
+    // arrange
+    secondCollectionBody = "{\"data\":[],\"not_found\":[]}";
+    var service = findCatalogCardsService();
+    var ids = IntStream.range(0, 100).mapToObj(index -> new UUID(0, index).toString()).toList();
+
+    // act / assert
+    assertThatThrownBy(
+            () ->
+                service.findCards(
+                    new RequestContext("alice"), new FindCatalogCardsRequest("mtg", ids)))
+        .isInstanceOf(ServiceUnavailableException.class)
+        .hasMessageContaining("incomplete collection data");
+    assertThat(collectionRequests).hasSize(2);
+  }
+
+  private FindCatalogCardsService findCatalogCardsService() {
+    return new FindCatalogCardsService(
+        new FakeGamesService(),
+        new MagicTheGatheringPrintingLookup(baseUri, HttpClient.newHttpClient(), objectMapper),
+        new PokemonPrintingLookup(
+            mock(DynamoDbClient.class),
+            mock(S3Client.class),
+            "unused",
+            "unused",
+            objectMapper,
+            Instant::now));
   }
 
   @Test
@@ -594,6 +762,14 @@ public class ScryfallCatalogTest {
       collectionRequests.add(request);
       body = collectionBody != null ? collectionBody : collectionResponse(request);
       collectionBody = null;
+      if (collectionRequests.size() == 2) {
+        if (secondCollectionStatus != 200) {
+          status = secondCollectionStatus;
+        }
+        if (secondCollectionBody != null) {
+          body = secondCollectionBody;
+        }
+      }
     } else if (isSearch) {
       body = searchBody;
     } else {

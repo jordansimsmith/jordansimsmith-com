@@ -5,6 +5,7 @@ import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.queue.FakeQueueClient;
 import com.jordansimsmith.queue.QueueClient;
 import com.jordansimsmith.tcginventory.catalog.CatalogSnapshotItem;
+import com.jordansimsmith.tcginventory.catalog.CatalogSnapshotStore;
 import com.jordansimsmith.tcginventory.catalog.Catalogs;
 import com.jordansimsmith.tcginventory.catalog.FakeCardCatalogs;
 import com.jordansimsmith.tcginventory.catalog.FakeTcgCsvClient;
@@ -35,6 +36,7 @@ import com.jordansimsmith.tcginventory.scans.ScanRowItem;
 import com.jordansimsmith.time.Clock;
 import dagger.Module;
 import dagger.Provides;
+import java.net.URI;
 import javax.inject.Named;
 import javax.inject.Singleton;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
@@ -60,6 +62,20 @@ public class TcgInventoryTestModule {
   @Named("tcgInventoryTableName")
   String tcgInventoryTableName() {
     return TcgInventoryTable.TABLE_NAME;
+  }
+
+  @Provides
+  @Singleton
+  @Named("catalogSnapshotBucket")
+  String catalogSnapshotBucket() {
+    return CatalogSnapshotStore.BUCKET;
+  }
+
+  @Provides
+  @Singleton
+  @Named("scryfallBaseUri")
+  URI scryfallBaseUri() {
+    return URI.create("http://localhost:1");
   }
 
   @Provides

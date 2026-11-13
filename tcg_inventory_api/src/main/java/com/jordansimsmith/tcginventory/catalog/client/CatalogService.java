@@ -6,4 +6,7 @@ import com.jordansimsmith.service.ServiceException;
 public interface CatalogService {
   FindCardImagesResponse findCardImages(RequestContext ctx, FindCardImagesRequest request)
       throws ServiceException;
+
+  FindCatalogCardsResponse findCards(RequestContext ctx, FindCatalogCardsRequest request)
+      throws ServiceException;
 }

@@ -578,6 +578,7 @@ java_test_suite(
         "//lib/secrets:lib",
         "//lib/secrets:test-lib",
         "//lib/service",
+        "//lib/time:lib",
         "//lib/time:test-lib",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/catalog/api:find-card-images-handler",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/catalog/client",
@@ -617,6 +618,7 @@ java_test_suite(
         "@maven//:org_mockito_mockito_core",
         "@maven//:software_amazon_awssdk_dynamodb",
         "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+        "@maven//:software_amazon_awssdk_s3",
     ],
 )
 
@@ -661,6 +663,7 @@ java_test_suite(
         "//lib/testcontainers:test-lib",
         "//lib/time:test-lib",
         "//lib/ulid:test-lib",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/catalog/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/imports/api:create-import-handler",
