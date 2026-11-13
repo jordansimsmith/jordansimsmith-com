@@ -33,7 +33,6 @@ import type {
   PublishResponse,
   RepricingResponse,
   ReportResponse,
-  IdentifyScanResponse,
   ScanDetail,
   OrderSettingsResponse,
   GetSkuResponse,
@@ -327,12 +326,11 @@ export function createHttpClient(): ApiClient {
       return response.json();
     },
 
-    async identifyScan(scanId: string): Promise<IdentifyScanResponse> {
-      const response = await authenticatedFetch(
+    async identifyScan(scanId: string): Promise<void> {
+      await authenticatedFetch(
         `/scans/${encodeURIComponent(scanId)}/identify`,
         { method: 'POST' },
       );
-      return response.json();
     },
 
     async deleteScanRow(scanId: string, scanPosition: number): Promise<void> {

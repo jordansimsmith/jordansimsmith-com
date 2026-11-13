@@ -829,21 +829,48 @@ describe('http client scans', () => {
     );
   });
 
-  it('gets and identifies an encoded scan', async () => {
-    const json = vi.fn().mockResolvedValue({ scan_id: 'scan/1' });
-    fetchSpy.mockResolvedValue({ ok: true, json });
+  it('identifies an encoded scan without parsing an empty response', async () => {
+    const json = vi.fn();
+    fetchSpy.mockResolvedValue({ ok: true, status: 202, json });
     const client = createHttpClient();
 
-    await client.getScan('scan/1');
-    await client.identifyScan('scan/1');
+    await expect(client.identifyScan('scan/1')).resolves.toBeUndefined();
 
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
     expect(fetchSpy.mock.calls[0][0]).toBe(
-      'https://api.tcg-inventory.jordansimsmith.com/scans/scan%2F1',
-    );
-    expect(fetchSpy.mock.calls[1][0]).toBe(
       'https://api.tcg-inventory.jordansimsmith.com/scans/scan%2F1/identify',
     );
-    expect(fetchSpy.mock.calls[1][1].method).toBe('POST');
+    expect(fetchSpy.mock.calls[0][1].method).toBe('POST');
+    expect(fetchSpy.mock.calls[0][1].headers.Authorization).toBe(
+      `Basic ${btoa('alice:pw')}`,
+    );
+    expect(json).not.toHaveBeenCalled();
+  });
+
+  it('ignores the existing JSON identify response', async () => {
+    const json = vi.fn().mockResolvedValue({
+      scan_id: 'scan/1',
+      status: 'identifying',
+    });
+    fetchSpy.mockResolvedValue({ ok: true, status: 202, json });
+    const client = createHttpClient();
+
+    await expect(client.identifyScan('scan/1')).resolves.toBeUndefined();
+    expect(json).not.toHaveBeenCalled();
+  });
+
+  it('surfaces identify request errors', async () => {
+    fetchSpy.mockResolvedValue({
+      ok: false,
+      status: 409,
+      statusText: 'Conflict',
+      json: vi.fn().mockResolvedValue({ message: 'scan is not ready' }),
+    });
+    const client = createHttpClient();
+
+    await expect(client.identifyScan('scan/1')).rejects.toThrow(
+      'scan is not ready',
+    );
   });
 
   it('deletes a scan row without parsing a body', async () => {

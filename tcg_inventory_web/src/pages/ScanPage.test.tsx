@@ -261,7 +261,7 @@ describe('ScanPage', () => {
       .mockResolvedValue(verified);
     const identifyScan = vi
       .spyOn(clientModule.apiClient, 'identifyScan')
-      .mockResolvedValue({ scan_id: 'scan-created', status: 'identifying' });
+      .mockResolvedValue(undefined);
     const user = userEvent.setup();
     const { container } = renderScanPage();
     const fileInput = container.querySelector('input[type="file"]');

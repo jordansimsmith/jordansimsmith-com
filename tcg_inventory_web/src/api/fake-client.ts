@@ -25,7 +25,6 @@ import type {
   FindUnitsResponse,
   GenerationStatus,
   GetFetchTcgAccountResponse,
-  IdentifyScanResponse,
   ImageUrls,
   ImportDetail,
   ImportRow,
@@ -2259,10 +2258,10 @@ export function createFakeClient(): ApiClient {
       return { cards: cards.map(copyCatalogCard), next_continuation: null };
     },
 
-    async identifyScan(scanId: string): Promise<IdentifyScanResponse> {
+    async identifyScan(scanId: string): Promise<void> {
       const scan = getScanOrThrow(scanId);
       if (scan.status !== 'uploading') {
-        return { scan_id: scan.scan_id, status: scan.status };
+        return;
       }
       if (activeScanRows(scan).some((row) => !row.uploaded)) {
         throw new Error(
@@ -2276,7 +2275,6 @@ export function createFakeClient(): ApiClient {
         row.needs_review = false;
         row.suggestions = [];
       }
-      return { scan_id: scan.scan_id, status: scan.status };
     },
 
     async deleteScanRow(scanId: string, scanPosition: number): Promise<void> {

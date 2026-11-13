@@ -801,10 +801,9 @@ describe('createFakeClient scans', () => {
     expect(
       (await client.getScan(created.scan_id)).rows.every((row) => row.uploaded),
     ).toBe(true);
-    await expect(client.identifyScan(created.scan_id)).resolves.toEqual({
-      scan_id: created.scan_id,
-      status: 'identifying',
-    });
+    await expect(client.identifyScan(created.scan_id)).resolves.toBeUndefined();
+    await expect(client.identifyScan(created.scan_id)).resolves.toBeUndefined();
+    expect((await client.getScan(created.scan_id)).status).toBe('identifying');
   });
 
   it('confirms a reviewing scan once and creates rows in scan order', async () => {

@@ -319,11 +319,6 @@ export interface FindScansResponse {
   next_continuation: string | null;
 }
 
-export interface IdentifyScanResponse {
-  scan_id: string;
-  status: ScanStatus;
-}
-
 export interface ConfirmScanRequest {
   rows: ScanConfirmationRow[];
 }
@@ -554,7 +549,7 @@ export interface ApiClient {
   findCatalogCards(
     params: FindCatalogCardsParams,
   ): Promise<CatalogCardsResponse>;
-  identifyScan(scanId: string): Promise<IdentifyScanResponse>;
+  identifyScan(scanId: string): Promise<void>;
   deleteScanRow(scanId: string, scanPosition: number): Promise<void>;
   confirmScan(scanId: string, request: ConfirmScanRequest): Promise<void>;
   deleteScan(scanId: string): Promise<void>;
