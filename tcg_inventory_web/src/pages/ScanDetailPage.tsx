@@ -261,20 +261,19 @@ export function ScanDetailPage() {
               description={`${getGame(scan.game).display_name} · Created ${new Date(scan.created_at * 1000).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}`}
               actions={
                 <Group gap="xs">
-                  {scan.status !== 'confirmed' &&
-                    scan.status !== 'confirming' && (
-                      <Button
-                        color="red"
-                        variant="subtle"
-                        disabled={reviewMutationLoading || deleteScanLoading}
-                        onClick={() => {
-                          setDeleteScanError(null);
-                          setDeleteScanOpen(true);
-                        }}
-                      >
-                        Delete scan
-                      </Button>
-                    )}
+                  {scan.status === 'reviewing' && (
+                    <Button
+                      color="red"
+                      variant="subtle"
+                      disabled={reviewMutationLoading || deleteScanLoading}
+                      onClick={() => {
+                        setDeleteScanError(null);
+                        setDeleteScanOpen(true);
+                      }}
+                    >
+                      Delete scan
+                    </Button>
+                  )}
                   {scan.status === 'confirmed' && scan.import_id && (
                     <Button
                       variant="light"

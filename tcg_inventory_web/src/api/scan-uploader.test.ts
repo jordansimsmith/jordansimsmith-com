@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { ScanUploadSlot } from './client';
+import type { ScanRowUpload } from './client';
 import { createHttpScanUploader, type ScanUploadItem } from './scan-uploader';
 
 function uploadItem(
   filename: string,
-  overrides: Partial<ScanUploadSlot> = {},
+  overrides: Partial<ScanRowUpload> = {},
 ): ScanUploadItem {
   return {
     slot: {

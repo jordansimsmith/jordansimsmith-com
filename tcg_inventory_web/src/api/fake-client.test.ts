@@ -847,28 +847,22 @@ describe('createFakeClient scans', () => {
     expect(scan.row_count).toBe(3);
   });
 
-  it('deletes unfinished scans but keeps confirmed scans immutable', async () => {
+  it('deletes only reviewing scans', async () => {
+    const client = createFakeClient();
+    await client.deleteScan('fake-scan-reviewing');
+    await expect(client.getScan('fake-scan-reviewing')).rejects.toThrow(
+      'Not Found',
+    );
+
     for (const scanId of [
       'fake-scan-uploading',
       'fake-scan-identifying',
-      'fake-scan-reviewing',
+      'fake-scan-confirmed',
     ]) {
-      const client = createFakeClient();
-
-      await client.deleteScan(scanId);
-
-      await expect(client.getScan(scanId)).rejects.toThrow('Not Found');
-      expect(
-        (await client.findScans()).scans.some(
-          (scan) => scan.scan_id === scanId,
-        ),
-      ).toBe(false);
+      await expect(client.deleteScan(scanId)).rejects.toThrow(
+        'scan is not in a deletable status',
+      );
     }
-
-    const client = createFakeClient();
-    await expect(client.deleteScan('fake-scan-confirmed')).rejects.toThrow(
-      'confirmed scans cannot be deleted',
-    );
   });
 });
 

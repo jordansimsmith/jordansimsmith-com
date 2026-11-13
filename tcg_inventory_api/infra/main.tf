@@ -137,7 +137,7 @@ module "java_api" {
       artifact = var.artifacts["confirm_import"]
     }
     create_scan = {
-      handler  = "com.jordansimsmith.tcginventory.scans.CreateScanHandler"
+      handler  = "com.jordansimsmith.tcginventory.scans.api.CreateScanHandler"
       artifact = var.artifacts["create_scan"]
     }
     find_scans = {
@@ -157,11 +157,11 @@ module "java_api" {
       artifact = var.artifacts["confirm_scan"]
     }
     delete_scan_row = {
-      handler  = "com.jordansimsmith.tcginventory.scans.DeleteScanRowHandler"
+      handler  = "com.jordansimsmith.tcginventory.scans.api.DeleteScanRowHandler"
       artifact = var.artifacts["delete_scan_row"]
     }
     delete_scan = {
-      handler  = "com.jordansimsmith.tcginventory.scans.DeleteScanHandler"
+      handler  = "com.jordansimsmith.tcginventory.scans.api.DeleteScanHandler"
       artifact = var.artifacts["delete_scan"]
     }
     update_import_row = {

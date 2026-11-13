@@ -14,12 +14,18 @@ import com.jordansimsmith.service.BadRequestException;
 import com.jordansimsmith.service.NotFoundException;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.tcginventory.TcgInventoryFactory;
+import com.jordansimsmith.tcginventory.scans.client.CreateScanRequest;
+import com.jordansimsmith.tcginventory.scans.client.CreateScanResponse;
+import com.jordansimsmith.tcginventory.scans.client.DeleteScanRequest;
+import com.jordansimsmith.tcginventory.scans.client.DeleteScanRowRequest;
 import com.jordansimsmith.tcginventory.scans.client.FindScansRequest;
 import com.jordansimsmith.tcginventory.scans.client.FindScansResponse;
 import com.jordansimsmith.tcginventory.scans.client.GetScanRequest;
 import com.jordansimsmith.tcginventory.scans.client.GetScanResponse;
+import com.jordansimsmith.tcginventory.scans.client.ScanFile;
 import com.jordansimsmith.tcginventory.scans.client.ScanRow;
 import com.jordansimsmith.tcginventory.scans.client.ScanRowStatus;
+import com.jordansimsmith.tcginventory.scans.client.ScanRowUpload;
 import com.jordansimsmith.tcginventory.scans.client.ScanService;
 import com.jordansimsmith.tcginventory.scans.client.ScanStatus;
 import com.jordansimsmith.tcginventory.scans.client.ScanSuggestion;
@@ -36,10 +42,14 @@ class ScanHandlersTest {
   private final ScanService scanService = mock(ScanService.class);
   private FindScansHandler findScansHandler;
   private GetScanHandler getScanHandler;
+  private CreateScanHandler createScanHandler;
+  private DeleteScanHandler deleteScanHandler;
+  private DeleteScanRowHandler deleteScanRowHandler;
 
   @BeforeEach
   void setUp() {
     var factory = mock(TcgInventoryFactory.class);
+    when(factory.objectMapper()).thenReturn(objectMapper);
     when(factory.scanService()).thenReturn(scanService);
     when(factory.requestContextFactory()).thenReturn(new RequestContextFactory());
     when(factory.httpResponseFactory())
@@ -49,6 +59,74 @@ class ScanHandlersTest {
                 .build());
     findScansHandler = new FindScansHandler(factory);
     getScanHandler = new GetScanHandler(factory);
+    createScanHandler = new CreateScanHandler(factory);
+    deleteScanHandler = new DeleteScanHandler(factory);
+    deleteScanRowHandler = new DeleteScanRowHandler(factory);
+  }
+
+  @Test
+  void createScanShouldReturnServiceResponseAndMapRequest() throws Exception {
+    // arrange
+    var responseBody =
+        new CreateScanResponse(
+            "scan-1",
+            List.of(
+                new ScanRowUpload(
+                    1,
+                    "card.jpg",
+                    5,
+                    false,
+                    "https://upload",
+                    Map.of("Content-Type", "image/jpeg"))));
+    when(scanService.createScan(any(), any())).thenReturn(responseBody);
+
+    // act
+    var response =
+        createScanHandler.handleRequest(
+            eventWithBody(
+                "{\"game\":\"mtg\",\"condition\":\"NM\",\"finish\":\"normal\","
+                    + "\"files\":[{\"filename\":\"card.jpg\",\"size_bytes\":5}]}"),
+            null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(201);
+    assertThat(response.getBody()).isEqualTo(objectMapper.writeValueAsString(responseBody));
+    verify(scanService)
+        .createScan(
+            new RequestContext("jordan"),
+            new CreateScanRequest("mtg", "NM", "normal", List.of(new ScanFile("card.jpg", 5L))));
+  }
+
+  @Test
+  void deleteScanShouldReturnNoContentAndMapPathParameter() throws Exception {
+    // arrange
+
+    // act
+    var response =
+        deleteScanHandler.handleRequest(event(Map.of(), Map.of("scan_id", "scan-1")), null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(204);
+    assertThat(response.getBody()).isNull();
+    verify(scanService).deleteScan(new RequestContext("jordan"), new DeleteScanRequest("scan-1"));
+  }
+
+  @Test
+  void deleteScanRowShouldRejectMalformedPathAndReturnNoContentForValidPath() throws Exception {
+    // arrange
+    var invalidEvent = event(Map.of(), Map.of("scan_id", "scan-1", "scan_position", "nope"));
+
+    // act
+    var invalidResponse = deleteScanRowHandler.handleRequest(invalidEvent, null);
+    var validResponse =
+        deleteScanRowHandler.handleRequest(
+            event(Map.of(), Map.of("scan_id", "scan-1", "scan_position", "3")), null);
+
+    // assert
+    assertThat(invalidResponse.getStatusCode()).isEqualTo(400);
+    assertThat(validResponse.getStatusCode()).isEqualTo(204);
+    verify(scanService)
+        .deleteScanRow(new RequestContext("jordan"), new DeleteScanRowRequest("scan-1", 3));
   }
 
   @Test
@@ -154,6 +232,13 @@ class ScanHandlersTest {
         .withHeaders(Map.of("Authorization", AUTH_HEADER))
         .withQueryStringParameters(queryParameters)
         .withPathParameters(pathParameters)
+        .build();
+  }
+
+  private static APIGatewayV2HTTPEvent eventWithBody(String body) {
+    return APIGatewayV2HTTPEvent.builder()
+        .withHeaders(Map.of("Authorization", AUTH_HEADER))
+        .withBody(body)
         .build();
   }
 }

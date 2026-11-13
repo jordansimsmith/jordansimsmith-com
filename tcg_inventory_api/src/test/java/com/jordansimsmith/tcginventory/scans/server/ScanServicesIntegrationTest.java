@@ -2,21 +2,34 @@ package com.jordansimsmith.tcginventory.scans.server;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.s3.S3Container;
 import com.jordansimsmith.service.BadRequestException;
+import com.jordansimsmith.service.ConflictException;
 import com.jordansimsmith.service.NotFoundException;
 import com.jordansimsmith.service.RequestContext;
+import com.jordansimsmith.tcginventory.games.client.Finish;
+import com.jordansimsmith.tcginventory.games.client.Game;
+import com.jordansimsmith.tcginventory.games.client.GamesService;
+import com.jordansimsmith.tcginventory.games.client.GetGameResponse;
+import com.jordansimsmith.tcginventory.scans.client.CreateScanRequest;
+import com.jordansimsmith.tcginventory.scans.client.DeleteScanRequest;
+import com.jordansimsmith.tcginventory.scans.client.DeleteScanRowRequest;
 import com.jordansimsmith.tcginventory.scans.client.FindScansRequest;
 import com.jordansimsmith.tcginventory.scans.client.GetScanRequest;
+import com.jordansimsmith.tcginventory.scans.client.ScanFile;
 import com.jordansimsmith.tcginventory.scans.client.ScanRowStatus;
 import com.jordansimsmith.tcginventory.scans.client.ScanStatus;
 import com.jordansimsmith.tcginventory.scans.client.ScanSuggestion;
 import java.time.Instant;
 import java.util.List;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,12 +41,16 @@ import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
+import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
+import software.amazon.awssdk.services.dynamodb.model.ConditionalCheckFailedException;
+import software.amazon.awssdk.services.dynamodb.model.TransactionCanceledException;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 
 @Testcontainers
@@ -53,6 +70,10 @@ class ScanServicesIntegrationTest {
 
   private FindScansService findScansService;
   private GetScanService getScanService;
+  private CreateScanService createScanService;
+  private DeleteScanRowService deleteScanRowService;
+  private DeleteScanService deleteScanService;
+  private ScanMutationRepository scanMutationRepository;
 
   @BeforeAll
   static void setUpBeforeClass() {
@@ -93,14 +114,284 @@ class ScanServicesIntegrationTest {
   }
 
   @BeforeEach
-  void setUp() {
+  void setUp() throws Exception {
     DynamoDbUtils.reset(dynamoDbClient);
     for (var object : s3Client.listObjectsV2(request -> request.bucket(BUCKET)).contents()) {
       s3Client.deleteObject(request -> request.bucket(BUCKET).key(object.key()));
     }
-    var repository = new ScanReadRepository(scanTable, scanRowTable);
-    findScansService = new FindScansService(repository, new ObjectMapper());
-    getScanService = new GetScanService(repository, s3Client, s3Presigner, BUCKET);
+    var readRepository = new ScanReadRepository(scanTable, scanRowTable);
+    scanMutationRepository =
+        new ScanMutationRepository(
+            scanTable, scanRowTable, dynamoDbClient, () -> CREATED_AT, TABLE_NAME);
+    findScansService = new FindScansService(readRepository, new ObjectMapper());
+    getScanService = new GetScanService(readRepository, s3Client, s3Presigner, BUCKET);
+    var gamesService = mock(GamesService.class);
+    when(gamesService.getGame(any(), any()))
+        .thenReturn(
+            new GetGameResponse(
+                new Game(
+                    "mtg",
+                    "Magic",
+                    "scryfall",
+                    true,
+                    true,
+                    List.of(new Finish("normal", "Normal")),
+                    List.of())));
+    createScanService =
+        new CreateScanService(
+            scanMutationRepository,
+            () -> CREATED_AT,
+            () -> "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            s3Presigner,
+            gamesService,
+            BUCKET);
+    deleteScanRowService =
+        new DeleteScanRowService(readRepository, scanMutationRepository, s3Client, BUCKET);
+    deleteScanService =
+        new DeleteScanService(readRepository, scanMutationRepository, s3Client, BUCKET);
+  }
+
+  @Test
+  void createScanShouldPersistSortedRowsAndReturnSignedUploadSlots() throws Exception {
+    // arrange
+    var request =
+        new CreateScanRequest(
+            "mtg", "NM", "normal", List.of(new ScanFile("2.jpg", 2L), new ScanFile("10.jpg", 10L)));
+
+    // act
+    var response = createScanService.createScan(new RequestContext("alice"), request);
+
+    // assert
+    assertThat(response.scanId()).isEqualTo("01ARZ3NDEKTSV4RRFFQ69G5FAV");
+    assertThat(response.rows()).extracting("filename").containsExactly("10.jpg", "2.jpg");
+    assertThat(response.rows()).allMatch(row -> row.uploadUrl().startsWith("http"));
+    assertThat(response.rows().getFirst().uploadHeaders())
+        .containsEntry("Content-Type", "image/jpeg")
+        .containsEntry("If-None-Match", "*");
+    assertThat(scanRowTable.getItem(scanRowKey("alice", response.scanId(), 1))).isNotNull();
+  }
+
+  @Test
+  void createScanShouldAccept200FilesAndReject201BeforeWriting() throws Exception {
+    // arrange
+    var files =
+        IntStream.rangeClosed(1, 200)
+            .mapToObj(index -> new ScanFile("%03d.jpg".formatted(index), 5L))
+            .toList();
+    var request = new CreateScanRequest("mtg", "NM", "normal", files);
+
+    // act
+    var response = createScanService.createScan(new RequestContext("alice"), request);
+
+    // assert
+    assertThat(response.rows()).hasSize(200);
+    assertThat(scanTable.getItem(scanKey("alice", response.scanId())).getRowCount()).isEqualTo(200);
+    var tooManyFiles =
+        IntStream.rangeClosed(1, 201)
+            .mapToObj(index -> new ScanFile("%03d.jpg".formatted(index), 5L))
+            .toList();
+    assertThatThrownBy(
+            () ->
+                createScanService.createScan(
+                    new RequestContext("bob"),
+                    new CreateScanRequest("mtg", "NM", "normal", tooManyFiles)))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("a scan must contain between 1 and 200 files");
+    assertThat(scanTable.getItem(scanKey("bob", response.scanId()))).isNull();
+    assertThat(scanRowTable.getItem(scanRowKey("bob", response.scanId(), 1))).isNull();
+  }
+
+  @Test
+  void createScanShouldRejectInvalidFilesAndScanMetadata() {
+    // arrange
+    var invalidRequests =
+        List.of(
+            new CreateScanRequest("mtg", "INVALID", "normal", List.of(new ScanFile("a.jpg", 1L))),
+            new CreateScanRequest("mtg", "NM", "invalid", List.of(new ScanFile("a.jpg", 1L))),
+            new CreateScanRequest("mtg", "NM", "normal", List.of(new ScanFile("é.jpg", 1L))),
+            new CreateScanRequest("mtg", "NM", "normal", List.of(new ScanFile("a.png", 1L))),
+            new CreateScanRequest("mtg", "NM", "normal", List.of(new ScanFile("a.jpg", 0L))),
+            new CreateScanRequest(
+                "mtg", "NM", "normal", List.of(new ScanFile("a.jpg", 10L * 1024 * 1024 + 1))));
+    var duplicateNames =
+        new CreateScanRequest(
+            "mtg", "NM", "normal", List.of(new ScanFile("a.jpg", 1L), new ScanFile("a.jpg", 2L)));
+
+    // act / assert
+    for (var request : invalidRequests) {
+      assertThatThrownBy(() -> createScanService.createScan(new RequestContext("alice"), request))
+          .isInstanceOf(BadRequestException.class);
+    }
+    assertThatThrownBy(
+            () -> createScanService.createScan(new RequestContext("alice"), duplicateNames))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("scan filenames must be unique");
+    assertThat(scanTable.getItem(scanKey("alice", "01ARZ3NDEKTSV4RRFFQ69G5FAV"))).isNull();
+  }
+
+  @Test
+  void deleteScanRowShouldRequireReviewAndIncrementVersionAtomically() throws Exception {
+    // arrange
+    putScan("alice", "delete-row", "reviewing", 2);
+    scanRowTable.putItem(
+        row("alice", "delete-row", 1, "users/alice/scans/delete-row/000001.jpg", 5));
+    scanRowTable.putItem(
+        row("alice", "delete-row", 2, "users/alice/scans/delete-row/000002.jpg", 5));
+    for (int position = 1; position <= 2; position++) {
+      s3Client.putObject(
+          PutObjectRequest.builder()
+              .bucket(BUCKET)
+              .key("users/alice/scans/delete-row/%06d.jpg".formatted(position))
+              .build(),
+          RequestBody.fromBytes(new byte[] {1}));
+    }
+
+    // act
+    deleteScanRowService.deleteScanRow(
+        new RequestContext("alice"), new DeleteScanRowRequest("delete-row", 1));
+
+    // assert
+    assertThat(scanTable.getItem(scanKey("alice", "delete-row")).getVersion()).isEqualTo(1L);
+    assertThat(scanRowTable.getItem(scanRowKey("alice", "delete-row", 1))).isNull();
+    assertThat(scanRowTable.getItem(scanRowKey("alice", "delete-row", 2))).isNotNull();
+    assertThat(scanTable.getItem(scanKey("alice", "delete-row")).getRowCount()).isEqualTo(2);
+    assertThatThrownBy(
+            () ->
+                s3Client.headObject(
+                    request ->
+                        request.bucket(BUCKET).key("users/alice/scans/delete-row/000001.jpg")))
+        .isInstanceOfSatisfying(
+            S3Exception.class, exception -> assertThat(exception.statusCode()).isEqualTo(404));
+  }
+
+  @Test
+  void deleteScanRowShouldRejectOtherStatesAndMissingOrForeignRows() {
+    // arrange
+    for (var status : List.of("uploading", "identifying", "confirming", "confirmed")) {
+      putScan("alice", "row-" + status, status, 1);
+    }
+    putScan("alice", "row-missing", "reviewing", 1);
+    scanRowTable.putItem(row("alice", "row-missing", 1, "row-missing-key", 5));
+
+    // act / assert
+    for (var status : List.of("uploading", "identifying", "confirming", "confirmed")) {
+      assertThatThrownBy(
+              () ->
+                  deleteScanRowService.deleteScanRow(
+                      new RequestContext("alice"), new DeleteScanRowRequest("row-" + status, 1)))
+          .isInstanceOf(ConflictException.class);
+    }
+    assertThatThrownBy(
+            () ->
+                deleteScanRowService.deleteScanRow(
+                    new RequestContext("alice"), new DeleteScanRowRequest("row-missing", 2)))
+        .isInstanceOf(NotFoundException.class);
+    assertThatThrownBy(
+            () ->
+                deleteScanRowService.deleteScanRow(
+                    new RequestContext("bob"), new DeleteScanRowRequest("row-missing", 1)))
+        .isInstanceOf(NotFoundException.class);
+    assertThat(scanRowTable.getItem(scanRowKey("alice", "row-missing", 1))).isNotNull();
+  }
+
+  @Test
+  void deleteScanRowShouldPropagateTransactionCancellationWhenRowDisappears() {
+    // arrange
+    putScan("alice", "missing-at-write", "reviewing", 1);
+
+    // act / assert
+    assertThatThrownBy(() -> scanMutationRepository.deleteScanRow("alice", "missing-at-write", 1))
+        .isInstanceOf(TransactionCanceledException.class);
+    assertThat(scanTable.getItem(scanKey("alice", "missing-at-write")).getVersion()).isNull();
+  }
+
+  @Test
+  void deleteScanShouldRemoveRowsAndObjectsAfterParent() throws Exception {
+    // arrange
+    putScan("alice", "delete-scan", "reviewing", 2);
+    for (var position : List.of(1, 2)) {
+      var key = "users/alice/scans/delete-scan/%06d.jpg".formatted(position);
+      scanRowTable.putItem(row("alice", "delete-scan", position, key, 5));
+      s3Client.putObject(
+          PutObjectRequest.builder().bucket(BUCKET).key(key).build(),
+          RequestBody.fromBytes(new byte[] {1}));
+    }
+
+    // act
+    deleteScanService.deleteScan(new RequestContext("alice"), new DeleteScanRequest("delete-scan"));
+
+    // assert
+    assertThat(scanTable.getItem(scanKey("alice", "delete-scan"))).isNull();
+    for (var position : List.of(1, 2)) {
+      var key = "users/alice/scans/delete-scan/%06d.jpg".formatted(position);
+      assertThat(scanRowTable.getItem(scanRowKey("alice", "delete-scan", position))).isNull();
+      assertThatThrownBy(() -> s3Client.headObject(request -> request.bucket(BUCKET).key(key)))
+          .isInstanceOfSatisfying(
+              S3Exception.class, exception -> assertThat(exception.statusCode()).isEqualTo(404));
+    }
+  }
+
+  @Test
+  void deleteScanShouldPropagateConditionalCheckFailureWhenScanIsNoLongerReviewing() {
+    // arrange
+    putScan("alice", "conditional-delete", "confirming", 1);
+
+    // act / assert
+    assertThatThrownBy(() -> scanMutationRepository.deleteScan("alice", "conditional-delete"))
+        .isInstanceOf(ConditionalCheckFailedException.class);
+    assertThat(scanTable.getItem(scanKey("alice", "conditional-delete"))).isNotNull();
+  }
+
+  @Test
+  void deleteScanShouldRejectEveryNonReviewingState() {
+    // arrange
+    var statuses = List.of("uploading", "identifying", "confirming", "confirmed");
+    for (var status : statuses) {
+      putScan("alice", "not-reviewing-" + status, status, 1);
+    }
+
+    // act/assert
+    for (var status : statuses) {
+      assertThatThrownBy(
+              () ->
+                  deleteScanService.deleteScan(
+                      new RequestContext("alice"),
+                      new DeleteScanRequest("not-reviewing-" + status)))
+          .isInstanceOf(ConflictException.class);
+    }
+  }
+
+  @Test
+  void deleteScanShouldReturnNotFoundForMissingOrForeignScans() {
+    // arrange
+    putScan("alice", "private-delete", "reviewing", 0);
+
+    // act / assert
+    assertThatThrownBy(
+            () ->
+                deleteScanService.deleteScan(
+                    new RequestContext("bob"), new DeleteScanRequest("private-delete")))
+        .isInstanceOf(NotFoundException.class);
+    assertThatThrownBy(
+            () ->
+                deleteScanService.deleteScan(
+                    new RequestContext("alice"), new DeleteScanRequest("missing-delete")))
+        .isInstanceOf(NotFoundException.class);
+    assertThat(scanTable.getItem(scanKey("alice", "private-delete"))).isNotNull();
+  }
+
+  @Test
+  void deleteScanShouldFailAfterConfirmationHasStarted() {
+    // arrange
+    putScan("alice", "confirming-delete", "confirming", 1);
+
+    // act / assert
+    assertThatThrownBy(
+            () ->
+                deleteScanService.deleteScan(
+                    new RequestContext("alice"), new DeleteScanRequest("confirming-delete")))
+        .isInstanceOf(ConflictException.class);
+    assertThat(scanTable.getItem(scanKey("alice", "confirming-delete"))).isNotNull();
   }
 
   @Test
@@ -262,6 +553,20 @@ class ScanServicesIntegrationTest {
     var scan = ScanItem.create(user, "mtg", scanId, "NM", "normal", rowCount, CREATED_AT);
     scan.setStatus(status);
     return scan;
+  }
+
+  private static Key scanKey(String user, String scanId) {
+    return Key.builder()
+        .partitionValue(ScanItem.formatPk(user))
+        .sortValue(ScanItem.formatSk(scanId))
+        .build();
+  }
+
+  private static Key scanRowKey(String user, String scanId, int position) {
+    return Key.builder()
+        .partitionValue(ScanRowItem.formatPk(user, scanId))
+        .sortValue(ScanRowItem.formatSk(position))
+        .build();
   }
 
   private static void putScan(String user, String scanId, String status, int rowCount) {

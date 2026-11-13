@@ -197,10 +197,10 @@ describe('ScanDetailPage', () => {
     expect(screen.getByText('Scan could not be loaded')).toBeDefined();
   });
 
-  it('deletes an unfinished scan through an explicit confirmation dialog', async () => {
+  it('deletes a reviewing scan through an explicit confirmation dialog', async () => {
     const user = userEvent.setup();
     vi.spyOn(clientModule.apiClient, 'getScan').mockResolvedValue(
-      detail({ status: 'uploading', row_count: 3 }),
+      detail({ status: 'reviewing', row_count: 3 }),
     );
     const deleteScan = vi
       .spyOn(clientModule.apiClient, 'deleteScan')
@@ -223,10 +223,10 @@ describe('ScanDetailPage', () => {
     expect(screen.getByText('Scans list')).toBeDefined();
   });
 
-  it('keeps the unfinished scan page when whole-scan deletion fails', async () => {
+  it('keeps the reviewing scan page when whole-scan deletion fails', async () => {
     const user = userEvent.setup();
     vi.spyOn(clientModule.apiClient, 'getScan').mockResolvedValue(
-      detail({ status: 'identifying' }),
+      detail({ status: 'reviewing' }),
     );
     vi.spyOn(clientModule.apiClient, 'deleteScan').mockRejectedValue(
       new Error('scan deletion unavailable'),

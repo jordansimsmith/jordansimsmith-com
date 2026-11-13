@@ -1,5 +1,5 @@
 import { createFakeScanUploader } from './fake-scan-uploader';
-import type { ScanUploadSlot } from './client';
+import type { ScanRowUpload } from './client';
 
 const MAX_CONCURRENT_UPLOADS = 10;
 
@@ -9,7 +9,7 @@ type FetchLike = (
 ) => Promise<Response>;
 
 export interface ScanUploadItem {
-  slot: ScanUploadSlot;
+  slot: ScanRowUpload;
   file: File;
 }
 
@@ -21,7 +21,7 @@ export interface ScanUploader {
 }
 
 type ValidatedScanUpload = ScanUploadItem & {
-  slot: ScanUploadSlot & {
+  slot: ScanRowUpload & {
     upload_url: string;
     upload_headers: Record<string, string>;
   };

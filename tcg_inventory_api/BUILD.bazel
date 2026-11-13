@@ -265,34 +265,6 @@ java_binary(
 )
 
 java_binary(
-    name = "create-scan-handler",
-    srcs = ["src/main/java/com/jordansimsmith/tcginventory/scans/CreateScanHandler.java"],
-    create_executable = False,
-    resources = [
-        "src/main/resources/logback.xml",
-    ],
-    deps = [
-        ":lib",
-        ":scan-lib",
-        "//lib/http:lib",
-        "//lib/time:lib",
-        "//lib/ulid:lib",
-        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
-        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/inventory/client",
-        "@maven//:ch_qos_logback_logback_classic",
-        "@maven//:ch_qos_logback_logback_core",
-        "@maven//:com_amazonaws_aws_lambda_java_core",
-        "@maven//:com_amazonaws_aws_lambda_java_events",
-        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
-        "@maven//:com_fasterxml_jackson_core_jackson_databind",
-        "@maven//:com_google_code_findbugs_jsr305",
-        "@maven//:com_google_guava_guava",
-        "@maven//:org_slf4j_slf4j_api",
-        "@maven//:software_amazon_awssdk_s3",
-    ],
-)
-
-java_binary(
     name = "identify-scan-handler",
     srcs = ["src/main/java/com/jordansimsmith/tcginventory/scans/IdentifyScanHandler.java"],
     create_executable = False,
@@ -341,53 +313,8 @@ java_binary(
         "@maven//:com_google_code_findbugs_jsr305",
         "@maven//:com_google_guava_guava",
         "@maven//:org_slf4j_slf4j_api",
+        "@maven//:software_amazon_awssdk_dynamodb",
         "@maven//:software_amazon_awssdk_dynamodb_enhanced",
-    ],
-)
-
-java_binary(
-    name = "delete-scan-row-handler",
-    srcs = ["src/main/java/com/jordansimsmith/tcginventory/scans/DeleteScanRowHandler.java"],
-    create_executable = False,
-    resources = [
-        "src/main/resources/logback.xml",
-    ],
-    deps = [
-        ":lib",
-        ":scan-lib",
-        "//lib/http:lib",
-        "@maven//:ch_qos_logback_logback_classic",
-        "@maven//:ch_qos_logback_logback_core",
-        "@maven//:com_amazonaws_aws_lambda_java_core",
-        "@maven//:com_amazonaws_aws_lambda_java_events",
-        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
-        "@maven//:com_google_code_findbugs_jsr305",
-        "@maven//:com_google_guava_guava",
-        "@maven//:org_slf4j_slf4j_api",
-        "@maven//:software_amazon_awssdk_s3",
-    ],
-)
-
-java_binary(
-    name = "delete-scan-handler",
-    srcs = ["src/main/java/com/jordansimsmith/tcginventory/scans/DeleteScanHandler.java"],
-    create_executable = False,
-    resources = [
-        "src/main/resources/logback.xml",
-    ],
-    deps = [
-        ":lib",
-        ":scan-lib",
-        "//lib/http:lib",
-        "@maven//:ch_qos_logback_logback_classic",
-        "@maven//:ch_qos_logback_logback_core",
-        "@maven//:com_amazonaws_aws_lambda_java_core",
-        "@maven//:com_amazonaws_aws_lambda_java_events",
-        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
-        "@maven//:com_google_code_findbugs_jsr305",
-        "@maven//:com_google_guava_guava",
-        "@maven//:org_slf4j_slf4j_api",
-        "@maven//:software_amazon_awssdk_s3",
     ],
 )
 
@@ -601,9 +528,6 @@ java_test_suite(
         ":catalog-jobs-handler",
         ":catalog-lib",
         ":confirm-scan-handler",
-        ":create-scan-handler",
-        ":delete-scan-handler",
-        ":delete-scan-row-handler",
         ":find-catalog-alternatives-handler",
         ":find-catalog-cards-handler",
         ":get-catalog-card-handler",
@@ -677,9 +601,9 @@ localstack_image(
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/imports/api:create-import-handler_deploy.jar",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/imports/api:create-import-row-photo-handler_deploy.jar",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/reports/api:create-report-handler_deploy.jar",
-        ":create-scan-handler_deploy.jar",
-        ":delete-scan-handler_deploy.jar",
-        ":delete-scan-row-handler_deploy.jar",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/scans/api:create-scan-handler_deploy.jar",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/scans/api:delete-scan-handler_deploy.jar",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/scans/api:delete-scan-row-handler_deploy.jar",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/orders/api:find-orders-handler_deploy.jar",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/inventory/api:find-skus-handler_deploy.jar",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/scans/api:find-scans-handler_deploy.jar",

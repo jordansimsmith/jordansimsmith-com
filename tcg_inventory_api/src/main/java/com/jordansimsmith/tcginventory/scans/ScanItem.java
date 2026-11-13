@@ -23,6 +23,7 @@ public class ScanItem {
   public static final String FINISH = "finish";
   public static final String ROW_COUNT = "row_count";
   public static final String IMPORT_ID = "import_id";
+  public static final String VERSION = "version";
   public static final String ERROR = "error";
   public static final String CATALOG_VERSION = "catalog_version";
   public static final String CREATED_AT = "created_at";
@@ -37,6 +38,7 @@ public class ScanItem {
   private String finish;
   private Integer rowCount;
   private String importId;
+  private Long version;
   private String error;
   private Integer catalogVersion;
   private Instant createdAt;
@@ -123,6 +125,15 @@ public class ScanItem {
 
   public void setImportId(@Nullable String importId) {
     this.importId = importId;
+  }
+
+  @DynamoDbAttribute(VERSION)
+  public Long getVersion() {
+    return version;
+  }
+
+  public void setVersion(@Nullable Long version) {
+    this.version = version;
   }
 
   @DynamoDbAttribute(ERROR)

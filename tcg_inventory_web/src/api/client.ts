@@ -212,7 +212,7 @@ export interface ScanFile {
   size_bytes: number;
 }
 
-export interface ScanUploadSlot extends ScanFile {
+export interface ScanRowUpload extends ScanFile {
   scan_position: number;
   uploaded: boolean;
   upload_url: string | null;
@@ -307,7 +307,7 @@ export interface CreateScanRequest {
 
 export interface CreateScanResponse {
   scan_id: string;
-  rows: ScanUploadSlot[];
+  rows: ScanRowUpload[];
 }
 
 export interface FindScansParams {

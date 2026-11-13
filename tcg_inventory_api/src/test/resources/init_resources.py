@@ -243,7 +243,7 @@ lambdas = {
         "zip_file": "confirm-import-handler_deploy.jar",
     },
     "create_scan": {
-        "handler": "com.jordansimsmith.tcginventory.scans.CreateScanHandler",
+        "handler": "com.jordansimsmith.tcginventory.scans.api.CreateScanHandler",
         "zip_file": "create-scan-handler_deploy.jar",
     },
     "find_scans": {
@@ -263,11 +263,11 @@ lambdas = {
         "zip_file": "confirm-scan-handler_deploy.jar",
     },
     "delete_scan_row": {
-        "handler": "com.jordansimsmith.tcginventory.scans.DeleteScanRowHandler",
+        "handler": "com.jordansimsmith.tcginventory.scans.api.DeleteScanRowHandler",
         "zip_file": "delete-scan-row-handler_deploy.jar",
     },
     "delete_scan": {
-        "handler": "com.jordansimsmith.tcginventory.scans.DeleteScanHandler",
+        "handler": "com.jordansimsmith.tcginventory.scans.api.DeleteScanHandler",
         "zip_file": "delete-scan-handler_deploy.jar",
     },
     "create_publish": {

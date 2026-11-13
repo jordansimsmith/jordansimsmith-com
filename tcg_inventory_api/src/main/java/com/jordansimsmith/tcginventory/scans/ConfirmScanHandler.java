@@ -24,6 +24,7 @@ import java.util.List;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import software.amazon.awssdk.services.dynamodb.model.ConditionalCheckFailedException;
 
 public class ConfirmScanHandler
     implements RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResponse> {
@@ -107,6 +108,7 @@ public class ConfirmScanHandler
       return httpResponseFactory.badRequest(new ErrorResponse("invalid request body"));
     }
 
+    var version = scanItem.getVersion() == null ? 0 : scanItem.getVersion();
     var scanRows = scanRepository.findScanRows(user, scanId);
     var orderedRows = orderRows(request);
     try {
@@ -120,27 +122,19 @@ public class ConfirmScanHandler
       return httpResponseFactory.conflict(new ErrorResponse("another job is in progress"));
     }
 
-    for (var row : orderedRows) {
-      scanRepository.updateScanRowSelection(user, scanId, row.scanPosition(), row.externalId());
+    try {
+      for (var row : orderedRows) {
+        scanRepository.updateScanRowSelection(user, scanId, row.scanPosition(), row.externalId());
+      }
+    } catch (ConditionalCheckFailedException e) {
+      return httpResponseFactory.conflict(new ErrorResponse("scan changed before confirmation"));
     }
 
     var now = clock.now();
     var jobItem = JobItem.create(user, ulidGenerator.generate(), "scan_confirmation", now);
     jobItem.setScanId(scanId);
 
-    if (!scanRepository.startScanConfirmation(user, scanId, jobItem)) {
-      var currentScan = scanRepository.getScan(user, scanId);
-      if (currentScan == null) {
-        return httpResponseFactory.notFound(new ErrorResponse("Not Found"));
-      }
-      if ("confirmed".equals(currentScan.getStatus())) {
-        return httpResponseFactory.noContent();
-      }
-      if ("confirming".equals(currentScan.getStatus())) {
-        return httpResponseFactory.accepted();
-      }
-      return httpResponseFactory.conflict(new ErrorResponse("scan changed before confirmation"));
-    }
+    scanRepository.startScanConfirmation(user, scanId, version, jobItem);
 
     var jobMessage = new JobMessage(user, jobItem.getJobId(), "scan_confirmation");
     jobsQueue.send(jobMessage, user, jobMessage.deduplicationId(0));

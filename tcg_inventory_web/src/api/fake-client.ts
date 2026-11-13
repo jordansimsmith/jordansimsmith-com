@@ -49,7 +49,7 @@ import type {
   ScanConfirmationRow,
   ScanFile,
   ScanRow,
-  ScanUploadSlot,
+  ScanRowUpload,
   ScanRowStatus,
   ScanStatus,
   ScanSuggestion,
@@ -1190,7 +1190,7 @@ function toScanSummary(scan: FakeScan): ScanSummary {
   };
 }
 
-function toScanUploadSlot(row: FakeScanRow): ScanUploadSlot {
+function toScanRowUpload(row: FakeScanRow): ScanRowUpload {
   return {
     scan_position: row.scan_position,
     filename: row.filename,
@@ -2157,7 +2157,7 @@ export function createFakeClient(): ApiClient {
       scans.push(scan);
       return {
         scan_id: scan.scan_id,
-        rows: activeScanRows(scan).map(toScanUploadSlot),
+        rows: activeScanRows(scan).map(toScanRowUpload),
       };
     },
 
@@ -2341,10 +2341,7 @@ export function createFakeClient(): ApiClient {
 
     async deleteScan(scanId: string): Promise<void> {
       const scan = getScanOrThrow(scanId);
-      if (scan.status === 'confirmed') {
-        throw new Error('confirmed scans cannot be deleted');
-      }
-      if (!['uploading', 'identifying', 'reviewing'].includes(scan.status)) {
+      if (scan.status !== 'reviewing') {
         throw new Error('scan is not in a deletable status');
       }
       const index = scans.indexOf(scan);

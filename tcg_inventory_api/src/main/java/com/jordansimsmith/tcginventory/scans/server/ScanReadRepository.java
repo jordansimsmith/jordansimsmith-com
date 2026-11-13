@@ -32,6 +32,7 @@ public class ScanReadRepository {
                         .sortValue(ScanItem.SCAN_PREFIX)
                         .build()))
             .scanIndexForward(false)
+            .consistentRead(true)
             .limit(limit);
     if (exclusiveStartKey != null && !exclusiveStartKey.isEmpty()) {
       requestBuilder.exclusiveStartKey(exclusiveStartKey);
@@ -54,16 +55,34 @@ public class ScanReadRepository {
                         .sortValue(ScanRowItem.ROW_PREFIX)
                         .build()))
             .scanIndexForward(true)
+            .consistentRead(true)
             .build();
     return scanRowTable.query(request).stream().flatMap(page -> page.items().stream()).toList();
   }
 
   @Nullable
+  public ScanRowItem getScanRow(String user, String scanId, int scanPosition) {
+    return scanRowTable.getItem(
+        request ->
+            request
+                .key(
+                    Key.builder()
+                        .partitionValue(ScanRowItem.formatPk(user, scanId))
+                        .sortValue(ScanRowItem.formatSk(scanPosition))
+                        .build())
+                .consistentRead(true));
+  }
+
+  @Nullable
   public ScanItem getScan(String user, String scanId) {
     return scanTable.getItem(
-        Key.builder()
-            .partitionValue(ScanItem.formatPk(user))
-            .sortValue(ScanItem.formatSk(scanId))
-            .build());
+        request ->
+            request
+                .key(
+                    Key.builder()
+                        .partitionValue(ScanItem.formatPk(user))
+                        .sortValue(ScanItem.formatSk(scanId))
+                        .build())
+                .consistentRead(true));
   }
 }

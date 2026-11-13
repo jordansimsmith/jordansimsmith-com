@@ -12,14 +12,10 @@ import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
-import software.amazon.awssdk.services.dynamodb.model.ConditionCheck;
 import software.amazon.awssdk.services.dynamodb.model.ConditionalCheckFailedException;
-import software.amazon.awssdk.services.dynamodb.model.Delete;
-import software.amazon.awssdk.services.dynamodb.model.DeleteItemRequest;
 import software.amazon.awssdk.services.dynamodb.model.Put;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItem;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItemsRequest;
-import software.amazon.awssdk.services.dynamodb.model.TransactionCanceledException;
 import software.amazon.awssdk.services.dynamodb.model.Update;
 import software.amazon.awssdk.services.dynamodb.model.UpdateItemRequest;
 
@@ -105,53 +101,59 @@ public class ScanRepository {
             .build());
   }
 
-  public boolean startScanConfirmation(String user, String scanId, JobItem jobItem) {
+  public void startScanConfirmation(
+      String user, String scanId, long expectedVersion, JobItem jobItem) {
     var scanKey =
         Map.of(
             ScanItem.PK,
             AttributeValue.builder().s(ScanItem.formatPk(user)).build(),
             ScanItem.SK,
             AttributeValue.builder().s(ScanItem.formatSk(scanId)).build());
-    try {
-      dynamoDbClient.transactWriteItems(
-          TransactWriteItemsRequest.builder()
-              .transactItems(
-                  TransactWriteItem.builder()
-                      .update(
-                          Update.builder()
-                              .tableName(tableName)
-                              .key(scanKey)
-                              .updateExpression(
-                                  "SET #status = :confirming, updated_at = :now REMOVE #error")
-                              .conditionExpression(
-                                  "attribute_exists(" + ScanItem.PK + ") AND #status = :reviewing")
-                              .expressionAttributeNames(
-                                  Map.of("#status", ScanItem.STATUS, "#error", ScanItem.ERROR))
-                              .expressionAttributeValues(
-                                  Map.of(
-                                      ":confirming",
-                                      AttributeValue.builder().s("confirming").build(),
-                                      ":reviewing",
-                                      AttributeValue.builder().s("reviewing").build(),
-                                      ":now",
-                                      AttributeValue.builder()
-                                          .n(String.valueOf(clock.now().getEpochSecond()))
-                                          .build()))
-                              .build())
-                      .build(),
-                  TransactWriteItem.builder()
-                      .put(
-                          Put.builder()
-                              .tableName(tableName)
-                              .item(JOB_ITEM_SCHEMA.itemToMap(jobItem, true))
-                              .conditionExpression("attribute_not_exists(" + JobItem.PK + ")")
-                              .build())
-                      .build())
-              .build());
-      return true;
-    } catch (TransactionCanceledException e) {
-      return false;
-    }
+    dynamoDbClient.transactWriteItems(
+        TransactWriteItemsRequest.builder()
+            .transactItems(
+                TransactWriteItem.builder()
+                    .update(
+                        Update.builder()
+                            .tableName(tableName)
+                            .key(scanKey)
+                            .updateExpression(
+                                "SET #status = :confirming, updated_at = :now REMOVE #error")
+                            .conditionExpression(
+                                "attribute_exists("
+                                    + ScanItem.PK
+                                    + ") AND #status = :reviewing AND (#version = :version OR "
+                                    + "(attribute_not_exists(#version) AND :version = :zero))")
+                            .expressionAttributeNames(
+                                Map.of(
+                                    "#status", ScanItem.STATUS,
+                                    "#error", ScanItem.ERROR,
+                                    "#version", ScanItem.VERSION))
+                            .expressionAttributeValues(
+                                Map.of(
+                                    ":confirming",
+                                    AttributeValue.builder().s("confirming").build(),
+                                    ":reviewing",
+                                    AttributeValue.builder().s("reviewing").build(),
+                                    ":now",
+                                    AttributeValue.builder()
+                                        .n(String.valueOf(clock.now().getEpochSecond()))
+                                        .build(),
+                                    ":version",
+                                    AttributeValue.fromN(Long.toString(expectedVersion)),
+                                    ":zero",
+                                    AttributeValue.fromN("0")))
+                            .build())
+                    .build(),
+                TransactWriteItem.builder()
+                    .put(
+                        Put.builder()
+                            .tableName(tableName)
+                            .item(JOB_ITEM_SCHEMA.itemToMap(jobItem, true))
+                            .conditionExpression("attribute_not_exists(" + JobItem.PK + ")")
+                            .build())
+                    .build())
+            .build());
   }
 
   public boolean failScanConfirmation(String user, String scanId, String error) {
@@ -220,88 +222,6 @@ public class ScanRepository {
     }
   }
 
-  public boolean deleteScanRow(String user, String scanId, int scanPosition) {
-    var scanKey =
-        Map.of(
-            ScanItem.PK,
-            AttributeValue.builder().s(ScanItem.formatPk(user)).build(),
-            ScanItem.SK,
-            AttributeValue.builder().s(ScanItem.formatSk(scanId)).build());
-    var rowKey =
-        Map.of(
-            ScanRowItem.PK,
-            AttributeValue.builder().s(ScanRowItem.formatPk(user, scanId)).build(),
-            ScanRowItem.SK,
-            AttributeValue.builder().s(ScanRowItem.formatSk(scanPosition)).build());
-
-    try {
-      dynamoDbClient.transactWriteItems(
-          TransactWriteItemsRequest.builder()
-              .transactItems(
-                  List.of(
-                      TransactWriteItem.builder()
-                          .conditionCheck(
-                              ConditionCheck.builder()
-                                  .tableName(tableName)
-                                  .key(scanKey)
-                                  .conditionExpression(
-                                      "attribute_exists("
-                                          + ScanItem.PK
-                                          + ") AND #status = :reviewing")
-                                  .expressionAttributeNames(Map.of("#status", ScanItem.STATUS))
-                                  .expressionAttributeValues(
-                                      Map.of(
-                                          ":reviewing",
-                                          AttributeValue.builder().s("reviewing").build()))
-                                  .build())
-                          .build(),
-                      TransactWriteItem.builder()
-                          .delete(
-                              Delete.builder()
-                                  .tableName(tableName)
-                                  .key(rowKey)
-                                  .conditionExpression("attribute_exists(" + ScanRowItem.PK + ")")
-                                  .build())
-                          .build()))
-              .build());
-      return true;
-    } catch (TransactionCanceledException e) {
-      return false;
-    }
-  }
-
-  public boolean deleteScan(String user, String scanId) {
-    try {
-      dynamoDbClient.deleteItem(
-          DeleteItemRequest.builder()
-              .tableName(tableName)
-              .key(
-                  Map.of(
-                      ScanItem.PK,
-                      AttributeValue.builder().s(ScanItem.formatPk(user)).build(),
-                      ScanItem.SK,
-                      AttributeValue.builder().s(ScanItem.formatSk(scanId)).build()))
-              .conditionExpression(
-                  "attribute_exists("
-                      + ScanItem.PK
-                      + ") AND #status IN (:uploading, :identifying, :reviewing)")
-              .expressionAttributeNames(Map.of("#status", ScanItem.STATUS))
-              .expressionAttributeValues(
-                  Map.of(
-                      ":uploading", AttributeValue.builder().s("uploading").build(),
-                      ":identifying", AttributeValue.builder().s("identifying").build(),
-                      ":reviewing", AttributeValue.builder().s("reviewing").build()))
-              .build());
-      return true;
-    } catch (ConditionalCheckFailedException e) {
-      return false;
-    }
-  }
-
-  public void deleteScanRows(List<ScanRowItem> rowItems) {
-    executeChunked(rowItems.stream().map(this::buildScanRowDelete).toList());
-  }
-
   public List<ScanRowItem> findScanRows(String user, String scanId) {
     var request =
         QueryEnhancedRequest.builder()
@@ -312,26 +232,22 @@ public class ScanRepository {
                         .sortValue(ScanRowItem.ROW_PREFIX)
                         .build()))
             .scanIndexForward(true)
+            .consistentRead(true)
             .build();
     return scanRowTable.query(request).stream().flatMap(page -> page.items().stream()).toList();
   }
 
   @Nullable
-  public ScanRowItem getScanRow(String user, String scanId, int scanPosition) {
-    return scanRowTable.getItem(
-        Key.builder()
-            .partitionValue(ScanRowItem.formatPk(user, scanId))
-            .sortValue(ScanRowItem.formatSk(scanPosition))
-            .build());
-  }
-
-  @Nullable
   public ScanItem getScan(String user, String scanId) {
     return scanTable.getItem(
-        Key.builder()
-            .partitionValue(ScanItem.formatPk(user))
-            .sortValue(ScanItem.formatSk(scanId))
-            .build());
+        request ->
+            request
+                .key(
+                    Key.builder()
+                        .partitionValue(ScanItem.formatPk(user))
+                        .sortValue(ScanItem.formatSk(scanId))
+                        .build())
+                .consistentRead(true));
   }
 
   private TransactWriteItem buildScanPut(ScanItem item) {
@@ -354,27 +270,5 @@ public class ScanRepository {
                 .conditionExpression("attribute_not_exists(" + ScanRowItem.PK + ")")
                 .build())
         .build();
-  }
-
-  private TransactWriteItem buildScanRowDelete(ScanRowItem item) {
-    return TransactWriteItem.builder()
-        .delete(
-            Delete.builder()
-                .tableName(tableName)
-                .key(
-                    Map.of(
-                        ScanRowItem.PK, AttributeValue.builder().s(item.getPk()).build(),
-                        ScanRowItem.SK, AttributeValue.builder().s(item.getSk()).build()))
-                .build())
-        .build();
-  }
-
-  private void executeChunked(List<TransactWriteItem> transactItems) {
-    for (int start = 0; start < transactItems.size(); start += MAX_TRANSACT_ITEMS) {
-      var chunk =
-          transactItems.subList(start, Math.min(start + MAX_TRANSACT_ITEMS, transactItems.size()));
-      dynamoDbClient.transactWriteItems(
-          TransactWriteItemsRequest.builder().transactItems(chunk).build());
-    }
   }
 }
