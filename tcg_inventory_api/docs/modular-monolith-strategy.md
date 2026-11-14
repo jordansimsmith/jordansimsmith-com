@@ -8,11 +8,11 @@ The adjacent [worker strategy](modular-monolith-worker-strategy.md) defines back
 
 ## Starting point
 
-Catalog owns bulk printing lookup through its client contract and server module. The server temporarily duplicates the provider reads used by that operation. Browser catalog routes and TCGCSV snapshot publication still use the legacy package.
+Catalog owns exact card detail, search, image URL lookup, and bulk printing lookup through its client contract and server module. The server temporarily duplicates legacy provider reads used by the migrated operations. The HTTP detail and search routes delegate directly to CatalogService. Alternatives and TCGCSV snapshot publication still use the legacy package.
 
 Scans owns the scan HTTP routes and sends confirmation to its own Java FIFO worker. Identification still dispatches to the Python recognition queue. Confirmation guards per-row selection saves and the parent transition with the scan version. The worker uses the Catalog and Imports clients to resolve printings and create an import with the scan ID as its receipt key.
 
-The shared Jobs runtime has been retired after confirmation moved to Scans. Historical `JOB#` records remain in DynamoDB and are not read or written. The top-level composition root retains package-scoped Bazel visibility to vertical servers for Dagger wiring. Catalog browser handlers and TCGCSV snapshot publication remain in the legacy Catalog package while the new Catalog server owns bulk printing lookup.
+The shared Jobs runtime has been retired after confirmation moved to Scans. Historical `JOB#` records remain in DynamoDB and are not read or written. The top-level composition root retains package-scoped Bazel visibility to vertical servers for Dagger wiring. Catalog alternatives and TCGCSV snapshot publication remain in the legacy Catalog package while the new Catalog server owns detail, search, image URL lookup, and bulk printing lookup.
 
 Existing import confirmation and order processing already use durable progress and replay to complete work in smaller transactions. Preserve those guarantees while changing ownership; service interfaces alone do not provide them.
 

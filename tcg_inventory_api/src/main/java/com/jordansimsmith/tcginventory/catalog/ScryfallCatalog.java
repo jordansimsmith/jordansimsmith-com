@@ -226,51 +226,6 @@ public class ScryfallCatalog implements CardCatalog {
         finish);
   }
 
-  @Override
-  public CatalogPage search(
-      Game game, String rawQuery, String finish, @Nullable String continuation) {
-    try {
-      return doSearch(game, rawQuery, finish, continuation);
-    } catch (CatalogException e) {
-      throw e;
-    } catch (Exception e) {
-      if (e instanceof InterruptedException) {
-        Thread.currentThread().interrupt();
-      }
-      throw new CatalogException.Unavailable("catalog returned invalid search data", e);
-    }
-  }
-
-  private CatalogPage doSearch(
-      Game game, String rawQuery, String finish, @Nullable String continuation)
-      throws IOException, InterruptedException {
-    var query = rawQuery != null ? rawQuery.trim() : "";
-    validateFinish(game, finish);
-    if (query.length() < 2 || query.length() > 200) {
-      throw new CatalogException.BadRequest("query must contain between 2 and 200 characters");
-    }
-    var context = "search:" + GAME + ":" + query + ":" + finish;
-    var position = decodePosition(continuation, context);
-    if (EXTERNAL_ID.matcher(query).matches()) {
-      if (continuation != null) {
-        throw new CatalogException.BadRequest("continuation is invalid for an exact ID search");
-      }
-      try {
-        var card = normalize(game, readCard(query));
-        if (!eligible(card, finish)) {
-          return emptyPage();
-        }
-        return new CatalogPage(List.of(card), null);
-      } catch (CatalogException.NotFound e) {
-        return emptyPage();
-      }
-    }
-    var queryString =
-        "name:\"%s\" lang:%s game:paper is:%s"
-            .formatted(escapeSearchPhrase(query), game.language().code(), scryfallFinish(finish));
-    return readPage(game, queryString, context, position, null, null, finish);
-  }
-
   private CatalogPage readPage(
       Game game,
       String query,
@@ -508,10 +463,6 @@ public class ScryfallCatalog implements CardCatalog {
     }
   }
 
-  private CatalogPage emptyPage() {
-    return new CatalogPage(List.of(), null);
-  }
-
   private void validateExternalId(String externalId) {
     if (externalId == null || !EXTERNAL_ID.matcher(externalId).matches()) {
       throw new CatalogException.BadRequest("external_id must be a valid Scryfall ID");
@@ -527,10 +478,6 @@ public class ScryfallCatalog implements CardCatalog {
 
   private String scryfallFinish(String finish) {
     return "normal".equals(finish) ? "nonfoil" : finish;
-  }
-
-  private String escapeSearchPhrase(String query) {
-    return query.replace("\\", "\\\\").replace("\"", "\\\"");
   }
 
   private String encode(String value) {

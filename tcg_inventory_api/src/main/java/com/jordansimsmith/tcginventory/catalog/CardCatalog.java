@@ -10,6 +10,4 @@ public interface CardCatalog {
   Map<String, CatalogCard> findCards(Game game, List<String> externalIds);
 
   CatalogPage findAlternatives(Game game, String externalId, String finish, String continuation);
-
-  CatalogPage search(Game game, String query, String finish, String continuation);
 }

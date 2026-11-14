@@ -37,10 +37,6 @@ public class FakeCardCatalogs extends Catalogs {
     catalog(game).setFailure(failure);
   }
 
-  public void setSearchPage(String game, CatalogPage page) {
-    catalog(game).searchPage = page;
-  }
-
   public void setAlternativesPage(String game, CatalogPage page) {
     catalog(game).alternativesPage = page;
   }
@@ -53,7 +49,6 @@ public class FakeCardCatalogs extends Catalogs {
     private final Map<String, CatalogCard> cardsById = new LinkedHashMap<>();
     private final List<List<String>> lookupRequests = new ArrayList<>();
     private CatalogException failure;
-    private CatalogPage searchPage;
     private CatalogPage alternativesPage;
 
     @Override
@@ -91,14 +86,6 @@ public class FakeCardCatalogs extends Catalogs {
         throw failure;
       }
       return Objects.requireNonNull(alternativesPage);
-    }
-
-    @Override
-    public CatalogPage search(Game ignoredGame, String query, String finish, String continuation) {
-      if (failure != null) {
-        throw failure;
-      }
-      return Objects.requireNonNull(searchPage);
     }
 
     private void addCard(CatalogCard card) {

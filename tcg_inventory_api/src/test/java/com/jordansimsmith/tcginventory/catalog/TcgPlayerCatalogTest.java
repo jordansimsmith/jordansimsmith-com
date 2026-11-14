@@ -8,11 +8,9 @@ import com.jordansimsmith.tcginventory.games.client.Game;
 import com.jordansimsmith.tcginventory.games.client.Language;
 import com.jordansimsmith.time.FakeClock;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -87,75 +85,7 @@ public class TcgPlayerCatalogTest {
   }
 
   @Test
-  void searchShouldMatchLiteralNamesAndMapProductMetadata() {
-    // arrange
-    var fixture =
-        new Fixture(
-            "pokemon",
-            snapshotWithProducts(
-                "pokemon",
-                "snapshot-1",
-                List.of(
-                    new TcgCsvCatalogSnapshot.Product(1, "Pikachu", 10, "25", List.of("normal")),
-                    new TcgCsvCatalogSnapshot.Product(
-                        2, "Pikachu (Master Ball)", 20, "025/165", List.of("holofoil")),
-                    new TcgCsvCatalogSnapshot.Product(3, "Flabébé", 10, "blue", List.of("normal")),
-                    new TcgCsvCatalogSnapshot.Product(
-                        4, "Pikachu  ex", 10, "26", List.of("normal")))));
-    var catalog = fixture.catalog();
-
-    // act
-    var ordinary = catalog.search(FakeGamesService.POKEMON_ENGLISH, "  PIKACHU  ", "normal", null);
-    var treatment =
-        catalog.search(FakeGamesService.POKEMON_ENGLISH, "pikachu (master ball)", "holofoil", null);
-
-    // assert
-    assertThat(ordinary.cards()).extracting(CatalogCard::externalId).containsExactly("1", "4");
-    assertThat(treatment.cards())
-        .extracting(CatalogCard::name)
-        .containsExactly("Pikachu (Master Ball)");
-    assertThat(
-            catalog.search(FakeGamesService.POKEMON_ENGLISH, "Pikachu", "holofoil", null).cards())
-        .hasSize(1);
-    assertThat(catalog.search(FakeGamesService.POKEMON_ENGLISH, "Flabebe", "normal", null).cards())
-        .isEmpty();
-    assertThat(catalog.search(FakeGamesService.POKEMON_ENGLISH, "FLABÉBÉ", "normal", null).cards())
-        .hasSize(1);
-    assertThat(
-            catalog.search(FakeGamesService.POKEMON_ENGLISH, "Pikachu ex", "normal", null).cards())
-        .isEmpty();
-    assertThat(
-            catalog.search(FakeGamesService.POKEMON_ENGLISH, "Pikachu  ex", "normal", null).cards())
-        .hasSize(1);
-    assertThat(
-            catalog.search(FakeGamesService.POKEMON_ENGLISH, "Pikachu.*", "normal", null).cards())
-        .isEmpty();
-    assertThat(catalog.search(FakeGamesService.POKEMON_ENGLISH, "sv2", "holofoil", null).cards())
-        .isEmpty();
-    assertThat(
-            catalog.search(FakeGamesService.POKEMON_ENGLISH, "025/165", "holofoil", null).cards())
-        .isEmpty();
-    assertThat(fixture.repository.latestSnapshotRequests).isEqualTo(1);
-  }
-
-  @Test
-  void searchShouldRejectQueriesOutsideTrimmedLengthLimitsWithoutLoading() {
-    // arrange
-    var fixture = new Fixture("pokemon", null);
-    var catalog = fixture.catalog();
-
-    // act / assert
-    for (var query : List.of("", "  ", " a ", "a".repeat(201))) {
-      assertThatThrownBy(
-              () -> catalog.search(FakeGamesService.POKEMON_ENGLISH, query, "normal", null))
-          .isInstanceOf(CatalogException.BadRequest.class)
-          .hasMessage("query must contain between 2 and 200 characters");
-    }
-    assertThat(fixture.repository.latestSnapshotRequests).isZero();
-  }
-
-  @Test
-  void searchAndAlternativesShouldFilterEverySupportedFinish() {
+  void alternativesShouldFilterEverySupportedFinish() {
     // arrange
     var products =
         List.of(
@@ -169,9 +99,6 @@ public class TcgPlayerCatalogTest {
     for (var product : products) {
       var finish = product.availableFinishes().getFirst();
       var expectedId = Integer.toString(product.productId());
-      assertThat(catalog.search(FakeGamesService.POKEMON_ENGLISH, "Pikachu", finish, null).cards())
-          .extracting(CatalogCard::externalId)
-          .containsExactly(expectedId);
       assertThat(
               catalog.findAlternatives(FakeGamesService.POKEMON_ENGLISH, "1", finish, null).cards())
           .extracting(CatalogCard::externalId)
@@ -217,56 +144,18 @@ public class TcgPlayerCatalogTest {
   }
 
   @Test
-  void searchAndAlternativesShouldReturnEmptyPagesWhenNoFinishMatches() {
+  void alternativesShouldReturnEmptyPageWhenNoFinishMatches() {
     // arrange
     var catalog =
         new Fixture("pokemon", snapshot("pokemon", "snapshot-1", "Pikachu", 123)).catalog();
 
     // act
-    var search = catalog.search(FakeGamesService.POKEMON_ENGLISH, "Missing", "normal", null);
     var alternatives =
         catalog.findAlternatives(FakeGamesService.POKEMON_ENGLISH, "123", "reverse_holofoil", null);
 
     // assert
-    assertThat(search.cards()).isEmpty();
-    assertThat(search.nextContinuation()).isNull();
     assertThat(alternatives.cards()).isEmpty();
     assertThat(alternatives.nextContinuation()).isNull();
-  }
-
-  @Test
-  void searchShouldPageInNumericProductOrderWithoutRepeats() {
-    // arrange
-    var products =
-        IntStream.rangeClosed(1, 41)
-            .mapToObj(
-                id ->
-                    new TcgCsvCatalogSnapshot.Product(
-                        id, "Pikachu", 10, Integer.toString(id), List.of("normal")))
-            .toList();
-    var catalog =
-        new Fixture("pokemon", snapshotWithProducts("pokemon", "snapshot-1", products)).catalog();
-
-    // act
-    var first = catalog.search(FakeGamesService.POKEMON_ENGLISH, "Pikachu", "normal", null);
-    var second =
-        catalog.search(
-            FakeGamesService.POKEMON_ENGLISH, " PIKACHU ", "normal", first.nextContinuation());
-    var third =
-        catalog.search(
-            FakeGamesService.POKEMON_ENGLISH, "Pikachu", "normal", second.nextContinuation());
-
-    // assert
-    assertThat(first.cards())
-        .extracting(CatalogCard::externalId)
-        .containsExactlyElementsOf(
-            IntStream.rangeClosed(1, 20).mapToObj(Integer::toString).toList());
-    assertThat(second.cards())
-        .extracting(CatalogCard::externalId)
-        .containsExactlyElementsOf(
-            IntStream.rangeClosed(21, 40).mapToObj(Integer::toString).toList());
-    assertThat(third.cards()).extracting(CatalogCard::externalId).containsExactly("41");
-    assertThat(third.nextContinuation()).isNull();
   }
 
   @Test
@@ -304,56 +193,6 @@ public class TcgPlayerCatalogTest {
             IntStream.rangeClosed(20, 39).mapToObj(Integer::toString).toList());
     assertThat(third.cards()).extracting(CatalogCard::externalId).containsExactly("40");
     assertThat(third.nextContinuation()).isNull();
-  }
-
-  @Test
-  void searchShouldOmitContinuationWhenExactlyTwentyProductsMatch() {
-    // arrange
-    var products =
-        IntStream.rangeClosed(1, 20)
-            .mapToObj(
-                id -> new TcgCsvCatalogSnapshot.Product(id, "Pikachu", 10, "25", List.of("normal")))
-            .toList();
-    var catalog =
-        new Fixture("pokemon", snapshotWithProducts("pokemon", "snapshot-1", products)).catalog();
-
-    // act
-    var page = catalog.search(FakeGamesService.POKEMON_ENGLISH, "Pikachu", "normal", null);
-
-    // assert
-    assertThat(page.cards()).hasSize(20);
-    assertThat(page.nextContinuation()).isNull();
-  }
-
-  @Test
-  void continuationsShouldRejectMalformedTokensAndInvalidOffsets() {
-    // arrange
-    var products =
-        IntStream.rangeClosed(1, 21)
-            .mapToObj(
-                id -> new TcgCsvCatalogSnapshot.Product(id, "Pikachu", 10, "25", List.of("normal")))
-            .toList();
-    var catalog =
-        new Fixture("pokemon", snapshotWithProducts("pokemon", "snapshot-1", products)).catalog();
-
-    // act / assert
-    for (var malformed : List.of("", "!", "YWJj")) {
-      assertThatThrownBy(
-              () ->
-                  catalog.search(FakeGamesService.POKEMON_ENGLISH, "Pikachu", "normal", malformed))
-          .isInstanceOf(CatalogException.BadRequest.class);
-    }
-    for (var offset : List.of("-1", "0", "21", "2147483647", "2147483648", "invalid")) {
-      var invalidToken =
-          Base64.getUrlEncoder()
-              .withoutPadding()
-              .encodeToString(offset.getBytes(StandardCharsets.UTF_8));
-      assertThatThrownBy(
-              () ->
-                  catalog.search(
-                      FakeGamesService.POKEMON_ENGLISH, "Pikachu", "normal", invalidToken))
-          .isInstanceOf(CatalogException.BadRequest.class);
-    }
   }
 
   @Test
@@ -452,13 +291,6 @@ public class TcgPlayerCatalogTest {
     assertThat(pokemonCard.name()).isEqualTo("Pikachu");
     assertThat(otherCard.game()).isEqualTo("other");
     assertThat(otherCard.name()).isEqualTo("Other game card");
-    assertThat(
-            pokemonCatalog
-                .search(FakeGamesService.POKEMON_ENGLISH, "Pikachu", "normal", null)
-                .cards())
-        .extracting(CatalogCard::name)
-        .containsExactly("Pikachu");
-    assertThat(otherCatalog.search(otherGame, "Pikachu", "normal", null).cards()).isEmpty();
     assertThat(otherCatalog.findAlternatives(otherGame, "123", "normal", null).cards())
         .extracting(CatalogCard::name)
         .containsExactly("Other game card");

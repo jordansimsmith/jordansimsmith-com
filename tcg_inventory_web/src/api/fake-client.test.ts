@@ -107,17 +107,41 @@ describe('createFakeClient', () => {
       next_continuation: null,
     });
 
-    const searchResults = await client.findCatalogCards({
+    const searchResults = await client.searchCards({
       game: 'mtg',
       query: 'Bolt',
       finish: 'normal',
+      limit: 2,
     });
     expect(searchResults.cards.map((card) => card.set_code)).toEqual([
       'm11',
       '2xm',
-      'sta',
     ]);
-    expect(searchResults.next_continuation).toBeNull();
+    expect(searchResults.next_continuation).toBe('fake:2');
+    await expect(
+      client.searchCards({
+        game: 'mtg',
+        query: 'Bolt',
+        finish: 'normal',
+        limit: 2,
+        continuation: searchResults.next_continuation ?? undefined,
+      }),
+    ).resolves.toMatchObject({
+      cards: [expect.objectContaining({ set_code: 'sta' })],
+      next_continuation: null,
+    });
+    await expect(
+      client.searchCards({
+        game: 'mtg',
+        query: 'Bolt',
+        finish: 'normal',
+      }),
+    ).resolves.toMatchObject({
+      cards: expect.arrayContaining([
+        expect.objectContaining({ set_code: 'sta' }),
+      ]),
+      next_continuation: null,
+    });
   });
 
   it('returns units and resolves images independently for opaque catalog IDs', async () => {

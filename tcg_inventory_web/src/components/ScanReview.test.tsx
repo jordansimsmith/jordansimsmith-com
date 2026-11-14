@@ -162,7 +162,7 @@ function mockSuggestionLookup(
       cards: alternatives,
       next_continuation: nextContinuation,
     });
-  vi.spyOn(apiClient, 'findCatalogCards').mockResolvedValue({
+  vi.spyOn(apiClient, 'searchCards').mockResolvedValue({
     cards: [],
     next_continuation: null,
   });
@@ -246,7 +246,7 @@ describe('ScanReview', () => {
       set_name: 'Magic 2010',
       collector_number: '54',
     });
-    const search = vi.spyOn(apiClient, 'findCatalogCards').mockResolvedValue({
+    const search = vi.spyOn(apiClient, 'searchCards').mockResolvedValue({
       cards: [counterspell, alternateCounterspell],
       next_continuation: null,
     });
@@ -336,7 +336,7 @@ describe('ScanReview', () => {
       cards: [thirdCard],
       next_continuation: null,
     });
-    const findCards = vi.spyOn(apiClient, 'findCatalogCards');
+    const findCards = vi.spyOn(apiClient, 'searchCards');
     findCards.mockResolvedValueOnce({
       cards: [firstCard, secondCard],
       next_continuation: 'search-next',
@@ -436,7 +436,7 @@ describe('ScanReview', () => {
     vi.spyOn(apiClient, 'findCatalogAlternatives').mockRejectedValue(
       new Error('catalog is temporarily unavailable'),
     );
-    vi.spyOn(apiClient, 'findCatalogCards').mockResolvedValue({
+    vi.spyOn(apiClient, 'searchCards').mockResolvedValue({
       cards: [],
       next_continuation: null,
     });
@@ -458,7 +458,7 @@ describe('ScanReview', () => {
   it('clears search results when the selected row changes', async () => {
     const user = userEvent.setup();
     mockSuggestionLookup();
-    vi.spyOn(apiClient, 'findCatalogCards').mockResolvedValue({
+    vi.spyOn(apiClient, 'searchCards').mockResolvedValue({
       cards: [thirdCard],
       next_continuation: null,
     });
@@ -535,7 +535,7 @@ describe('ScanReview', () => {
         next_continuation: null,
       }),
     );
-    vi.spyOn(apiClient, 'findCatalogCards').mockResolvedValue({
+    vi.spyOn(apiClient, 'searchCards').mockResolvedValue({
       cards: [],
       next_continuation: null,
     });

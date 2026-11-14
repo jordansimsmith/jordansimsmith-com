@@ -10,6 +10,8 @@ import com.jordansimsmith.tcginventory.catalog.client.FindCatalogCardsRequest;
 import com.jordansimsmith.tcginventory.catalog.client.FindCatalogCardsResponse;
 import com.jordansimsmith.tcginventory.catalog.client.GetCardRequest;
 import com.jordansimsmith.tcginventory.catalog.client.GetCardResponse;
+import com.jordansimsmith.tcginventory.catalog.client.SearchCardsRequest;
+import com.jordansimsmith.tcginventory.catalog.client.SearchCardsResponse;
 import com.jordansimsmith.tcginventory.games.client.GamesService;
 import com.jordansimsmith.time.Clock;
 import dagger.Module;
@@ -48,6 +50,7 @@ public class CatalogModule {
     var getCardService = new GetCardService(gamesService, magicTheGathering, pokemon);
     var findCatalogCardsService =
         new FindCatalogCardsService(gamesService, magicTheGathering, pokemon);
+    var searchCardsService = new SearchCardsService(gamesService, magicTheGathering, pokemon);
     return new CatalogService() {
       @Override
       public GetCardResponse getCard(RequestContext ctx, GetCardRequest request)
@@ -65,6 +68,12 @@ public class CatalogModule {
       public FindCatalogCardsResponse findCards(RequestContext ctx, FindCatalogCardsRequest request)
           throws ServiceException {
         return findCatalogCardsService.findCards(ctx, request);
+      }
+
+      @Override
+      public SearchCardsResponse searchCards(RequestContext ctx, SearchCardsRequest request)
+          throws ServiceException {
+        return searchCardsService.searchCards(ctx, request);
       }
     };
   }

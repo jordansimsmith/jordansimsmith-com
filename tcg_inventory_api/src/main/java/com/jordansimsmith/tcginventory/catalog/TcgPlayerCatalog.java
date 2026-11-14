@@ -12,7 +12,6 @@ import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
 public class TcgPlayerCatalog implements CardCatalog {
@@ -86,24 +85,6 @@ public class TcgPlayerCatalog implements CardCatalog {
         .filter(product -> product.name().equals(anchor.name()))
         .filter(product -> product.availableFinishes().contains(finish))
         .forEach(products::add);
-    return page(snapshot, products, offset);
-  }
-
-  @Override
-  public CatalogPage search(Game ignoredGame, String rawQuery, String finish, String continuation) {
-    var query = rawQuery.trim();
-    if (query.length() < 2 || query.length() > 200) {
-      throw new CatalogException.BadRequest("query must contain between 2 and 200 characters");
-    }
-    var normalizedQuery = query.toLowerCase(Locale.ROOT);
-    var snapshot = load();
-    var offset = decodeContinuation(continuation);
-    var products =
-        snapshot.products().stream()
-            .filter(
-                product -> product.name().trim().toLowerCase(Locale.ROOT).contains(normalizedQuery))
-            .filter(product -> product.availableFinishes().contains(finish))
-            .toList();
     return page(snapshot, products, offset);
   }
 

@@ -12,7 +12,8 @@ import type {
   FindScansParams,
   FindScansResponse,
   FindCatalogAlternativesParams,
-  FindCatalogCardsParams,
+  SearchCardsRequest,
+  SearchCardsResponse,
   FindCardImagesRequest,
   FindCardImagesResponse,
   FindPhotosResponse,
@@ -312,14 +313,20 @@ export function createHttpClient(): ApiClient {
       return response.json();
     },
 
-    async findCatalogCards(
-      params: FindCatalogCardsParams,
-    ): Promise<CatalogCardsResponse> {
+    async searchCards(
+      request: SearchCardsRequest,
+    ): Promise<SearchCardsResponse> {
       const query = new URLSearchParams({
-        game: params.game,
-        query: params.query,
-        finish: params.finish,
+        game: request.game,
+        query: request.query,
+        finish: request.finish,
       });
+      if (request.limit !== undefined) {
+        query.set('limit', String(request.limit));
+      }
+      if (request.continuation) {
+        query.set('continuation', request.continuation);
+      }
       const response = await authenticatedFetch(`/catalog/cards?${query}`);
       return response.json();
     },

@@ -12,7 +12,8 @@ import type {
   Game,
   GameId,
   FindCatalogAlternativesParams,
-  FindCatalogCardsParams,
+  SearchCardsRequest,
+  SearchCardsResponse,
   FindCardImagesRequest,
   FindCardImagesResponse,
   FindPhotosResponse,
@@ -208,8 +209,9 @@ function copyCatalogCard(card: CatalogCard): CatalogCard {
 function catalogPage(
   cards: CatalogCard[],
   offset: number,
+  limit = FAKE_CATALOG_PAGE_SIZE,
 ): CatalogCardsResponse {
-  const page = cards.slice(offset, offset + FAKE_CATALOG_PAGE_SIZE);
+  const page = cards.slice(offset, offset + limit);
   const nextOffset = offset + page.length;
   return {
     cards: page.map(copyCatalogCard),
@@ -2258,21 +2260,24 @@ export function createFakeClient(): ApiClient {
       return catalogPage(cards, catalogOffset(params.continuation));
     },
 
-    async findCatalogCards(
-      params: FindCatalogCardsParams,
-    ): Promise<CatalogCardsResponse> {
-      const query = params.query.trim().toLocaleLowerCase();
-      if (query.length < 2) {
-        throw new Error('query must contain at least two characters');
+    async searchCards(
+      request: SearchCardsRequest,
+    ): Promise<SearchCardsResponse> {
+      const query = request.query.trim().toLowerCase();
+      if (query.length < 2 || query.length > 200) {
+        throw new Error('query must contain between 2 and 200 characters');
+      }
+      const limit = request.limit ?? 20;
+      if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+        throw new Error('limit must be between 1 and 100');
       }
       const cards = FAKE_CATALOG_CARDS.filter(
         (candidate) =>
-          candidate.game === params.game &&
-          candidate.available_finishes.includes(params.finish) &&
-          (candidate.external_id.toLocaleLowerCase() === query ||
-            candidate.name.toLocaleLowerCase().includes(query)),
+          candidate.game === request.game &&
+          candidate.available_finishes.includes(request.finish) &&
+          candidate.name.toLowerCase().includes(query),
       );
-      return { cards: cards.map(copyCatalogCard), next_continuation: null };
+      return catalogPage(cards, catalogOffset(request.continuation), limit);
     },
 
     async identifyScan(scanId: string): Promise<void> {

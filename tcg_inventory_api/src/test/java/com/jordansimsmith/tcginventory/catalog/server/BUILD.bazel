@@ -5,6 +5,7 @@ java_test_suite(
     srcs = [
         "FindCardImagesServiceTest.java",
         "GetCardServiceTest.java",
+        "SearchCardsServiceTest.java",
     ],
     runner = "junit5",
     test_suffixes = ["Test.java"],
@@ -18,5 +19,39 @@ java_test_suite(
         "@maven//:com_fasterxml_jackson_core_jackson_databind",
         "@maven//:org_assertj_assertj_core",
         "@maven//:org_junit_jupiter_junit_jupiter_api",
+    ],
+)
+
+java_test_suite(
+    name = "server-integration-tests",
+    size = "medium",
+    srcs = ["SearchCardsServiceIntegrationTest.java"],
+    env = {
+        "AWS_ACCESS_KEY_ID": "fake",
+        "AWS_SECRET_ACCESS_KEY": "fake",
+        "AWS_REGION": "ap-southeast-2",
+    },
+    runner = "junit5",
+    test_suffixes = ["IntegrationTest.java"],
+    runtime_deps = JUNIT5_DEPS,
+    deps = [
+        "//lib/dynamodb:test-lib",
+        "//lib/s3:test-lib",
+        "//lib/service",
+        "//lib/testcontainers:test-lib",
+        "//lib/time:lib",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/catalog/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/catalog/server",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
+        "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/games/client:test-lib",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@maven//:org_assertj_assertj_core",
+        "@maven//:org_junit_jupiter_junit_jupiter_api",
+        "@maven//:org_testcontainers_junit_jupiter",
+        "@maven//:software_amazon_awssdk_auth",
+        "@maven//:software_amazon_awssdk_dynamodb",
+        "@maven//:software_amazon_awssdk_regions",
+        "@maven//:software_amazon_awssdk_s3",
+        "@maven//:software_amazon_awssdk_sdk_core",
     ],
 )

@@ -11,4 +11,7 @@ public interface CatalogService {
 
   FindCatalogCardsResponse findCards(RequestContext ctx, FindCatalogCardsRequest request)
       throws ServiceException;
+
+  SearchCardsResponse searchCards(RequestContext ctx, SearchCardsRequest request)
+      throws ServiceException;
 }

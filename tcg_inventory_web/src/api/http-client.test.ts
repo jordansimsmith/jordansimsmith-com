@@ -694,10 +694,12 @@ describe('http client catalog', () => {
       continuation: 'next/page',
     });
     await expect(
-      client.findCatalogCards({
+      client.searchCards({
         game: 'mtg',
         query: 'Bolt & Co',
         finish: 'normal',
+        limit: 7,
+        continuation: 'next/page',
       }),
     ).resolves.toEqual(response);
 
@@ -705,8 +707,11 @@ describe('http client catalog', () => {
       'https://api.tcg-inventory.jordansimsmith.com/catalog/cards/opaque%2Fid/alternatives?game=mtg&finish=reverse+holo&continuation=next%2Fpage',
     );
     expect(fetchSpy.mock.calls[1][0]).toBe(
-      'https://api.tcg-inventory.jordansimsmith.com/catalog/cards?game=mtg&query=Bolt+%26+Co&finish=normal',
+      'https://api.tcg-inventory.jordansimsmith.com/catalog/cards?game=mtg&query=Bolt+%26+Co&finish=normal&limit=7&continuation=next%2Fpage',
     );
+    expect(fetchSpy.mock.calls[1][1]).toMatchObject({
+      headers: { Authorization: `Basic ${btoa('alice:pw')}` },
+    });
     expect(json).toHaveBeenCalledTimes(2);
   });
 
@@ -720,7 +725,7 @@ describe('http client catalog', () => {
     });
 
     await expect(
-      createHttpClient().findCatalogCards({
+      createHttpClient().searchCards({
         game: 'mtg',
         query: 'Bolt',
         finish: 'normal',

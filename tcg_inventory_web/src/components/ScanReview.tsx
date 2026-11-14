@@ -346,7 +346,7 @@ export function ScanReview({
       setSearching(true);
       setSearchError(null);
       try {
-        const response = await apiClient.findCatalogCards({
+        const response = await apiClient.searchCards({
           game: scan.game,
           query,
           finish: scan.finish,

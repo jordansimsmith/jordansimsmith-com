@@ -292,17 +292,24 @@ export interface CatalogCardsResponse {
   next_continuation: string | null;
 }
 
+export interface SearchCardsRequest {
+  game: GameId;
+  query: string;
+  finish: Finish;
+  limit?: number;
+  continuation?: string;
+}
+
+export interface SearchCardsResponse {
+  cards: CatalogCard[];
+  next_continuation: string | null;
+}
+
 export interface FindCatalogAlternativesParams {
   game: GameId;
   external_id: string;
   finish: Finish;
   continuation?: string;
-}
-
-export interface FindCatalogCardsParams {
-  game: GameId;
-  query: string;
-  finish: Finish;
 }
 
 export interface CreateScanRequest {
@@ -553,9 +560,7 @@ export interface ApiClient {
   findCatalogAlternatives(
     params: FindCatalogAlternativesParams,
   ): Promise<CatalogCardsResponse>;
-  findCatalogCards(
-    params: FindCatalogCardsParams,
-  ): Promise<CatalogCardsResponse>;
+  searchCards(request: SearchCardsRequest): Promise<SearchCardsResponse>;
   identifyScan(scanId: string): Promise<void>;
   deleteScanRow(scanId: string, scanPosition: number): Promise<void>;
   confirmScan(scanId: string, request: ConfirmScanRequest): Promise<void>;
