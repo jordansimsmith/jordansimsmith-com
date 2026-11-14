@@ -83,38 +83,18 @@ while True:
 
 queue_configs = {
     "scan_identification": {"name": "tcg_inventory_scan_identification.fifo"},
-    "scans": {
-        "name": "tcg_inventory_scans.fifo",
-        "visibility_timeout": 960,
-    },
-    "reports": {
-        "name": "tcg_inventory_reports.fifo",
-        "visibility_timeout": 960,
-    },
-    "pricing": {
-        "name": "tcg_inventory_pricing.fifo",
-        "visibility_timeout": 960,
-    },
-    "publish": {
-        "name": "tcg_inventory_publish.fifo",
-        "visibility_timeout": 960,
-    },
-    "orders": {
-        "name": "tcg_inventory_orders.fifo",
-        "visibility_timeout": 960,
-    },
-    "imports": {
-        "name": "tcg_inventory_imports.fifo",
-        "visibility_timeout": 960,
-    },
+    "scans": {"name": "tcg_inventory_scans.fifo"},
+    "reports": {"name": "tcg_inventory_reports.fifo"},
+    "pricing": {"name": "tcg_inventory_pricing.fifo"},
+    "publish": {"name": "tcg_inventory_publish.fifo"},
+    "orders": {"name": "tcg_inventory_orders.fifo"},
+    "imports": {"name": "tcg_inventory_imports.fifo"},
 }
 
 queue_urls = {}
 queue_arns = {}
 for queue_key, config in queue_configs.items():
     attributes = {"FifoQueue": "true", "ContentBasedDeduplication": "false"}
-    if "visibility_timeout" in config:
-        attributes["VisibilityTimeout"] = str(config["visibility_timeout"])
     queue_urls[queue_key] = sqs_client.create_queue(
         QueueName=config["name"], Attributes=attributes
     )["QueueUrl"]
@@ -161,21 +141,24 @@ iam_client.put_role_policy(
     PolicyDocument=json.dumps(policy_document),
 )
 
+lambda_environment = {
+    "SCRYFALL_BASE_URL": os.environ.get("SCRYFALL_BASE_URL", ""),
+    "FETCHTCG_BASE_URL": os.environ.get("FETCHTCG_BASE_URL", ""),
+    "FIREBASE_TOKEN_URL": os.environ.get("FIREBASE_TOKEN_URL", ""),
+}
+
 lambdas = {
     "get_catalog_card": {
         "handler": "com.jordansimsmith.tcginventory.catalog.GetCatalogCardHandler",
         "zip_file": "get-catalog-card-handler_deploy.jar",
-        "environment": {"SCRYFALL_BASE_URL": os.environ.get("SCRYFALL_BASE_URL", "")},
     },
     "find_catalog_alternatives": {
         "handler": "com.jordansimsmith.tcginventory.catalog.FindCatalogAlternativesHandler",
         "zip_file": "find-catalog-alternatives-handler_deploy.jar",
-        "environment": {"SCRYFALL_BASE_URL": os.environ.get("SCRYFALL_BASE_URL", "")},
     },
     "find_catalog_cards": {
         "handler": "com.jordansimsmith.tcginventory.catalog.FindCatalogCardsHandler",
         "zip_file": "find-catalog-cards-handler_deploy.jar",
-        "environment": {"SCRYFALL_BASE_URL": os.environ.get("SCRYFALL_BASE_URL", "")},
     },
     "find_card_images": {
         "handler": "com.jordansimsmith.tcginventory.catalog.api.FindCardImagesHandler",
@@ -196,10 +179,6 @@ lambdas = {
     "update_fetchtcg_credentials": {
         "handler": "com.jordansimsmith.tcginventory.fetchtcg.api.UpdateCredentialsHandler",
         "zip_file": "update-fetchtcg-credentials-handler_deploy.jar",
-        "environment": {
-            "FETCHTCG_BASE_URL": os.environ.get("FETCHTCG_BASE_URL", ""),
-            "FIREBASE_TOKEN_URL": os.environ.get("FIREBASE_TOKEN_URL", ""),
-        },
     },
     "get_order_settings": {
         "handler": "com.jordansimsmith.tcginventory.orders.api.GetOrderSettingsHandler",
@@ -284,43 +263,26 @@ lambdas = {
     "reports_worker": {
         "handler": "com.jordansimsmith.tcginventory.reports.worker.ReportWorkerHandler",
         "zip_file": "report-worker-handler_deploy.jar",
-        "timeout": 900,
     },
     "pricing_worker": {
         "handler": "com.jordansimsmith.tcginventory.pricing.worker.PricingWorkerHandler",
         "zip_file": "pricing-worker-handler_deploy.jar",
-        "timeout": 900,
-        "environment": {
-            "FETCHTCG_BASE_URL": os.environ.get("FETCHTCG_BASE_URL", ""),
-        },
     },
     "publish_worker": {
         "handler": "com.jordansimsmith.tcginventory.publish.worker.PublishWorkerHandler",
         "zip_file": "publish-worker-handler_deploy.jar",
-        "timeout": 900,
-        "environment": {
-            "FETCHTCG_BASE_URL": os.environ.get("FETCHTCG_BASE_URL", ""),
-            "FIREBASE_TOKEN_URL": os.environ.get("FIREBASE_TOKEN_URL", ""),
-        },
     },
     "orders_worker": {
         "handler": "com.jordansimsmith.tcginventory.orders.worker.OrdersWorkerHandler",
         "zip_file": "orders-worker-handler_deploy.jar",
-        "timeout": 900,
     },
     "scans_worker": {
         "handler": "com.jordansimsmith.tcginventory.scans.worker.ScanWorkerHandler",
         "zip_file": "scan-worker-handler_deploy.jar",
-        "timeout": 900,
-        "environment": {"SCRYFALL_BASE_URL": os.environ.get("SCRYFALL_BASE_URL", "")},
     },
     "imports_worker": {
         "handler": "com.jordansimsmith.tcginventory.imports.worker.ImportsWorkerHandler",
         "zip_file": "imports-worker-handler_deploy.jar",
-        "timeout": 900,
-        "environment": {
-            "FETCHTCG_BASE_URL": os.environ.get("FETCHTCG_BASE_URL", ""),
-        },
     },
     "find_skus": {
         "handler": "com.jordansimsmith.tcginventory.inventory.api.FindSkusHandler",
@@ -606,12 +568,11 @@ for function_name, config in lambdas.items():
         "Role": role_arn,
         "Handler": config["handler"],
         "Code": {"ZipFile": zip_file_bytes},
-        "Timeout": config.get("timeout", 30),
+        "Timeout": 30,
         "MemorySize": 1024,
         "Architectures": ["x86_64"],
+        "Environment": {"Variables": lambda_environment},
     }
-    if "environment" in config:
-        create_kwargs["Environment"] = {"Variables": config["environment"]}
     lambda_client.create_function(**create_kwargs)
 
 lambda_client.create_event_source_mapping(
