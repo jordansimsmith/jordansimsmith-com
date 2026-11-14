@@ -142,7 +142,7 @@ flowchart TD
   scanworker --> recognitioncatalog[Bundled Scryfall MTG catalog + Milo model]
 ```
 
-The `catalog.client` and `catalog.server` packages provide `CatalogService#findCardImages` and `CatalogService#findCards`. The application module includes the Catalog server module and supplies its provider and storage configuration. Constructing CatalogService initializes the shared DynamoDB and S3 clients and runs their ListTables and ListBuckets startup calls. `GET /catalog/cardimages` delegates to the URL-only operation. SKU and order detail responses retain the game and external card ID for frontend image composition. The Catalog server owns the read adapters for bulk lookup and depends on the Games client for game and finish metadata. Browser printing handlers and the TCGCSV refresh worker still use the legacy Catalog package. The two implementations currently duplicate bulk provider reads and use the same published Pokémon snapshot format. The catalog storage bucket is independent of photo storage configuration.
+The `catalog.client` and `catalog.server` packages provide `CatalogService#getCard`, `CatalogService#findCardImages`, and `CatalogService#findCards`. The application module includes the Catalog server module and supplies its provider and storage configuration. `GET /catalog/cards/{external_id}` and `GET /catalog/cardimages` delegate directly to service responses. SKU and order detail responses retain the game and external card ID for frontend image composition. The Catalog server owns the read adapters for Magic and Pokémon and depends on the Games client for game and finish metadata. Search, alternatives, and the TCGCSV refresh worker still use the legacy Catalog package. The two implementations currently duplicate provider reads and use the same published Pokémon snapshot format. The catalog storage bucket is independent of photo storage configuration.
 
 All scan HTTP routes delegate through `ScanService`. The Scans server maps the same scan parent and row storage used by Python recognition. While a scan is uploading, the server verifies object size and content type before returning a presigned source URL. Row deletion and confirmation attempts increment the scan’s internal `version`. Confirmation uses the version to guard each selection write and the transition to `confirming`. Existing scans without a version start at zero.
 
@@ -562,41 +562,45 @@ Pokémon's three regions cover the lower-left set and collector number (`x=0`, `
 
 `GET /catalog/cardimages?game=mtg&external_ids=id1&external_ids=id2` returns `{ "images": [{ "external_id": "id1", "image_urls": { "small": "...", "normal": "..." } }] }`. Supply `external_ids` as repeated query parameters and URL-encode each value independently. The endpoint supports registered `scryfall` and `tcgplayer` sources, accepts 1–100 nonblank IDs, deduplicates while preserving request order, and constructs the existing small/normal image URLs locally. It does not verify card existence or call provider APIs, read snapshots, or access catalog storage. Browsers still fetch the returned image URLs, including Scryfall redirects.
 
-`GET /catalog/cards/{external_id}` requires `game`. Exact detail, list search, and alternatives are available for `mtg` and `pokemon`; search and alternatives also require the registered application `finish` ID. Magic returns English physical printings. Finish values map from Scryfall's `nonfoil`, `foil`, and `etched` into the ordered registered IDs `normal`, `foil`, and `etched`. Results keep distinct printing IDs, including alternate art and tokens. Search text is treated as a literal card-name phrase; a UUID-shaped query resolves that exact Scryfall ID.
+`GET /catalog/cards/{external_id}` requires `game` and returns `{ "card": { ... } }`, matching `CatalogService#getCard` directly. Exact detail, list search, and alternatives are available for `mtg` and `pokemon`; search and alternatives also require the registered application `finish` ID. Magic detail returns English printing metadata and all available finishes without a finish parameter. Finish values map from Scryfall's `nonfoil`, `foil`, and `etched` into the ordered registered IDs `normal`, `foil`, and `etched`. Results keep distinct printing IDs, including alternate art and tokens. Search text is treated as a literal card-name phrase; a UUID-shaped query resolves that exact Scryfall ID.
 
-`GET /catalog/cards/{external_id}?game=mtg` returns `200` with the exact English printing, even if it lacks the finish selected for a scan. Missing and non-English IDs return `404`. Images use the top-level Scryfall image when present, then the first card face; each image size is `null` if unavailable.
+`GET /catalog/cards/{external_id}?game=mtg` returns `200` with the exact English printing, even if it lacks the finish selected for a scan. Missing and non-English IDs return `404`; malformed Magic IDs return `400`. Images use the top-level Scryfall image when present, then the first card face; each image size is `null` if unavailable. Provider failures and inconsistent responses return `503` with `{"message":"catalog is temporarily unavailable"}`; the cause is retained in server diagnostics.
 
-`GET /catalog/cards/{external_id}?game=pokemon` treats `external_id` as an opaque TCGplayer product ID and returns its exact full product name, set, collector number, images, and available finishes from the latest published snapshot. An ID absent from the snapshot returns `404`; a missing or blank `external_id` returns `400`. The response does not depend on a finish query, so it can show all available finishes. Internal batch lookup treats non-null IDs as opaque strings, deduplicates them, omits products absent from the snapshot, and uses one captured snapshot for the entire batch.
+`GET /catalog/cards/{external_id}?game=pokemon` treats `external_id` as an opaque TCGplayer product ID and returns its exact full product name, set, collector number, images, and available finishes from the latest published snapshot. An ID absent from the snapshot returns `404`; a missing or blank `external_id` returns `400`. The response does not depend on a finish query, so it can show all available finishes. Missing or unreadable snapshots return the same `503` response as provider failures. Detail and bulk lookup share the five-minute registry check and cached snapshot. Internal batch lookup treats non-null IDs as opaque strings, deduplicates them, omits products absent from the snapshot, and uses one captured snapshot for the entire batch.
 
 ```json
 {
-  "game": "pokemon",
-  "external_id": "123456",
-  "name": "Pikachu",
-  "set_code": "sv1",
-  "set_name": "Scarlet & Violet",
-  "collector_number": "025/198",
-  "image_urls": {
-    "small": "https://tcgplayer-cdn.tcgplayer.com/product/123456_200w.jpg",
-    "normal": "https://tcgplayer-cdn.tcgplayer.com/product/123456_in_1000x1000.jpg"
-  },
-  "available_finishes": ["normal", "holofoil", "reverse_holofoil"]
+  "card": {
+    "game": "pokemon",
+    "external_id": "123456",
+    "name": "Pikachu",
+    "set_code": "sv1",
+    "set_name": "Scarlet & Violet",
+    "collector_number": "025/198",
+    "image_urls": {
+      "small": "https://tcgplayer-cdn.tcgplayer.com/product/123456_200w.jpg",
+      "normal": "https://tcgplayer-cdn.tcgplayer.com/product/123456_in_1000x1000.jpg"
+    },
+    "available_finishes": ["normal", "holofoil", "reverse_holofoil"]
+  }
 }
 ```
 
 ```json
 {
-  "game": "mtg",
-  "external_id": "4eaac4fd-95f5-4f38-b593-0101e79a20f9",
-  "name": "Lightning Bolt",
-  "set_code": "sta",
-  "set_name": "Strixhaven Mystical Archive",
-  "collector_number": "42",
-  "image_urls": {
-    "small": "https://cards.scryfall.io/small/front/4/e/4eaac4fd-95f5-4f38-b593-0101e79a20f9.jpg?1783927429",
-    "normal": "https://cards.scryfall.io/normal/front/4/e/4eaac4fd-95f5-4f38-b593-0101e79a20f9.jpg?1783927429"
-  },
-  "available_finishes": ["normal", "foil", "etched"]
+  "card": {
+    "game": "mtg",
+    "external_id": "4eaac4fd-95f5-4f38-b593-0101e79a20f9",
+    "name": "Lightning Bolt",
+    "set_code": "sta",
+    "set_name": "Strixhaven Mystical Archive",
+    "collector_number": "42",
+    "image_urls": {
+      "small": "https://cards.scryfall.io/small/front/4/e/4eaac4fd-95f5-4f38-b593-0101e79a20f9.jpg?1783927429",
+      "normal": "https://cards.scryfall.io/normal/front/4/e/4eaac4fd-95f5-4f38-b593-0101e79a20f9.jpg?1783927429"
+    },
+    "available_finishes": ["normal", "foil", "etched"]
+  }
 }
 ```
 

@@ -171,26 +171,6 @@ java_library(
 )
 
 java_binary(
-    name = "get-catalog-card-handler",
-    srcs = ["src/main/java/com/jordansimsmith/tcginventory/catalog/GetCatalogCardHandler.java"],
-    create_executable = False,
-    resources = ["src/main/resources/logback.xml"],
-    deps = [
-        ":catalog-lib",
-        ":lib",
-        "//lib/http:lib",
-        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
-        "@maven//:ch_qos_logback_logback_classic",
-        "@maven//:ch_qos_logback_logback_core",
-        "@maven//:com_amazonaws_aws_lambda_java_core",
-        "@maven//:com_amazonaws_aws_lambda_java_events",
-        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
-        "@maven//:com_google_guava_guava",
-        "@maven//:org_slf4j_slf4j_api",
-    ],
-)
-
-java_binary(
     name = "catalog-jobs-handler",
     srcs = ["src/main/java/com/jordansimsmith/tcginventory/catalog/CatalogJobsHandler.java"],
     create_executable = False,
@@ -364,7 +344,6 @@ java_test_suite(
         ":catalog-lib",
         ":find-catalog-alternatives-handler",
         ":find-catalog-cards-handler",
-        ":get-catalog-card-handler",
         ":lib",
         ":test-lib",
         "//lib/http:lib",
@@ -435,7 +414,6 @@ java_test_suite(
         ":catalog-lib",
         ":find-catalog-alternatives-handler",
         ":find-catalog-cards-handler",
-        ":get-catalog-card-handler",
         ":lib",
         ":test-lib",
         "//lib/dynamodb:test-lib",
@@ -493,7 +471,7 @@ java_test_suite(
 localstack_image(
     name = "local",
     handler_jars = [
-        ":get-catalog-card-handler_deploy.jar",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/catalog/api:get-card-handler_deploy.jar",
         ":find-catalog-alternatives-handler_deploy.jar",
         ":find-catalog-cards-handler_deploy.jar",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/catalog/api:find-card-images-handler_deploy.jar",

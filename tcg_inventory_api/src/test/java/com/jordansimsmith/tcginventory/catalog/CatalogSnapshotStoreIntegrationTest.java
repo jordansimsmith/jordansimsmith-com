@@ -7,15 +7,18 @@ import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.s3.S3Container;
+import com.jordansimsmith.service.NotFoundException;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceUnavailableException;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
 import com.jordansimsmith.tcginventory.catalog.client.CatalogPrinting;
 import com.jordansimsmith.tcginventory.catalog.client.FindCatalogCardsRequest;
+import com.jordansimsmith.tcginventory.catalog.client.GetCardRequest;
 import com.jordansimsmith.tcginventory.games.client.FakeGamesService;
 import com.jordansimsmith.tcginventory.games.client.Game;
 import com.jordansimsmith.tcginventory.games.client.Language;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Instant;
@@ -101,6 +104,35 @@ public class CatalogSnapshotStoreIntegrationTest {
   }
 
   @Test
+  void getCardShouldReadSnapshotPublishedByLegacyStoreAndShareItWithBulkLookup() throws Exception {
+    // arrange
+    store.createSnapshot(snapshot("pokemon", "2026-10-07T20:06:09Z", "Pikachu", 25));
+    var service = factory.catalogService();
+
+    // act
+    var card = service.getCard(new RequestContext("alice"), new GetCardRequest("pokemon", "25"));
+    store.createSnapshot(snapshot("pokemon", "2026-10-07T20:07:09Z", "Raichu", 26));
+    var printings =
+        service.findCards(
+            new RequestContext("alice"), new FindCatalogCardsRequest("pokemon", List.of("25")));
+
+    // assert
+    assertThat(card.card().name()).isEqualTo("Pikachu");
+    assertThat(card.card().collectorNumber()).isEqualTo("58");
+    assertThat(card.card().availableFinishes()).containsExactly("normal");
+    assertThat(card.card().imageUrls().small())
+        .isEqualTo("https://tcgplayer-cdn.tcgplayer.com/product/25_200w.jpg");
+    assertThat(printings.cards())
+        .containsExactly(
+            new CatalogPrinting(
+                "pokemon", "25", "Pikachu", "BASE", "Base Set", "58", List.of("normal")));
+    assertThatThrownBy(
+            () ->
+                service.getCard(new RequestContext("alice"), new GetCardRequest("pokemon", "025")))
+        .isInstanceOf(NotFoundException.class);
+  }
+
+  @Test
   void findCardsShouldFailWhenNoSnapshotIsPublished() {
     // arrange
     var service = factory.catalogService();
@@ -113,6 +145,32 @@ public class CatalogSnapshotStoreIntegrationTest {
                     new FindCatalogCardsRequest("pokemon", List.of("25"))))
         .isInstanceOf(ServiceUnavailableException.class)
         .hasMessageContaining("has not been published");
+    assertThatThrownBy(
+            () -> service.getCard(new RequestContext("alice"), new GetCardRequest("pokemon", "25")))
+        .isInstanceOf(ServiceUnavailableException.class)
+        .hasMessage("catalog is temporarily unavailable")
+        .hasCauseInstanceOf(ServiceUnavailableException.class);
+  }
+
+  @Test
+  void getCardShouldReturnUnavailableWhenSnapshotArtifactIsUnreadable() throws Exception {
+    // arrange
+    var item = store.createSnapshot(snapshot("pokemon", "2026-10-07T20:06:09Z", "Pikachu", 25));
+    factory
+        .s3Client()
+        .putObject(
+            request -> request.bucket(CatalogSnapshotStore.BUCKET).key(item.getS3Key()),
+            RequestBody.fromBytes(gzip("{not json".getBytes(StandardCharsets.UTF_8))));
+
+    // act / assert
+    assertThatThrownBy(
+            () ->
+                factory
+                    .catalogService()
+                    .getCard(new RequestContext("alice"), new GetCardRequest("pokemon", "25")))
+        .isInstanceOf(ServiceUnavailableException.class)
+        .hasMessage("catalog is temporarily unavailable")
+        .hasCauseInstanceOf(IOException.class);
   }
 
   @Test
@@ -299,41 +357,6 @@ public class CatalogSnapshotStoreIntegrationTest {
         .isEqualTo("Raichu");
     assertThat(catalogs.forGame(otherGame).getCard(otherGame, "25").name())
         .isEqualTo("Other game card");
-  }
-
-  @Test
-  void getCatalogCardHandlerShouldMapPokemonLookupStatuses() {
-    // arrange
-    factory
-        .fakeCardCatalogs()
-        .addCard(
-            new CatalogCard(
-                "pokemon",
-                "25",
-                "Pikachu",
-                "BASE",
-                "Base Set",
-                "58",
-                new CatalogCard.ImageUrls("small.jpg", "normal.jpg"),
-                List.of("normal")));
-    var handler = new GetCatalogCardHandler(factory);
-
-    // act
-    var found = handler.handleRequest(catalogEvent("25"), null);
-    var missingId = handler.handleRequest(catalogEventWithoutId(), null);
-    var absent = handler.handleRequest(catalogEvent("not-numeric"), null);
-    var missing = handler.handleRequest(catalogEvent("999"), null);
-    factory
-        .fakeCardCatalogs()
-        .setFailure("pokemon", new CatalogException.Unavailable("storage unavailable"));
-    var unavailable = handler.handleRequest(catalogEvent("25"), null);
-
-    // assert
-    assertThat(found.getStatusCode()).isEqualTo(200);
-    assertThat(missingId.getStatusCode()).isEqualTo(400);
-    assertThat(absent.getStatusCode()).isEqualTo(404);
-    assertThat(missing.getStatusCode()).isEqualTo(404);
-    assertThat(unavailable.getStatusCode()).isEqualTo(503);
   }
 
   @Test
@@ -694,21 +717,5 @@ public class CatalogSnapshotStoreIntegrationTest {
       gzip.write(bytes);
     }
     return output.toByteArray();
-  }
-
-  private static APIGatewayV2HTTPEvent catalogEvent(String externalId) {
-    return APIGatewayV2HTTPEvent.builder()
-        .withHeaders(Map.of("Authorization", "Basic am9yZGFuOnBhc3N3b3Jk"))
-        .withQueryStringParameters(Map.of("game", "pokemon"))
-        .withPathParameters(Map.of("external_id", externalId))
-        .build();
-  }
-
-  private static APIGatewayV2HTTPEvent catalogEventWithoutId() {
-    return APIGatewayV2HTTPEvent.builder()
-        .withHeaders(Map.of("Authorization", "Basic am9yZGFuOnBhc3N3b3Jk"))
-        .withQueryStringParameters(Map.of("game", "pokemon"))
-        .withPathParameters(Map.of())
-        .build();
   }
 }

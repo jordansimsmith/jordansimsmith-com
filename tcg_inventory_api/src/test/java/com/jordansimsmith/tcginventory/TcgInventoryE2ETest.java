@@ -249,8 +249,9 @@ public class TcgInventoryE2ETest {
     var catalogCardResponse = get("/catalog/cards/" + SCRYFALL_ID + "?game=mtg");
     assertThat(catalogCardResponse.statusCode()).isEqualTo(200);
     var catalogCard = objectMapper.readTree(catalogCardResponse.body());
-    assertThat(catalogCard.get("external_id").asText()).isEqualTo(SCRYFALL_ID);
-    assertThat(catalogCard.get("available_finishes").toString()).isEqualTo("[\"normal\",\"foil\"]");
+    assertThat(catalogCard.get("card").get("external_id").asText()).isEqualTo(SCRYFALL_ID);
+    assertThat(catalogCard.get("card").get("available_finishes").toString())
+        .isEqualTo("[\"normal\",\"foil\"]");
 
     var alternativesResponse =
         get("/catalog/cards/" + SCRYFALL_ID + "/alternatives?game=mtg&finish=foil");

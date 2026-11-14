@@ -14,7 +14,7 @@ import type {
 } from '../api/client';
 import finishClasses from '../components/CardFinishName.module.css';
 
-const REGISTERED_GAMES = [
+const REGISTERED_GAMES: Game[] = [
   {
     id: 'mtg',
     display_name: 'Magic: The Gathering',

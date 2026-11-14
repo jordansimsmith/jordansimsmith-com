@@ -13,9 +13,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ScanDetailPage } from './ScanDetailPage';
 import { GamesProvider } from '../GamesProvider';
 import * as clientModule from '../api/client';
-import type { CatalogCard, ScanDetail, ScanRow } from '../api/client';
+import type { CatalogCard, Game, ScanDetail, ScanRow } from '../api/client';
 
-const REGISTERED_GAMES = [
+const REGISTERED_GAMES: Game[] = [
   {
     id: 'mtg',
     display_name: 'Magic: The Gathering',
@@ -263,9 +263,9 @@ describe('ScanDetailPage', () => {
           import_id: 'import-confirmed',
         }),
       );
-    vi.spyOn(clientModule.apiClient, 'getCatalogCard').mockResolvedValue(
-      suggestedProduct,
-    );
+    vi.spyOn(clientModule.apiClient, 'getCard').mockResolvedValue({
+      card: suggestedProduct,
+    });
     vi.spyOn(
       clientModule.apiClient,
       'findCatalogAlternatives',
@@ -300,9 +300,9 @@ describe('ScanDetailPage', () => {
       .mockResolvedValueOnce(reviewableDetail())
       .mockResolvedValueOnce(reviewableDetail({ status: 'confirming' }))
       .mockResolvedValue(reviewableDetail());
-    vi.spyOn(clientModule.apiClient, 'getCatalogCard').mockResolvedValue(
-      suggestedProduct,
-    );
+    vi.spyOn(clientModule.apiClient, 'getCard').mockResolvedValue({
+      card: suggestedProduct,
+    });
     vi.spyOn(
       clientModule.apiClient,
       'findCatalogAlternatives',

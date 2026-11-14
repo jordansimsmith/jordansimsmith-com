@@ -250,7 +250,11 @@ export function ScanReview({
 
     async function loadSuggestedProduct() {
       try {
-        const card = await apiClient.getCatalogCard(scan.game, suggestionId);
+        const detailResponse = await apiClient.getCard({
+          game: scan.game,
+          external_id: suggestionId,
+        });
+        const card = detailResponse.card;
         if (
           cancelled ||
           catalogLookupVersions.current.get(selectedPosition) !== requestVersion

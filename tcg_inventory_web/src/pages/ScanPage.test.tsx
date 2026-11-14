@@ -22,7 +22,7 @@ import type {
   ScanSummary,
 } from '../api/client';
 
-const REGISTERED_GAMES = [
+const REGISTERED_GAMES: Game[] = [
   {
     id: 'mtg',
     display_name: 'Magic: The Gathering',

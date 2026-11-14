@@ -6,7 +6,8 @@ import type {
   CreateImportResponse,
   CreateScanRequest,
   CreateScanResponse,
-  CatalogCard,
+  GetCardRequest,
+  GetCardResponse,
   CatalogCardsResponse,
   FindScansParams,
   FindScansResponse,
@@ -276,13 +277,10 @@ export function createHttpClient(): ApiClient {
       return response.json();
     },
 
-    async getCatalogCard(
-      game: GameId,
-      externalId: string,
-    ): Promise<CatalogCard> {
-      const query = new URLSearchParams({ game });
+    async getCard(request: GetCardRequest): Promise<GetCardResponse> {
+      const query = new URLSearchParams({ game: request.game });
       const response = await authenticatedFetch(
-        `/catalog/cards/${encodeURIComponent(externalId)}?${query}`,
+        `/catalog/cards/${encodeURIComponent(request.external_id)}?${query}`,
       );
       return response.json();
     },

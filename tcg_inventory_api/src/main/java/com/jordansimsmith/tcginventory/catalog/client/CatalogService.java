@@ -4,6 +4,8 @@ import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceException;
 
 public interface CatalogService {
+  GetCardResponse getCard(RequestContext ctx, GetCardRequest request) throws ServiceException;
+
   FindCardImagesResponse findCardImages(RequestContext ctx, FindCardImagesRequest request)
       throws ServiceException;
 

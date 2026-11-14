@@ -8,6 +8,8 @@ import com.jordansimsmith.tcginventory.catalog.client.FindCardImagesRequest;
 import com.jordansimsmith.tcginventory.catalog.client.FindCardImagesResponse;
 import com.jordansimsmith.tcginventory.catalog.client.FindCatalogCardsRequest;
 import com.jordansimsmith.tcginventory.catalog.client.FindCatalogCardsResponse;
+import com.jordansimsmith.tcginventory.catalog.client.GetCardRequest;
+import com.jordansimsmith.tcginventory.catalog.client.GetCardResponse;
 import com.jordansimsmith.tcginventory.games.client.GamesService;
 import com.jordansimsmith.time.Clock;
 import dagger.Module;
@@ -39,13 +41,20 @@ public class CatalogModule {
             .connectTimeout(Duration.ofSeconds(3))
             .followRedirects(HttpClient.Redirect.NEVER)
             .build();
+    var magicTheGathering =
+        new MagicTheGatheringPrintingLookup(scryfallBaseUri, httpClient, objectMapper);
+    var pokemon =
+        new PokemonPrintingLookup(dynamoDb, s3, tableName, snapshotBucket, objectMapper, clock);
+    var getCardService = new GetCardService(gamesService, magicTheGathering, pokemon);
     var findCatalogCardsService =
-        new FindCatalogCardsService(
-            gamesService,
-            new MagicTheGatheringPrintingLookup(scryfallBaseUri, httpClient, objectMapper),
-            new PokemonPrintingLookup(
-                dynamoDb, s3, tableName, snapshotBucket, objectMapper, clock));
+        new FindCatalogCardsService(gamesService, magicTheGathering, pokemon);
     return new CatalogService() {
+      @Override
+      public GetCardResponse getCard(RequestContext ctx, GetCardRequest request)
+          throws ServiceException {
+        return getCardService.getCard(ctx, request);
+      }
+
       @Override
       public FindCardImagesResponse findCardImages(
           RequestContext ctx, FindCardImagesRequest request) throws ServiceException {

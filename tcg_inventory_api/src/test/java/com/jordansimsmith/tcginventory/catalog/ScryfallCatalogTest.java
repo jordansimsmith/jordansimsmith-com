@@ -431,21 +431,6 @@ public class ScryfallCatalogTest {
   }
 
   @Test
-  void getCardShouldRejectAProviderResponseForADifferentPrinting() {
-    // arrange
-    nextBody = card(ALT_ID, "Lightning Bolt", "en", List.of("nonfoil"), true);
-    var handler = new GetCatalogCardHandler(createFactory(new Catalogs(Map.of("mtg", catalog))));
-
-    // act
-    var response =
-        handler.handleRequest(event(Map.of("game", "mtg"), Map.of("external_id", CARD_ID)), null);
-
-    // assert
-    assertThat(response.getStatusCode()).isEqualTo(503);
-    assertThat(requests).extracting(URI::getPath).containsExactly("/cards/" + CARD_ID);
-  }
-
-  @Test
   void getCardShouldUseFirstFaceImagesWhenTopLevelImagesAreMissing() throws Exception {
     // arrange
     var card =
@@ -653,17 +638,13 @@ public class ScryfallCatalogTest {
   }
 
   @Test
-  void handlersShouldReturnBadRequestForInvalidOrMismatchedParameters() throws Exception {
+  void handlersShouldReturnBadRequestForInvalidSearchAndAlternativeParameters() throws Exception {
     // arrange
     var catalogs = new Catalogs(Map.of("mtg", catalog));
-    var getCard = new GetCatalogCardHandler(createFactory(catalogs));
     var search = new FindCatalogCardsHandler(createFactory(catalogs));
     var alternatives = new FindCatalogAlternativesHandler(createFactory(catalogs));
 
     // act
-    var missingGame = getCard.handleRequest(event(Map.of(), Map.of("external_id", CARD_ID)), null);
-    var malformedId =
-        getCard.handleRequest(event(Map.of("game", "mtg"), Map.of("external_id", "bad-id")), null);
     var unsupportedGame =
         search.handleRequest(
             event(Map.of("game", "pokemon", "query", "Mew", "finish", "normal"), null), null);
@@ -691,8 +672,6 @@ public class ScryfallCatalogTest {
             event(Map.of("game", "mtg", "finish", "bad"), Map.of("external_id", CARD_ID)), null);
 
     // assert
-    assertThat(missingGame.getStatusCode()).isEqualTo(400);
-    assertThat(malformedId.getStatusCode()).isEqualTo(400);
     assertThat(unsupportedGame.getStatusCode()).isEqualTo(400);
     assertThat(unsupportedFinish.getStatusCode()).isEqualTo(400);
     assertThat(missingQuery.getStatusCode()).isEqualTo(400);
@@ -701,41 +680,11 @@ public class ScryfallCatalogTest {
   }
 
   @Test
-  void handlersShouldReturnNotFoundForUnknownAndNonEnglishExactCards() throws Exception {
+  void searchHandlerShouldReturnServiceUnavailableForMalformedData() {
     // arrange
-    var getCard = new GetCatalogCardHandler(createFactory(new Catalogs(Map.of("mtg", catalog))));
-
-    // act
-    nextStatus = 404;
-    var missing =
-        getCard.handleRequest(event(Map.of("game", "mtg"), Map.of("external_id", CARD_ID)), null);
-    nextStatus = 200;
-    nextBody = card(CARD_ID, "Lightning Bolt", "ja", List.of("nonfoil"), true);
-    var nonEnglish =
-        getCard.handleRequest(event(Map.of("game", "mtg"), Map.of("external_id", CARD_ID)), null);
-
-    // assert
-    assertThat(missing.getStatusCode()).isEqualTo(404);
-    assertThat(nonEnglish.getStatusCode()).isEqualTo(404);
-  }
-
-  @Test
-  void handlerShouldReturnServiceUnavailableForRateLimitProviderFailureAndMalformedData() {
-    // arrange
-    var getCard = new GetCatalogCardHandler(createFactory(new Catalogs(Map.of("mtg", catalog))));
-
-    // act
-    nextStatus = 429;
-    var rateLimited =
-        getCard.handleRequest(event(Map.of("game", "mtg"), Map.of("external_id", CARD_ID)), null);
-    nextStatus = 500;
-    var providerError =
-        getCard.handleRequest(event(Map.of("game", "mtg"), Map.of("external_id", CARD_ID)), null);
+    var search = new FindCatalogCardsHandler(createFactory(new Catalogs(Map.of("mtg", catalog))));
     nextStatus = 200;
     nextBody = "{not-json";
-    var malformed =
-        getCard.handleRequest(event(Map.of("game", "mtg"), Map.of("external_id", CARD_ID)), null);
-    var search = new FindCatalogCardsHandler(createFactory(new Catalogs(Map.of("mtg", catalog))));
     searchBody = "{\"object\":\"list\",\"data\":[]}";
     var malformedSearch =
         search.handleRequest(
@@ -743,66 +692,14 @@ public class ScryfallCatalogTest {
             null);
 
     // assert
-    assertThat(rateLimited.getStatusCode()).isEqualTo(503);
-    assertThat(providerError.getStatusCode()).isEqualTo(503);
-    assertThat(malformed.getStatusCode()).isEqualTo(503);
     assertThat(malformedSearch.getStatusCode()).isEqualTo(503);
   }
 
-  @Test
-  void handlerShouldReturnServiceUnavailableWhenProviderDoesNotRespond() throws Exception {
-    // arrange
-    var endpoint = baseUri;
-    server.stop(0);
-    var unavailableCatalog =
-        new ScryfallCatalog(endpoint, HttpClient.newHttpClient(), objectMapper, () -> {});
-    var getCard =
-        new GetCatalogCardHandler(createFactory(new Catalogs(Map.of("mtg", unavailableCatalog))));
-
-    // act
-    var response =
-        getCard.handleRequest(event(Map.of("game", "mtg"), Map.of("external_id", CARD_ID)), null);
-
-    // assert
-    assertThat(response.getStatusCode()).isEqualTo(503);
-  }
-
-  @Test
-  void handlerShouldReturnServiceUnavailableWhenProviderTimesOut() {
-    // arrange
-    nextDelayMillis = 6000;
-    var getCard = new GetCatalogCardHandler(createFactory(new Catalogs(Map.of("mtg", catalog))));
-
-    // act
-    var response =
-        getCard.handleRequest(event(Map.of("game", "mtg"), Map.of("external_id", CARD_ID)), null);
-
-    // assert
-    assertThat(response.getStatusCode()).isEqualTo(503);
-  }
-
-  @Test
-  void providerRequestsShouldIncludeRequiredHeaders() {
-    // arrange
-    nextBody = card(CARD_ID, "Lightning Bolt", "en", List.of("nonfoil"), true);
-
-    // act
-    catalog.getCard(FakeGamesService.MAGIC_THE_GATHERING, CARD_ID);
-
-    // assert
-    assertThat(lastUserAgent).startsWith("TcgInventory/");
-    assertThat(lastAccept).contains("application/json");
-  }
-
-  private String lastUserAgent;
-  private String lastAccept;
   private String lastContentType;
 
   private void handleRequest(HttpExchange exchange) throws IOException {
     requests.add(exchange.getRequestURI());
     requestMethods.add(exchange.getRequestMethod());
-    lastUserAgent = exchange.getRequestHeaders().getFirst("User-Agent");
-    lastAccept = exchange.getRequestHeaders().getFirst("Accept");
     lastContentType = exchange.getRequestHeaders().getFirst("Content-Type");
     var status = nextStatus;
     nextStatus = 200;

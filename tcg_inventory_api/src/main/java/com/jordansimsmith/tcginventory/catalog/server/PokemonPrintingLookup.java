@@ -3,7 +3,10 @@ package com.jordansimsmith.tcginventory.catalog.server;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jordansimsmith.service.NotFoundException;
+import com.jordansimsmith.service.ServiceException;
 import com.jordansimsmith.service.ServiceUnavailableException;
+import com.jordansimsmith.tcginventory.catalog.client.Card;
 import com.jordansimsmith.tcginventory.catalog.client.CatalogPrinting;
 import com.jordansimsmith.tcginventory.games.client.Finish;
 import com.jordansimsmith.tcginventory.games.client.Game;
@@ -70,6 +73,63 @@ public class PokemonPrintingLookup {
     this.bucket = bucket;
     this.objectMapper = objectMapper;
     this.clock = clock;
+  }
+
+  public Card getCard(Game game, String externalId) throws ServiceException {
+    try {
+      return doGetCard(game, externalId);
+    } catch (IOException | SdkException e) {
+      throw new ServiceUnavailableException("catalog is temporarily unavailable", e);
+    } catch (ServiceUnavailableException e) {
+      throw new ServiceUnavailableException("catalog is temporarily unavailable", e);
+    }
+  }
+
+  private Card doGetCard(Game game, String externalId)
+      throws IOException, NotFoundException, ServiceUnavailableException {
+    var currentSnapshot = loadSnapshot(game.id());
+    var groupsById = new HashMap<Integer, Group>();
+    for (var group : currentSnapshot.groups()) {
+      if (group == null || groupsById.putIfAbsent(group.id(), group) != null) {
+        throw new ServiceUnavailableException("catalog returned inconsistent group data");
+      }
+    }
+
+    Product product = null;
+    for (var candidate : currentSnapshot.products()) {
+      if (candidate == null) {
+        throw new ServiceUnavailableException("catalog returned invalid product data");
+      }
+      if (Integer.toString(candidate.id()).equals(externalId)) {
+        if (product != null) {
+          throw new ServiceUnavailableException("catalog returned duplicate product data");
+        }
+        product = candidate;
+      }
+    }
+    if (product == null) {
+      throw new NotFoundException("card not found");
+    }
+    var group = groupsById.get(product.groupId());
+    if (group == null
+        || group.setCode() == null
+        || group.setName() == null
+        || product.name() == null
+        || product.collectorNumber() == null
+        || product.finishes() == null) {
+      throw new ServiceUnavailableException("catalog returned invalid product data");
+    }
+    var finishes =
+        game.finishes().stream().map(Finish::id).filter(product.finishes()::contains).toList();
+    return new Card(
+        game.id(),
+        externalId,
+        product.name(),
+        group.setCode(),
+        group.setName(),
+        product.collectorNumber(),
+        CardImageUrls.forSource(game.externalSource(), externalId),
+        finishes);
   }
 
   public List<CatalogPrinting> findCards(Game game, Set<String> externalIds)

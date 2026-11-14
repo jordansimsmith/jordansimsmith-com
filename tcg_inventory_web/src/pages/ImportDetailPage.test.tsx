@@ -14,11 +14,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ImportDetailPage } from './ImportDetailPage';
 import { GamesProvider } from '../GamesProvider';
 import * as clientModule from '../api/client';
-import type { ImportDetail, ImportRow } from '../api/client';
+import type { Game, ImportDetail, ImportRow } from '../api/client';
 import { encodeListingPhoto } from '../domain/encode-listing-photo';
 import finishClasses from '../components/CardFinishName.module.css';
 
-const REGISTERED_GAMES = [
+const REGISTERED_GAMES: Game[] = [
   {
     id: 'mtg',
     display_name: 'Magic: The Gathering',

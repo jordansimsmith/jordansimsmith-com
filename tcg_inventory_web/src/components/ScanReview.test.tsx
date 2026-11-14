@@ -154,8 +154,8 @@ function mockSuggestionLookup(
   nextContinuation: string | null = null,
 ) {
   const detail = vi
-    .spyOn(apiClient, 'getCatalogCard')
-    .mockResolvedValue(selectedCard);
+    .spyOn(apiClient, 'getCard')
+    .mockResolvedValue({ card: selectedCard });
   const findAlternatives = vi
     .spyOn(apiClient, 'findCatalogAlternatives')
     .mockResolvedValue({
@@ -197,7 +197,10 @@ describe('ScanReview', () => {
     );
     expect(screen.getByText('Your scan · Set code')).toBeDefined();
     expect(screen.getByText('Reference · Set symbol')).toBeDefined();
-    expect(detail).toHaveBeenCalledWith('mtg', firstCard.external_id);
+    expect(detail).toHaveBeenCalledWith({
+      game: 'mtg',
+      external_id: firstCard.external_id,
+    });
     expect(findAlternatives).toHaveBeenCalledWith({
       game: 'mtg',
       external_id: firstCard.external_id,
@@ -429,7 +432,7 @@ describe('ScanReview', () => {
 
   it('keeps a valid product selectable after related-printing lookup fails', async () => {
     const user = userEvent.setup();
-    vi.spyOn(apiClient, 'getCatalogCard').mockResolvedValue(firstCard);
+    vi.spyOn(apiClient, 'getCard').mockResolvedValue({ card: firstCard });
     vi.spyOn(apiClient, 'findCatalogAlternatives').mockRejectedValue(
       new Error('catalog is temporarily unavailable'),
     );
@@ -521,9 +524,10 @@ describe('ScanReview', () => {
         },
       ],
     });
-    vi.spyOn(apiClient, 'getCatalogCard').mockImplementation(
-      async (_game, externalId) =>
-        externalId === firstCard.external_id ? firstCard : secondCard,
+    vi.spyOn(apiClient, 'getCard').mockImplementation(
+      async ({ external_id }) => ({
+        card: external_id === firstCard.external_id ? firstCard : secondCard,
+      }),
     );
     vi.spyOn(apiClient, 'findCatalogAlternatives').mockImplementation(
       async ({ external_id }) => ({

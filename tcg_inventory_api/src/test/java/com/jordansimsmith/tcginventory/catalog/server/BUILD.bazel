@@ -2,7 +2,10 @@ load("@contrib_rules_jvm//java:defs.bzl", "JUNIT5_DEPS", "java_test_suite")
 
 java_test_suite(
     name = "server-unit-tests",
-    srcs = ["FindCardImagesServiceTest.java"],
+    srcs = [
+        "FindCardImagesServiceTest.java",
+        "GetCardServiceTest.java",
+    ],
     runner = "junit5",
     test_suffixes = ["Test.java"],
     runtime_deps = JUNIT5_DEPS,
@@ -12,6 +15,7 @@ java_test_suite(
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/catalog/server",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
         "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/games/client:test-lib",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
         "@maven//:org_assertj_assertj_core",
         "@maven//:org_junit_jupiter_junit_jupiter_api",
     ],

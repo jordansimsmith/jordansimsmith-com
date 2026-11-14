@@ -130,7 +130,7 @@ module "java_api" {
 
   lambdas = {
     get_catalog_card = {
-      handler  = "com.jordansimsmith.tcginventory.catalog.GetCatalogCardHandler"
+      handler  = "com.jordansimsmith.tcginventory.catalog.api.GetCardHandler"
       artifact = var.artifacts["get_catalog_card"]
     }
     find_catalog_alternatives = {

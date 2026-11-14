@@ -261,6 +261,15 @@ export interface CatalogCard {
   available_finishes: Finish[];
 }
 
+export interface GetCardRequest {
+  game: GameId;
+  external_id: string;
+}
+
+export interface GetCardResponse {
+  card: CatalogCard;
+}
+
 export interface ImageUrls {
   small: string | null;
   normal: string | null;
@@ -537,7 +546,7 @@ export interface ApiClient {
   createScan(request: CreateScanRequest): Promise<CreateScanResponse>;
   findScans(params?: FindScansParams): Promise<FindScansResponse>;
   getScan(scanId: string): Promise<ScanDetail>;
-  getCatalogCard(game: GameId, externalId: string): Promise<CatalogCard>;
+  getCard(request: GetCardRequest): Promise<GetCardResponse>;
   findCardImages(
     request: FindCardImagesRequest,
   ): Promise<FindCardImagesResponse>;

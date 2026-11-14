@@ -10,9 +10,10 @@ import { ScanPage } from './pages/ScanPage';
 import { ScanDetailPage } from './pages/ScanDetailPage';
 import { getSession } from './auth/session';
 import { apiClient } from './api/client';
+import type { Game } from './api/client';
 import { GamesProvider } from './GamesProvider';
 
-const REGISTERED_GAMES = [
+const REGISTERED_GAMES: Game[] = [
   {
     id: 'mtg',
     display_name: 'Magic: The Gathering',

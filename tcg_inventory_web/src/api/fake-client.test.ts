@@ -76,10 +76,12 @@ describe('createFakeClient', () => {
 
   it('returns exact catalog cards, paged alternatives, and search results', async () => {
     const client = createFakeClient();
-    const firstCard = await client.getCatalogCard(
-      'mtg',
-      'f29ba16f-c8fb-42fe-aabf-87089cb214a7',
-    );
+    const firstCard = (
+      await client.getCard({
+        game: 'mtg',
+        external_id: 'f29ba16f-c8fb-42fe-aabf-87089cb214a7',
+      })
+    ).card;
 
     expect(firstCard.name).toBe('Lightning Bolt');
     expect(firstCard).not.toHaveProperty('external_source');

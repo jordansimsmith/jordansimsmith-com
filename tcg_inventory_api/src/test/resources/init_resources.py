@@ -149,8 +149,8 @@ lambda_environment = {
 
 lambdas = {
     "get_catalog_card": {
-        "handler": "com.jordansimsmith.tcginventory.catalog.GetCatalogCardHandler",
-        "zip_file": "get-catalog-card-handler_deploy.jar",
+        "handler": "com.jordansimsmith.tcginventory.catalog.api.GetCardHandler",
+        "zip_file": "get-card-handler_deploy.jar",
     },
     "find_catalog_alternatives": {
         "handler": "com.jordansimsmith.tcginventory.catalog.FindCatalogAlternativesHandler",

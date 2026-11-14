@@ -626,22 +626,24 @@ describe('http client catalog', () => {
   });
 
   it('gets exact catalog detail through the authenticated API', async () => {
-    const card = {
-      game: 'mtg',
-      external_id: 'opaque/id',
-      name: 'Example',
-      set_code: 'set',
-      set_name: 'Set Name',
-      collector_number: '12',
-      image_urls: { small: null, normal: null },
-      available_finishes: ['normal'],
+    const responseBody = {
+      card: {
+        game: 'mtg',
+        external_id: 'opaque/id',
+        name: 'Example',
+        set_code: 'set',
+        set_name: 'Set Name',
+        collector_number: '12',
+        image_urls: { small: null, normal: null },
+        available_finishes: ['normal'],
+      },
     };
-    const json = vi.fn().mockResolvedValue(card);
+    const json = vi.fn().mockResolvedValue(responseBody);
     fetchSpy.mockResolvedValue({ ok: true, json });
 
     await expect(
-      createHttpClient().getCatalogCard('mtg', 'opaque/id'),
-    ).resolves.toEqual(card);
+      createHttpClient().getCard({ game: 'mtg', external_id: 'opaque/id' }),
+    ).resolves.toEqual(responseBody);
 
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     expect(fetchSpy.mock.calls[0][0]).toBe(

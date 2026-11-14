@@ -24,6 +24,8 @@ import type {
   FindSkusResponse,
   FindUnitsResponse,
   GenerationStatus,
+  GetCardRequest,
+  GetCardResponse,
   GetFetchTcgAccountResponse,
   ImageUrls,
   ImportDetail,
@@ -2207,18 +2209,16 @@ export function createFakeClient(): ApiClient {
       return toScanDetail(scan);
     },
 
-    async getCatalogCard(
-      game: GameId,
-      externalId: string,
-    ): Promise<CatalogCard> {
+    async getCard(request: GetCardRequest): Promise<GetCardResponse> {
       const card = FAKE_CATALOG_CARDS.find(
         (candidate) =>
-          candidate.game === game && candidate.external_id === externalId,
+          candidate.game === request.game &&
+          candidate.external_id === request.external_id,
       );
       if (!card) {
         throw new Error('card not found');
       }
-      return copyCatalogCard(card);
+      return { card: copyCatalogCard(card) };
     },
 
     async findCardImages(

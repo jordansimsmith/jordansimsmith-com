@@ -15,9 +15,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { OrderDetailPage } from './OrderDetailPage';
 import { GamesProvider } from '../GamesProvider';
 import * as clientModule from '../api/client';
-import type { FindCardImagesResponse, OrderDetail } from '../api/client';
+import type { FindCardImagesResponse, Game, OrderDetail } from '../api/client';
 
-const REGISTERED_GAMES = [
+const REGISTERED_GAMES: Game[] = [
   {
     id: 'mtg',
     display_name: 'Magic: The Gathering',
