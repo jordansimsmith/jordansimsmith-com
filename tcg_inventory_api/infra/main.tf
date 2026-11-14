@@ -49,6 +49,75 @@ variable "images" {
 
 locals {
   application_id = "tcg_inventory_api"
+
+  queues = {
+    reports = {
+      name                        = "tcg_inventory_reports"
+      fifo                        = true
+      dlq                         = true
+      content_based_deduplication = false
+      max_receive_count           = 5
+      visibility_timeout_seconds  = 960
+    }
+    pricing = {
+      name                        = "tcg_inventory_pricing"
+      fifo                        = true
+      dlq                         = true
+      content_based_deduplication = false
+      max_receive_count           = 5
+      visibility_timeout_seconds  = 960
+    }
+    publish = {
+      name                        = "tcg_inventory_publish"
+      fifo                        = true
+      dlq                         = true
+      content_based_deduplication = false
+      max_receive_count           = 5
+      visibility_timeout_seconds  = 960
+    }
+    orders = {
+      name                        = "tcg_inventory_orders"
+      fifo                        = true
+      dlq                         = true
+      content_based_deduplication = false
+      max_receive_count           = 5
+      visibility_timeout_seconds  = 960
+    }
+    imports = {
+      name                        = "tcg_inventory_imports"
+      fifo                        = true
+      dlq                         = true
+      content_based_deduplication = false
+      max_receive_count           = 5
+      visibility_timeout_seconds  = 960
+    }
+    scans = {
+      name                        = "tcg_inventory_scans"
+      fifo                        = true
+      dlq                         = true
+      content_based_deduplication = false
+      max_receive_count           = 5
+      visibility_timeout_seconds  = 960
+    }
+    scan_jobs = {
+      name                        = "tcg_inventory_scan_jobs"
+      fifo                        = true
+      dlq                         = true
+      content_based_deduplication = false
+      max_receive_count           = 5
+      visibility_timeout_seconds  = 960
+    }
+  }
+
+  queue_lambda_arns = {
+    reports   = module.java_api.lambda_functions["reports_worker"].qualified_arn
+    pricing   = module.java_api.lambda_functions["pricing_worker"].qualified_arn
+    publish   = module.java_api.lambda_functions["publish_worker"].qualified_arn
+    orders    = module.java_api.lambda_functions["orders_worker"].qualified_arn
+    imports   = module.java_api.lambda_functions["imports_worker"].qualified_arn
+    scans     = module.java_api.lambda_functions["scans_worker"].qualified_arn
+    scan_jobs = module.scan_worker.lambda_function.qualified_arn
+  }
 }
 
 module "java_api" {
@@ -316,19 +385,30 @@ module "java_api" {
     aws.us_east_1 = aws.us_east_1
   }
 
-  # snapstart snapshot init resolves worker queues, dynamodb table, and s3
-  # bucket at startup, so they must exist before any lambda version is published
+  # snapstart snapshot init resolves the dynamodb table and s3 bucket at startup
+  # the sqs policy attachment depends on queue creation before lambda versions publish
   depends_on = [
-    aws_sqs_queue.scan_jobs,
-    aws_sqs_queue.reports,
-    aws_sqs_queue.pricing,
-    aws_sqs_queue.publish,
-    aws_sqs_queue.orders,
-    aws_sqs_queue.imports,
-    aws_sqs_queue.scans,
     aws_dynamodb_table.tcg_inventory,
     aws_s3_bucket.tcg_inventory,
   ]
+}
+
+module "sqs_queue" {
+  for_each = local.queues
+
+  source = "../../infra/modules/sqs_queue"
+
+  name                        = each.value.name
+  visibility_timeout_seconds  = each.value.visibility_timeout_seconds
+  fifo                        = each.value.fifo
+  dlq                         = each.value.dlq
+  content_based_deduplication = each.value.content_based_deduplication
+  max_receive_count           = each.value.max_receive_count
+  lambda_trigger = {
+    function_arn                       = local.queue_lambda_arns[each.key]
+    batch_size                         = 1
+    maximum_batching_window_in_seconds = 0
+  }
 }
 
 resource "aws_s3_bucket" "tcg_inventory" {
@@ -439,174 +519,6 @@ resource "aws_dynamodb_table" "tcg_inventory" {
   deletion_protection_enabled = true
 }
 
-resource "aws_sqs_queue" "reports_dlq" {
-  name                        = "tcg_inventory_reports_dlq.fifo"
-  fifo_queue                  = true
-  content_based_deduplication = false
-}
-
-resource "aws_sqs_queue" "reports" {
-  name                        = "tcg_inventory_reports.fifo"
-  fifo_queue                  = true
-  content_based_deduplication = false
-  visibility_timeout_seconds  = 960
-
-  redrive_policy = jsonencode({
-    deadLetterTargetArn = aws_sqs_queue.reports_dlq.arn
-    maxReceiveCount     = 5
-  })
-}
-
-resource "aws_lambda_event_source_mapping" "reports" {
-  event_source_arn                   = aws_sqs_queue.reports.arn
-  function_name                      = module.java_api.lambda_functions["reports_worker"].qualified_arn
-  batch_size                         = 1
-  maximum_batching_window_in_seconds = 0
-}
-
-resource "aws_sqs_queue" "pricing_dlq" {
-  name                        = "tcg_inventory_pricing_dlq.fifo"
-  fifo_queue                  = true
-  content_based_deduplication = false
-}
-
-resource "aws_sqs_queue" "pricing" {
-  name                        = "tcg_inventory_pricing.fifo"
-  fifo_queue                  = true
-  content_based_deduplication = false
-  visibility_timeout_seconds  = 960
-
-  redrive_policy = jsonencode({
-    deadLetterTargetArn = aws_sqs_queue.pricing_dlq.arn
-    maxReceiveCount     = 5
-  })
-}
-
-resource "aws_lambda_event_source_mapping" "pricing" {
-  event_source_arn                   = aws_sqs_queue.pricing.arn
-  function_name                      = module.java_api.lambda_functions["pricing_worker"].qualified_arn
-  batch_size                         = 1
-  maximum_batching_window_in_seconds = 0
-}
-
-resource "aws_sqs_queue" "publish_dlq" {
-  name                        = "tcg_inventory_publish_dlq.fifo"
-  fifo_queue                  = true
-  content_based_deduplication = false
-}
-
-resource "aws_sqs_queue" "publish" {
-  name                        = "tcg_inventory_publish.fifo"
-  fifo_queue                  = true
-  content_based_deduplication = false
-  visibility_timeout_seconds  = 960
-
-  redrive_policy = jsonencode({
-    deadLetterTargetArn = aws_sqs_queue.publish_dlq.arn
-    maxReceiveCount     = 5
-  })
-}
-
-resource "aws_lambda_event_source_mapping" "publish" {
-  event_source_arn                   = aws_sqs_queue.publish.arn
-  function_name                      = module.java_api.lambda_functions["publish_worker"].qualified_arn
-  batch_size                         = 1
-  maximum_batching_window_in_seconds = 0
-}
-
-resource "aws_sqs_queue" "orders_dlq" {
-  name                        = "tcg_inventory_orders_dlq.fifo"
-  fifo_queue                  = true
-  content_based_deduplication = false
-}
-
-resource "aws_sqs_queue" "orders" {
-  name                        = "tcg_inventory_orders.fifo"
-  fifo_queue                  = true
-  content_based_deduplication = false
-  visibility_timeout_seconds  = 960
-
-  redrive_policy = jsonencode({
-    deadLetterTargetArn = aws_sqs_queue.orders_dlq.arn
-    maxReceiveCount     = 5
-  })
-}
-
-resource "aws_lambda_event_source_mapping" "orders" {
-  event_source_arn                   = aws_sqs_queue.orders.arn
-  function_name                      = module.java_api.lambda_functions["orders_worker"].qualified_arn
-  batch_size                         = 1
-  maximum_batching_window_in_seconds = 0
-}
-
-resource "aws_sqs_queue" "imports_dlq" {
-  name                        = "tcg_inventory_imports_dlq.fifo"
-  fifo_queue                  = true
-  content_based_deduplication = false
-}
-
-resource "aws_sqs_queue" "imports" {
-  name                        = "tcg_inventory_imports.fifo"
-  fifo_queue                  = true
-  content_based_deduplication = false
-  visibility_timeout_seconds  = 960
-
-  redrive_policy = jsonencode({
-    deadLetterTargetArn = aws_sqs_queue.imports_dlq.arn
-    maxReceiveCount     = 5
-  })
-}
-
-resource "aws_lambda_event_source_mapping" "imports" {
-  event_source_arn                   = aws_sqs_queue.imports.arn
-  function_name                      = module.java_api.lambda_functions["imports_worker"].qualified_arn
-  batch_size                         = 1
-  maximum_batching_window_in_seconds = 0
-}
-
-resource "aws_sqs_queue" "scans_dlq" {
-  name                        = "tcg_inventory_scans_dlq.fifo"
-  fifo_queue                  = true
-  content_based_deduplication = false
-}
-
-resource "aws_sqs_queue" "scans" {
-  name                        = "tcg_inventory_scans.fifo"
-  fifo_queue                  = true
-  content_based_deduplication = false
-  visibility_timeout_seconds  = 960
-
-  redrive_policy = jsonencode({
-    deadLetterTargetArn = aws_sqs_queue.scans_dlq.arn
-    maxReceiveCount     = 5
-  })
-}
-
-resource "aws_lambda_event_source_mapping" "scans" {
-  event_source_arn                   = aws_sqs_queue.scans.arn
-  function_name                      = module.java_api.lambda_functions["scans_worker"].qualified_arn
-  batch_size                         = 1
-  maximum_batching_window_in_seconds = 0
-}
-
-resource "aws_sqs_queue" "scan_jobs_dlq" {
-  name                        = "tcg_inventory_scan_jobs_dlq.fifo"
-  fifo_queue                  = true
-  content_based_deduplication = false
-}
-
-resource "aws_sqs_queue" "scan_jobs" {
-  name                        = "tcg_inventory_scan_jobs.fifo"
-  fifo_queue                  = true
-  content_based_deduplication = false
-  visibility_timeout_seconds  = 960
-
-  redrive_policy = jsonencode({
-    deadLetterTargetArn = aws_sqs_queue.scan_jobs_dlq.arn
-    maxReceiveCount     = 5
-  })
-}
-
 data "aws_iam_policy_document" "scan_worker_ecr" {
   statement {
     effect = "Allow"
@@ -673,12 +585,12 @@ data "aws_iam_policy_document" "lambda_sqs" {
     effect = "Allow"
 
     resources = [
-      aws_sqs_queue.reports.arn,
-      aws_sqs_queue.pricing.arn,
-      aws_sqs_queue.publish.arn,
-      aws_sqs_queue.orders.arn,
-      aws_sqs_queue.imports.arn,
-      aws_sqs_queue.scans.arn,
+      module.sqs_queue["reports"].queue_arn,
+      module.sqs_queue["pricing"].queue_arn,
+      module.sqs_queue["publish"].queue_arn,
+      module.sqs_queue["orders"].queue_arn,
+      module.sqs_queue["imports"].queue_arn,
+      module.sqs_queue["scans"].queue_arn,
     ]
 
     actions = [
@@ -694,7 +606,7 @@ data "aws_iam_policy_document" "lambda_sqs" {
     effect = "Allow"
 
     resources = [
-      aws_sqs_queue.scan_jobs.arn,
+      module.sqs_queue["scan_jobs"].queue_arn,
     ]
 
     actions = [
@@ -789,7 +701,7 @@ data "aws_iam_policy_document" "scan_worker" {
 
   statement {
     effect    = "Allow"
-    resources = [aws_sqs_queue.scan_jobs.arn]
+    resources = [module.sqs_queue["scan_jobs"].queue_arn]
     actions = [
       "sqs:DeleteMessage",
       "sqs:GetQueueAttributes",
@@ -825,14 +737,6 @@ module "scan_worker" {
     scan_worker = aws_iam_policy.scan_worker.arn
   }
 
-  event_source_mappings = {
-    scan_jobs = {
-      event_source_arn                   = aws_sqs_queue.scan_jobs.arn
-      batch_size                         = 1
-      maximum_batching_window_in_seconds = 0
-    }
-  }
-
   depends_on = [aws_ecr_repository_policy.scan_worker]
 }
 
@@ -864,4 +768,109 @@ moved {
 moved {
   from = aws_lambda_event_source_mapping.scan_jobs
   to   = module.scan_worker.aws_lambda_event_source_mapping.lambda["scan_jobs"]
+}
+
+moved {
+  from = aws_sqs_queue.reports
+  to   = module.sqs_queue["reports"].aws_sqs_queue.queue
+}
+
+moved {
+  from = aws_sqs_queue.reports_dlq
+  to   = module.sqs_queue["reports"].aws_sqs_queue.dlq[0]
+}
+
+moved {
+  from = aws_lambda_event_source_mapping.reports
+  to   = module.sqs_queue["reports"].aws_lambda_event_source_mapping.lambda_trigger[0]
+}
+
+moved {
+  from = aws_sqs_queue.pricing
+  to   = module.sqs_queue["pricing"].aws_sqs_queue.queue
+}
+
+moved {
+  from = aws_sqs_queue.pricing_dlq
+  to   = module.sqs_queue["pricing"].aws_sqs_queue.dlq[0]
+}
+
+moved {
+  from = aws_lambda_event_source_mapping.pricing
+  to   = module.sqs_queue["pricing"].aws_lambda_event_source_mapping.lambda_trigger[0]
+}
+
+moved {
+  from = aws_sqs_queue.publish
+  to   = module.sqs_queue["publish"].aws_sqs_queue.queue
+}
+
+moved {
+  from = aws_sqs_queue.publish_dlq
+  to   = module.sqs_queue["publish"].aws_sqs_queue.dlq[0]
+}
+
+moved {
+  from = aws_lambda_event_source_mapping.publish
+  to   = module.sqs_queue["publish"].aws_lambda_event_source_mapping.lambda_trigger[0]
+}
+
+moved {
+  from = aws_sqs_queue.orders
+  to   = module.sqs_queue["orders"].aws_sqs_queue.queue
+}
+
+moved {
+  from = aws_sqs_queue.orders_dlq
+  to   = module.sqs_queue["orders"].aws_sqs_queue.dlq[0]
+}
+
+moved {
+  from = aws_lambda_event_source_mapping.orders
+  to   = module.sqs_queue["orders"].aws_lambda_event_source_mapping.lambda_trigger[0]
+}
+
+moved {
+  from = aws_sqs_queue.imports
+  to   = module.sqs_queue["imports"].aws_sqs_queue.queue
+}
+
+moved {
+  from = aws_sqs_queue.imports_dlq
+  to   = module.sqs_queue["imports"].aws_sqs_queue.dlq[0]
+}
+
+moved {
+  from = aws_lambda_event_source_mapping.imports
+  to   = module.sqs_queue["imports"].aws_lambda_event_source_mapping.lambda_trigger[0]
+}
+
+moved {
+  from = aws_sqs_queue.scans
+  to   = module.sqs_queue["scans"].aws_sqs_queue.queue
+}
+
+moved {
+  from = aws_sqs_queue.scans_dlq
+  to   = module.sqs_queue["scans"].aws_sqs_queue.dlq[0]
+}
+
+moved {
+  from = aws_lambda_event_source_mapping.scans
+  to   = module.sqs_queue["scans"].aws_lambda_event_source_mapping.lambda_trigger[0]
+}
+
+moved {
+  from = aws_sqs_queue.scan_jobs
+  to   = module.sqs_queue["scan_jobs"].aws_sqs_queue.queue
+}
+
+moved {
+  from = aws_sqs_queue.scan_jobs_dlq
+  to   = module.sqs_queue["scan_jobs"].aws_sqs_queue.dlq[0]
+}
+
+moved {
+  from = module.scan_worker.aws_lambda_event_source_mapping.lambda["scan_jobs"]
+  to   = module.sqs_queue["scan_jobs"].aws_lambda_event_source_mapping.lambda_trigger[0]
 }
