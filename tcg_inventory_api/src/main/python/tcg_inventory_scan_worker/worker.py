@@ -19,7 +19,7 @@ LOGGER = logging.getLogger(__name__)
 TABLE_ENV = "SCAN_TABLE_NAME"
 BUCKET_ENV = "SCAN_BUCKET_NAME"
 CACHE_ENV = "COLLECTORVISION_CACHE"
-SCAN_QUEUE_NAME = "tcg_inventory_scan_jobs.fifo"
+SCAN_IDENTIFICATION_QUEUE_NAME = "tcg_inventory_scan_identification.fifo"
 CATALOG_VERSION = 40
 BATCH_SIZE = 100
 SEARCH_TOP_K = 25
@@ -299,7 +299,7 @@ class S3ImageStore:
 
 
 class SqsContinuationQueue:
-    def __init__(self, client, queue_name: str = SCAN_QUEUE_NAME):
+    def __init__(self, client, queue_name: str = SCAN_IDENTIFICATION_QUEUE_NAME):
         self._client = client
         self._queue_name = queue_name
         self._queue_url: str | None = None

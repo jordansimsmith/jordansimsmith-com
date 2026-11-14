@@ -82,7 +82,7 @@ while True:
     time.sleep(1)
 
 queue_configs = {
-    "scan_jobs": {"name": "tcg_inventory_scan_jobs.fifo"},
+    "scan_identification": {"name": "tcg_inventory_scan_identification.fifo"},
     "scans": {
         "name": "tcg_inventory_scans.fifo",
         "visibility_timeout": 960,

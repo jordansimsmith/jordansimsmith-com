@@ -83,7 +83,7 @@ public class ScansModule {
     var getScanService =
         new GetScanService(readRepository, scanUploadVerifier, s3Presigner, bucket);
     QueueClient<ScanMessage> scanQueue =
-        SqsQueueClient.create(sqsClient, objectMapper, "tcg_inventory_scan_jobs.fifo");
+        SqsQueueClient.create(sqsClient, objectMapper, "tcg_inventory_scan_identification.fifo");
     var identifyScanService =
         new IdentifyScanService(readRepository, mutationRepository, scanUploadVerifier, scanQueue);
     QueueClient<ScanConfirmationMessage> confirmationQueue =

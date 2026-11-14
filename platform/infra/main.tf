@@ -32,7 +32,7 @@ locals {
   ]
 
   dead_letter_queues = [
-    "tcg_inventory_scan_jobs_dlq.fifo",
+    "tcg_inventory_scan_identification_dlq.fifo",
     "tcg_inventory_reports_dlq.fifo",
     "tcg_inventory_pricing_dlq.fifo",
     "tcg_inventory_publish_dlq.fifo",

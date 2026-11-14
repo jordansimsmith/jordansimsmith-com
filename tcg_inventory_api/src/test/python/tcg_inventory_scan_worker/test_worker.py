@@ -188,7 +188,7 @@ class FakeSqsClient:
 
     def get_queue_url(self, QueueName: str):
         self.queue_url_calls += 1
-        assert QueueName == "tcg_inventory_scan_jobs.fifo"
+        assert QueueName == "tcg_inventory_scan_identification.fifo"
         return {"QueueUrl": "https://sqs.example/scan"}
 
     def send_message(self, **kwargs):

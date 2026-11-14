@@ -99,8 +99,8 @@ locals {
       max_receive_count           = 5
       visibility_timeout_seconds  = 960
     }
-    scan_jobs = {
-      name                        = "tcg_inventory_scan_jobs"
+    scan_identification = {
+      name                        = "tcg_inventory_scan_identification"
       fifo                        = true
       dlq                         = true
       content_based_deduplication = false
@@ -110,13 +110,13 @@ locals {
   }
 
   queue_lambda_arns = {
-    reports   = module.java_api.lambda_functions["reports_worker"].qualified_arn
-    pricing   = module.java_api.lambda_functions["pricing_worker"].qualified_arn
-    publish   = module.java_api.lambda_functions["publish_worker"].qualified_arn
-    orders    = module.java_api.lambda_functions["orders_worker"].qualified_arn
-    imports   = module.java_api.lambda_functions["imports_worker"].qualified_arn
-    scans     = module.java_api.lambda_functions["scans_worker"].qualified_arn
-    scan_jobs = module.scan_worker.lambda_function.qualified_arn
+    reports             = module.java_api.lambda_functions["reports_worker"].qualified_arn
+    pricing             = module.java_api.lambda_functions["pricing_worker"].qualified_arn
+    publish             = module.java_api.lambda_functions["publish_worker"].qualified_arn
+    orders              = module.java_api.lambda_functions["orders_worker"].qualified_arn
+    imports             = module.java_api.lambda_functions["imports_worker"].qualified_arn
+    scans               = module.java_api.lambda_functions["scans_worker"].qualified_arn
+    scan_identification = module.scan_worker.lambda_function.qualified_arn
   }
 }
 
@@ -606,7 +606,7 @@ data "aws_iam_policy_document" "lambda_sqs" {
     effect = "Allow"
 
     resources = [
-      module.sqs_queue["scan_jobs"].queue_arn,
+      module.sqs_queue["scan_identification"].queue_arn,
     ]
 
     actions = [
@@ -701,7 +701,7 @@ data "aws_iam_policy_document" "scan_worker" {
 
   statement {
     effect    = "Allow"
-    resources = [module.sqs_queue["scan_jobs"].queue_arn]
+    resources = [module.sqs_queue["scan_identification"].queue_arn]
     actions = [
       "sqs:DeleteMessage",
       "sqs:GetQueueAttributes",
@@ -873,4 +873,19 @@ moved {
 moved {
   from = module.scan_worker.aws_lambda_event_source_mapping.lambda["scan_jobs"]
   to   = module.sqs_queue["scan_jobs"].aws_lambda_event_source_mapping.lambda_trigger[0]
+}
+
+moved {
+  from = module.sqs_queue["scan_jobs"].aws_sqs_queue.queue
+  to   = module.sqs_queue["scan_identification"].aws_sqs_queue.queue
+}
+
+moved {
+  from = module.sqs_queue["scan_jobs"].aws_sqs_queue.dlq[0]
+  to   = module.sqs_queue["scan_identification"].aws_sqs_queue.dlq[0]
+}
+
+moved {
+  from = module.sqs_queue["scan_jobs"].aws_lambda_event_source_mapping.lambda_trigger[0]
+  to   = module.sqs_queue["scan_identification"].aws_lambda_event_source_mapping.lambda_trigger[0]
 }
