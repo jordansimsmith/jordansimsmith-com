@@ -6,8 +6,6 @@ import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
-import com.jordansimsmith.tcginventory.TcgInventoryFactory;
-import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
 import java.util.Base64;
 import java.util.Map;
@@ -24,7 +22,7 @@ import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
 public class PricingConfigurationHandlerIntegrationTest {
   @Container private static final DynamoDbContainer dynamoDbContainer = new DynamoDbContainer();
 
-  private TcgInventoryFactory factory;
+  private TcgInventoryTestFactory factory;
   private ObjectMapper objectMapper;
   private GetPricingHandler getPricingHandler;
   private UpdatePricingHandler updatePricingHandler;
@@ -118,7 +116,7 @@ public class PricingConfigurationHandlerIntegrationTest {
         .dynamoDbClient()
         .putItem(
             PutItemRequest.builder()
-                .tableName(TcgInventoryTable.TABLE_NAME)
+                .tableName(factory.tableDefinition().tableName())
                 .item(
                     Map.of(
                         "pk", AttributeValue.fromS("USER#jordan"),
@@ -147,7 +145,7 @@ public class PricingConfigurationHandlerIntegrationTest {
 
   private GetItemRequest getPricingItemRequest(String user) {
     return GetItemRequest.builder()
-        .tableName(TcgInventoryTable.TABLE_NAME)
+        .tableName(factory.tableDefinition().tableName())
         .key(
             Map.of(
                 "pk", AttributeValue.fromS("USER#" + user),

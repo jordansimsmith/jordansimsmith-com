@@ -5,12 +5,10 @@ import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.amazonaws.services.lambda.runtime.events.SQSEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
-import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import java.io.IOException;
 import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 
 public class CatalogJobsHandler implements RequestHandler<SQSEvent, Void> {
   private static final Logger LOGGER = LoggerFactory.getLogger(CatalogJobsHandler.class);
@@ -25,10 +23,7 @@ public class CatalogJobsHandler implements RequestHandler<SQSEvent, Void> {
   @VisibleForTesting
   CatalogJobsHandler(CatalogFactory factory) {
     this.objectMapper = factory.objectMapper();
-    var catalogSnapshotTable =
-        factory
-            .dynamoDbEnhancedClient()
-            .table(TcgInventoryTable.TABLE_NAME, TableSchema.fromBean(CatalogSnapshotItem.class));
+    var catalogSnapshotTable = factory.catalogSnapshotTable();
     var catalogRepository = new CatalogRepository(catalogSnapshotTable, factory.dynamoDbClient());
     var catalogSnapshotStore =
         new CatalogSnapshotStore(

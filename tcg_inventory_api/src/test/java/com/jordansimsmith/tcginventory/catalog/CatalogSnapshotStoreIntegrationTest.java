@@ -9,7 +9,6 @@ import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.s3.S3Container;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceUnavailableException;
-import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
 import com.jordansimsmith.tcginventory.catalog.client.CatalogPrinting;
 import com.jordansimsmith.tcginventory.catalog.client.FindCatalogCardsRequest;
@@ -136,7 +135,7 @@ public class CatalogSnapshotStoreIntegrationTest {
             .getItem(
                 request ->
                     request
-                        .tableName(TcgInventoryTable.TABLE_NAME)
+                        .tableName(factory.tableDefinition().tableName())
                         .consistentRead(true)
                         .key(
                             Map.of(
@@ -640,7 +639,7 @@ public class CatalogSnapshotStoreIntegrationTest {
         .dynamoDbClient()
         .putItem(
             PutItemRequest.builder()
-                .tableName(TcgInventoryTable.TABLE_NAME)
+                .tableName(factory.tableDefinition().tableName())
                 .item(
                     Map.of(
                         CatalogSnapshotItem.PK,

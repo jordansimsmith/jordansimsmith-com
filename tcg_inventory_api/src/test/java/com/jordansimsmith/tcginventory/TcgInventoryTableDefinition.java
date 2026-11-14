@@ -38,7 +38,7 @@ public class TcgInventoryTableDefinition {
     this.sk = sk;
   }
 
-  @DynamoDbSecondaryPartitionKey(indexNames = TcgInventoryTable.GSI1_NAME)
+  @DynamoDbSecondaryPartitionKey(indexNames = "gsi1")
   @DynamoDbAttribute("gsi1pk")
   public String getGsi1pk() {
     return gsi1pk;
@@ -48,7 +48,7 @@ public class TcgInventoryTableDefinition {
     this.gsi1pk = gsi1pk;
   }
 
-  @DynamoDbSecondarySortKey(indexNames = TcgInventoryTable.GSI1_NAME)
+  @DynamoDbSecondarySortKey(indexNames = "gsi1")
   @DynamoDbAttribute("gsi1sk")
   public String getGsi1sk() {
     return gsi1sk;
@@ -58,7 +58,7 @@ public class TcgInventoryTableDefinition {
     this.gsi1sk = gsi1sk;
   }
 
-  @DynamoDbSecondaryPartitionKey(indexNames = TcgInventoryTable.GSI2_NAME)
+  @DynamoDbSecondaryPartitionKey(indexNames = "gsi2")
   @DynamoDbAttribute("gsi2pk")
   public String getGsi2pk() {
     return gsi2pk;
@@ -68,7 +68,7 @@ public class TcgInventoryTableDefinition {
     this.gsi2pk = gsi2pk;
   }
 
-  @DynamoDbSecondarySortKey(indexNames = TcgInventoryTable.GSI2_NAME)
+  @DynamoDbSecondarySortKey(indexNames = "gsi2")
   @DynamoDbAttribute("gsi2sk")
   public String getGsi2sk() {
     return gsi2sk;
@@ -78,7 +78,7 @@ public class TcgInventoryTableDefinition {
     this.gsi2sk = gsi2sk;
   }
 
-  @DynamoDbSecondaryPartitionKey(indexNames = TcgInventoryTable.GSI3_NAME)
+  @DynamoDbSecondaryPartitionKey(indexNames = "gsi3")
   @DynamoDbAttribute("gsi3pk")
   public String getGsi3pk() {
     return gsi3pk;
@@ -88,7 +88,7 @@ public class TcgInventoryTableDefinition {
     this.gsi3pk = gsi3pk;
   }
 
-  @DynamoDbSecondarySortKey(indexNames = TcgInventoryTable.GSI3_NAME)
+  @DynamoDbSecondarySortKey(indexNames = "gsi3")
   @DynamoDbAttribute("sequence_number")
   public Integer getSequenceNumber() {
     return sequenceNumber;

@@ -74,7 +74,7 @@ public class TcgInventoryModule {
   @Singleton
   @Named("tcgInventoryTableName")
   String tcgInventoryTableName() {
-    return TcgInventoryTable.TABLE_NAME;
+    return "tcg_inventory";
   }
 
   @Provides

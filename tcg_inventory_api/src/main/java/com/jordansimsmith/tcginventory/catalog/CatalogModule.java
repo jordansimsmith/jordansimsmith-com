@@ -1,7 +1,6 @@
 package com.jordansimsmith.tcginventory.catalog;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.time.Clock;
 import dagger.Module;
 import dagger.Provides;
@@ -9,6 +8,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.time.Duration;
 import java.util.Map;
+import javax.inject.Named;
 import javax.inject.Singleton;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
@@ -67,9 +67,9 @@ public class CatalogModule {
 
   @Provides
   @Singleton
-  DynamoDbTable<CatalogSnapshotItem> catalogSnapshotTable(DynamoDbEnhancedClient client) {
-    return client.table(
-        TcgInventoryTable.TABLE_NAME, TableSchema.fromBean(CatalogSnapshotItem.class));
+  DynamoDbTable<CatalogSnapshotItem> catalogSnapshotTable(
+      DynamoDbEnhancedClient client, @Named("tcgInventoryTableName") String tableName) {
+    return client.table(tableName, TableSchema.fromBean(CatalogSnapshotItem.class));
   }
 
   @Provides

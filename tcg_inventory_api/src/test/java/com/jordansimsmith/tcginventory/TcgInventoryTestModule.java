@@ -58,7 +58,7 @@ public class TcgInventoryTestModule {
   @Singleton
   @Named("tcgInventoryTableName")
   String tcgInventoryTableName() {
-    return TcgInventoryTable.TABLE_NAME;
+    return "tcg_inventory";
   }
 
   @Provides
@@ -114,16 +114,17 @@ public class TcgInventoryTestModule {
   @Provides
   @Singleton
   DynamoDbTable<TcgInventoryTableDefinition> tableDefinition(
-      DynamoDbEnhancedClient dynamoDbEnhancedClient) {
+      DynamoDbEnhancedClient dynamoDbEnhancedClient,
+      @Named("tcgInventoryTableName") String tableName) {
     var schema = TableSchema.fromBean(TcgInventoryTableDefinition.class);
-    return dynamoDbEnhancedClient.table(TcgInventoryTable.TABLE_NAME, schema);
+    return dynamoDbEnhancedClient.table(tableName, schema);
   }
 
   @Provides
   @Singleton
-  DynamoDbTable<CatalogSnapshotItem> catalogSnapshotTable(DynamoDbEnhancedClient client) {
-    return client.table(
-        TcgInventoryTable.TABLE_NAME, TableSchema.fromBean(CatalogSnapshotItem.class));
+  DynamoDbTable<CatalogSnapshotItem> catalogSnapshotTable(
+      DynamoDbEnhancedClient client, @Named("tcgInventoryTableName") String tableName) {
+    return client.table(tableName, TableSchema.fromBean(CatalogSnapshotItem.class));
   }
 
   @Provides

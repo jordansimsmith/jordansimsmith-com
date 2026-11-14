@@ -44,6 +44,7 @@ import javax.inject.Singleton;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.s3.S3Client;
 
@@ -54,7 +55,9 @@ public class ScryfallCatalogTest {
     @Component.Factory
     interface Factory {
       HandlerTestFactory create(
-          @BindsInstance Catalogs catalogs, @BindsInstance TcgCsvClient tcgCsvClient);
+          @BindsInstance Catalogs catalogs,
+          @BindsInstance TcgCsvClient tcgCsvClient,
+          @BindsInstance DynamoDbTable<CatalogSnapshotItem> catalogSnapshotTable);
     }
   }
 
@@ -100,7 +103,7 @@ public class ScryfallCatalogTest {
 
   private CatalogFactory createFactory(Catalogs catalogs) {
     return DaggerScryfallCatalogTest_HandlerTestFactory.factory()
-        .create(catalogs, new FakeTcgCsvClient());
+        .create(catalogs, new FakeTcgCsvClient(), mock(DynamoDbTable.class));
   }
 
   @Test
