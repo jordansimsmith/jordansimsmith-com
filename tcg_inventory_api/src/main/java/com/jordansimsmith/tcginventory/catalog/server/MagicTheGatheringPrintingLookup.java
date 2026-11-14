@@ -94,7 +94,7 @@ public class MagicTheGatheringPrintingLookup {
           throw new ServiceUnavailableException("catalog returned incomplete card data");
         }
         resolveId(unresolved, card.id());
-        if ("en".equals(card.language()) && card.games().contains("paper")) {
+        if (game.language().code().equals(card.language()) && card.games().contains("paper")) {
           var finishes =
               game.finishes().stream()
                   .map(Finish::id)

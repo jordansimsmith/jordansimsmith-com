@@ -7,6 +7,7 @@ public record Game(
     @JsonProperty("id") String id,
     @JsonProperty("display_name") String displayName,
     @JsonProperty("external_source") String externalSource,
+    @JsonProperty("language") Language language,
     @JsonProperty("scanning_enabled") boolean scanningEnabled,
     @JsonProperty("csv_import_enabled") boolean csvImportEnabled,
     @JsonProperty("finishes") List<Finish> finishes,

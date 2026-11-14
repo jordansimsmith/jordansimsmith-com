@@ -213,7 +213,9 @@ public class ScryfallCatalog implements CardCatalog {
     var anchorCard = normalize(game, anchor);
     var position = decodePosition(continuation, context);
     var providerQuery = queryFromPrintsUri(anchor.printsSearchUri());
-    var query = "%s lang:en game:paper is:%s".formatted(providerQuery, scryfallFinish(finish));
+    var query =
+        "%s lang:%s game:paper is:%s"
+            .formatted(providerQuery, game.language().code(), scryfallFinish(finish));
     return readPage(
         game,
         query,
@@ -264,8 +266,8 @@ public class ScryfallCatalog implements CardCatalog {
       }
     }
     var queryString =
-        "name:\"%s\" lang:en game:paper is:%s"
-            .formatted(escapeSearchPhrase(query), scryfallFinish(finish));
+        "name:\"%s\" lang:%s game:paper is:%s"
+            .formatted(escapeSearchPhrase(query), game.language().code(), scryfallFinish(finish));
     return readPage(game, queryString, context, position, null, null, finish);
   }
 
@@ -309,7 +311,8 @@ public class ScryfallCatalog implements CardCatalog {
         if (candidate == null || candidate.language() == null) {
           throw new CatalogException.Unavailable("catalog returned invalid card data");
         }
-        var card = "en".equals(candidate.language()) ? normalize(game, candidate) : null;
+        var card =
+            game.language().code().equals(candidate.language()) ? normalize(game, candidate) : null;
         if (card == null
             || (excludedId != null && excludedId.equals(card.externalId()))
             || !eligible(card, finish)
@@ -406,7 +409,7 @@ public class ScryfallCatalog implements CardCatalog {
         || card.games() == null) {
       throw new CatalogException.Unavailable("catalog returned incomplete card data");
     }
-    if (!"en".equals(card.language())) {
+    if (!game.language().code().equals(card.language())) {
       throw new CatalogException.NotFound("card not found");
     }
     var finishes =

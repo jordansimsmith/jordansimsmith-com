@@ -6,7 +6,6 @@ import com.fasterxml.jackson.dataformat.csv.CsvMapper;
 import com.fasterxml.jackson.dataformat.csv.CsvSchema;
 import com.jordansimsmith.tcginventory.games.client.Game;
 import com.jordansimsmith.tcginventory.imports.client.CreateImportRow;
-import com.jordansimsmith.tcginventory.imports.client.Language;
 import com.jordansimsmith.tcginventory.inventory.client.Condition;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -89,12 +88,17 @@ public class ManaBoxCsvParser implements ImportCsvParser {
                   "row " + rowNumber + ": unknown Condition " + conditionValue);
         };
 
-    var language =
-        switch (row.language().toLowerCase(Locale.ROOT)) {
-          case "en", "english" -> Language.ENGLISH;
-          case "ja", "jp", "japanese" -> Language.JAPANESE;
-          default -> Language.OTHER;
-        };
+    if (!row.language().equals(game.language().code())) {
+      throw new IllegalArgumentException(
+          "row "
+              + rowNumber
+              + ": expected language "
+              + game.language().code()
+              + " for "
+              + game.id()
+              + ", found "
+              + row.language());
+    }
     return new CreateImportRow(
         row.externalId(),
         row.name(),
@@ -102,8 +106,7 @@ public class ManaBoxCsvParser implements ImportCsvParser {
         row.setName(),
         row.collectorNumber(),
         finish,
-        condition,
-        language);
+        condition);
   }
 
   private static void requireNonBlank(String value, String column, int rowNumber) {

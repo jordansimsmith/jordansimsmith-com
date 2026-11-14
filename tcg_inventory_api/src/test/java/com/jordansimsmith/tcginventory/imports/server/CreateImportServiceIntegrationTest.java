@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 
@@ -24,7 +25,6 @@ import com.jordansimsmith.tcginventory.games.client.GetGameResponse;
 import com.jordansimsmith.tcginventory.imports.client.CreateImportRequest;
 import com.jordansimsmith.tcginventory.imports.client.CreateImportResponse;
 import com.jordansimsmith.tcginventory.imports.client.CreateImportRow;
-import com.jordansimsmith.tcginventory.imports.client.Language;
 import com.jordansimsmith.tcginventory.inventory.client.Condition;
 import com.jordansimsmith.time.FakeClock;
 import com.jordansimsmith.ulid.FakeUlidGenerator;
@@ -45,6 +45,7 @@ import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
+import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
 @Testcontainers
 class CreateImportServiceIntegrationTest {
@@ -116,7 +117,8 @@ class CreateImportServiceIntegrationTest {
     assertThat(item.getFilename()).isEqualTo("bulk.csv");
     assertThat(rows).extracting(ImportRowItem::getName).containsExactly("Sol Ring", "Opt", "Opt");
     assertThat(rows.get(1).getExternalId()).isEqualTo("opaque/id");
-    assertThat(rows.get(1).getLanguage()).isEqualTo("en");
+    assertThat(TableSchema.fromBean(ImportRowItem.class).itemToMap(rows.get(1), true))
+        .doesNotContainKey("language");
     assertThat(reads.getCreateImportOperation("alice", "operation-1").getImportId())
         .isEqualTo(response.importId());
     assertThat(queue.getSends()).hasSize(1);
@@ -201,6 +203,57 @@ class CreateImportServiceIntegrationTest {
         .isInstanceOf(BadRequestException.class);
     assertThat(queue.getSends()).hasSize(2);
     assertThat(reads.getCreateImportOperation("alice", "operation-2")).isNull();
+  }
+
+  @Test
+  void rejectsCsvLanguageMismatchBeforeWritingRowsOrReceipt() {
+    var rowWrites = spy(writes);
+    service =
+        new CreateImportService(
+            reads,
+            rowWrites,
+            new FakeGamesService(),
+            new ImportCsvParserFactory(new ManaBoxCsvParser()),
+            queue,
+            clock,
+            ulidGenerator);
+
+    assertThatThrownBy(
+            () ->
+                service.createImport(
+                    new RequestContext("alice"),
+                    new CreateImportRequest("language-mismatch", "mtg", csv(), "bulk.csv", null)))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("row 3: expected language en for mtg, found ja");
+
+    verify(rowWrites, never()).createRows(anyList());
+    verify(rowWrites, never()).createImport(any(), any());
+    assertThat(reads.getCreateImportOperation("alice", "language-mismatch")).isNull();
+    assertThat(queue.getSends()).isEmpty();
+  }
+
+  @Test
+  void readsLegacyImportRowWithLanguageAttribute() {
+    var legacyRow =
+        ImportRowItem.create(
+            "alice",
+            "legacy-import",
+            1,
+            "Opt",
+            "dom",
+            "Dominaria",
+            "60",
+            "normal",
+            "NM",
+            "opaque/id");
+    var attributes = TableSchema.fromBean(ImportRowItem.class).itemToMap(legacyRow, true);
+    attributes.put("language", AttributeValue.fromS("en"));
+    dynamoDbClient.putItem(request -> request.tableName(TABLE_NAME).item(attributes));
+
+    var loadedRow = reads.getRow("alice", "legacy-import", 1);
+    assertThat(loadedRow.getExternalId()).isEqualTo("opaque/id");
+    assertThat(TableSchema.fromBean(ImportRowItem.class).itemToMap(loadedRow, true))
+        .doesNotContainKey("language");
   }
 
   @Test
@@ -365,12 +418,11 @@ class CreateImportServiceIntegrationTest {
   private static String csv() {
     return "Name,Set code,Set name,Collector number,Foil,Quantity,Scryfall ID,Condition,Language"
         + "\nOpt,DOM,Dominaria,60,Normal,2,opaque/id,near_mint,en"
-        + "\nSol Ring,CMR,Commander Legends,472,Foil,1,opaque/sol-ring,excellent,ja";
+        + "\nSol Ring,CMR,Commander Legends,472,Foil,1,opaque/sol-ring,excellent,en";
   }
 
   private static CreateImportRow normalizedRow(String externalId, String name) {
-    return new CreateImportRow(
-        externalId, name, "dom", "Dominaria", "60", "normal", Condition.NM, Language.ENGLISH);
+    return new CreateImportRow(externalId, name, "dom", "Dominaria", "60", "normal", Condition.NM);
   }
 
   private static CreateAttempt attempt(

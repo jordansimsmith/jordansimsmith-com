@@ -10,7 +10,6 @@ import com.jordansimsmith.tcginventory.games.client.GetGameRequest;
 import com.jordansimsmith.tcginventory.imports.client.CreateImportRequest;
 import com.jordansimsmith.tcginventory.imports.client.CreateImportResponse;
 import com.jordansimsmith.tcginventory.imports.client.CreateImportRow;
-import com.jordansimsmith.tcginventory.imports.client.Language;
 import com.jordansimsmith.time.Clock;
 import com.jordansimsmith.ulid.UlidGenerator;
 import java.util.ArrayList;
@@ -99,8 +98,7 @@ public class CreateImportService {
               row.collectorNumber(),
               row.finish(),
               row.condition().name(),
-              row.externalId(),
-              languageCode(row.language())));
+              row.externalId()));
     }
 
     importMutationRepository.createRows(rows);
@@ -130,20 +128,12 @@ public class CreateImportService {
         throw new BadRequestException("row identity and metadata are required");
       }
     }
-    if (row.condition() == null || row.language() == null) {
-      throw new BadRequestException("row condition and language are required");
+    if (row.condition() == null) {
+      throw new BadRequestException("row condition is required");
     }
     if (game.finishes().stream().noneMatch(finish -> finish.id().equals(row.finish()))) {
       throw new BadRequestException("unsupported finish for game " + game.id());
     }
-  }
-
-  private static String languageCode(Language language) {
-    return switch (language) {
-      case ENGLISH -> "en";
-      case JAPANESE -> "ja";
-      case OTHER -> "other";
-    };
   }
 
   private static void checkOperationId(CreateImportRequest request) throws BadRequestException {

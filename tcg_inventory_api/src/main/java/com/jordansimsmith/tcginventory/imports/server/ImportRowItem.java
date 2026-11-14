@@ -22,7 +22,6 @@ public class ImportRowItem {
   public static final String FINISH = "finish";
   public static final String CONDITION = "condition";
   public static final String EXTERNAL_ID = "external_id";
-  public static final String LANGUAGE = "language";
   public static final String DECISION = "decision";
   public static final String DECISION_REASON = "decision_reason";
   public static final String FETCHTCG_CARD_ID = "fetchtcg_card_id";
@@ -44,7 +43,6 @@ public class ImportRowItem {
   private String finish;
   private String condition;
   private String externalId;
-  private String language;
   private String decision;
   private String decisionReason;
   private String fetchtcgCardId;
@@ -146,15 +144,6 @@ public class ImportRowItem {
 
   public void setExternalId(@Nullable String value) {
     externalId = value;
-  }
-
-  @DynamoDbAttribute(LANGUAGE)
-  public String getLanguage() {
-    return language;
-  }
-
-  public void setLanguage(@Nullable String value) {
-    language = value;
   }
 
   @DynamoDbAttribute(DECISION)
@@ -259,8 +248,7 @@ public class ImportRowItem {
       String collectorNumber,
       String finish,
       String condition,
-      String externalId,
-      String language) {
+      String externalId) {
     var item = new ImportRowItem();
     item.setPk(formatPk(user, importId));
     item.setSk(formatSk(position));
@@ -272,7 +260,6 @@ public class ImportRowItem {
     item.setFinish(finish);
     item.setCondition(condition);
     item.setExternalId(externalId);
-    item.setLanguage(language);
     return item;
   }
 

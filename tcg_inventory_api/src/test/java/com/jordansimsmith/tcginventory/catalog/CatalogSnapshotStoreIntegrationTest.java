@@ -15,6 +15,7 @@ import com.jordansimsmith.tcginventory.catalog.client.CatalogPrinting;
 import com.jordansimsmith.tcginventory.catalog.client.FindCatalogCardsRequest;
 import com.jordansimsmith.tcginventory.games.client.FakeGamesService;
 import com.jordansimsmith.tcginventory.games.client.Game;
+import com.jordansimsmith.tcginventory.games.client.Language;
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -261,7 +262,15 @@ public class CatalogSnapshotStoreIntegrationTest {
     var otherItem = store.createSnapshot(otherSnapshot);
     factory.fakeClock().setTime(Instant.parse("2026-10-08T20:06:09Z"));
     var otherGame =
-        new Game("other", "Other game", "tcgplayer", false, false, List.of(), List.of());
+        new Game(
+            "other",
+            "Other game",
+            "tcgplayer",
+            Language.ENGLISH,
+            false,
+            false,
+            List.of(),
+            List.of());
     var catalogs =
         new Catalogs(
             Map.of(

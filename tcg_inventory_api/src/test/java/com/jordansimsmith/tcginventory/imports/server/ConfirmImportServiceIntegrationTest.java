@@ -188,8 +188,7 @@ class ConfirmImportServiceIntegrationTest {
               Integer.toString(position),
               "normal",
               "NM",
-              "external-" + position,
-              "en");
+              "external-" + position);
       row.setDecision("keep");
       row.setSuggestedPrice(position == 11 ? "20.00" : "1.00");
       importRowTable.putItem(row);
@@ -217,8 +216,7 @@ class ConfirmImportServiceIntegrationTest {
             Integer.toString(position),
             "normal",
             "NM",
-            externalId,
-            "en");
+            externalId);
     row.setDecision("keep");
     row.setSuggestedPrice("1.00");
     row.setFetchtcgSetId(42);

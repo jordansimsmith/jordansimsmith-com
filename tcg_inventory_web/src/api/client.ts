@@ -2,6 +2,7 @@ import { createFakeClient } from './fake-client';
 import { createHttpClient } from './http-client';
 
 export type GameId = string;
+export type GameLanguage = 'en' | 'ja';
 export type Finish = string;
 
 export interface GameFinish {
@@ -21,6 +22,7 @@ export interface ScanReviewImageRegion {
 export interface Game {
   id: GameId;
   display_name: string;
+  language: GameLanguage;
   scanning_enabled: boolean;
   csv_import_enabled: boolean;
   finishes: GameFinish[];

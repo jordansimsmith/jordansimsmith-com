@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.jordansimsmith.tcginventory.games.client.FakeGamesService;
 import com.jordansimsmith.tcginventory.games.client.Game;
+import com.jordansimsmith.tcginventory.games.client.Language;
 import com.jordansimsmith.time.FakeClock;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -429,7 +430,15 @@ public class TcgPlayerCatalogTest {
     var otherCatalog = otherFixture.catalog();
     var catalogs = new Catalogs(Map.of("pokemon", pokemonCatalog, "other", otherCatalog));
     var otherGame =
-        new Game("other", "Other game", "tcgplayer", false, false, List.of(), List.of());
+        new Game(
+            "other",
+            "Other game",
+            "tcgplayer",
+            Language.ENGLISH,
+            false,
+            false,
+            List.of(),
+            List.of());
 
     // act
     var pokemonCard =

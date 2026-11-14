@@ -26,6 +26,7 @@ const REGISTERED_GAMES = [
   {
     id: 'mtg',
     display_name: 'Magic: The Gathering',
+    language: 'en',
     scanning_enabled: true,
     csv_import_enabled: true,
     scan_review_image_regions: [],
@@ -177,6 +178,7 @@ describe('ScanPage', () => {
       {
         id: 'mtg',
         display_name: 'Card Game A',
+        language: 'en',
         scanning_enabled: false,
         csv_import_enabled: false,
         scan_review_image_regions: [],
@@ -188,6 +190,7 @@ describe('ScanPage', () => {
       {
         id: 'other-game',
         display_name: 'Card Game B',
+        language: 'en',
         scanning_enabled: true,
         csv_import_enabled: false,
         scan_review_image_regions: [],

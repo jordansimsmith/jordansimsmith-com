@@ -311,7 +311,6 @@ class ImportConfirmationProcessingIntegrationTest {
     item.setFinish(finish);
     item.setCondition("NM");
     item.setExternalId(externalId);
-    item.setLanguage("en");
     item.setDecision(decision);
     item.setSuggestedPrice("1.00");
     item.setFetchtcgSetId(42);

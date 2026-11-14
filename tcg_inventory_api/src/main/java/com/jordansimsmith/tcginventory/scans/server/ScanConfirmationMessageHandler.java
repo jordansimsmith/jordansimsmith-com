@@ -9,7 +9,6 @@ import com.jordansimsmith.tcginventory.catalog.client.FindCatalogCardsRequest;
 import com.jordansimsmith.tcginventory.imports.client.CreateImportRequest;
 import com.jordansimsmith.tcginventory.imports.client.CreateImportRow;
 import com.jordansimsmith.tcginventory.imports.client.ImportService;
-import com.jordansimsmith.tcginventory.imports.client.Language;
 import com.jordansimsmith.tcginventory.inventory.client.Condition;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -74,8 +73,7 @@ public class ScanConfirmationMessageHandler {
               printing.setName(),
               printing.collectorNumber(),
               scan.getFinish(),
-              condition,
-              Language.ENGLISH));
+              condition));
     }
     var response =
         importService.createImport(

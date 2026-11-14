@@ -15,6 +15,7 @@ public class FakeGamesService implements GamesService {
           "mtg",
           "Magic: The Gathering",
           "scryfall",
+          Language.ENGLISH,
           true,
           true,
           List.of(
@@ -29,6 +30,7 @@ public class FakeGamesService implements GamesService {
           "pokemon",
           "Pokémon (EN)",
           "tcgplayer",
+          Language.ENGLISH,
           false,
           false,
           List.of(

@@ -78,6 +78,7 @@ const FAKE_GAMES: Game[] = [
   {
     id: 'mtg',
     display_name: 'Magic: The Gathering',
+    language: 'en',
     scanning_enabled: true,
     csv_import_enabled: true,
     finishes: [
@@ -107,6 +108,7 @@ const FAKE_GAMES: Game[] = [
   {
     id: 'pokemon',
     display_name: 'Pokémon (EN)',
+    language: 'en',
     scanning_enabled: false,
     csv_import_enabled: false,
     finishes: [

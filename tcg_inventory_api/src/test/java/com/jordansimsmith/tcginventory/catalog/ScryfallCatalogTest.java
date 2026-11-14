@@ -20,6 +20,8 @@ import com.jordansimsmith.tcginventory.catalog.server.FindCatalogCardsService;
 import com.jordansimsmith.tcginventory.catalog.server.MagicTheGatheringPrintingLookup;
 import com.jordansimsmith.tcginventory.catalog.server.PokemonPrintingLookup;
 import com.jordansimsmith.tcginventory.games.client.FakeGamesService;
+import com.jordansimsmith.tcginventory.games.client.Game;
+import com.jordansimsmith.tcginventory.games.client.Language;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import dagger.BindsInstance;
@@ -204,6 +206,62 @@ public class ScryfallCatalogTest {
     assertThat(collectionRequests.getFirst().get("identifiers"))
         .extracting(identifier -> identifier.get("id").asText())
         .containsExactly(CARD_ID, uppercaseId, ALT_ID, digitalOnly, noSupportedFinish, TOKEN_ID);
+  }
+
+  @Test
+  void bulkLookupUsesRegisteredGameLanguage() throws Exception {
+    var japaneseGame =
+        new Game(
+            "mtg",
+            "Magic: The Gathering",
+            "scryfall",
+            Language.JAPANESE,
+            true,
+            true,
+            FakeGamesService.MAGIC_THE_GATHERING.finishes(),
+            FakeGamesService.MAGIC_THE_GATHERING.scanReviewImageRegions());
+    var response = objectMapper.createObjectNode();
+    response
+        .putArray("data")
+        .add(cardNode(CARD_ID, "Lightning Bolt", "ja", List.of("nonfoil"), true));
+    response.putArray("not_found");
+    collectionBody = response.toString();
+
+    var lookup =
+        new MagicTheGatheringPrintingLookup(baseUri, HttpClient.newHttpClient(), objectMapper);
+
+    assertThat(lookup.findCards(japaneseGame, List.of(CARD_ID)))
+        .containsExactly(
+            new CatalogPrinting(
+                "mtg",
+                CARD_ID,
+                "Lightning Bolt",
+                "sta",
+                "Strixhaven Mystical Archive",
+                "42",
+                List.of("normal")));
+  }
+
+  @Test
+  void scryfallSearchUsesRegisteredGameLanguage() {
+    var japaneseGame =
+        new Game(
+            "mtg",
+            "Magic: The Gathering",
+            "scryfall",
+            Language.JAPANESE,
+            true,
+            true,
+            FakeGamesService.MAGIC_THE_GATHERING.finishes(),
+            FakeGamesService.MAGIC_THE_GATHERING.scanReviewImageRegions());
+    searchBody =
+        searchPage(
+            List.of(cardNode(CARD_ID, "Lightning Bolt", "ja", List.of("nonfoil"), true)), false);
+
+    var result = catalog.search(japaneseGame, "Lightning Bolt", "normal", null);
+
+    assertThat(result.cards()).extracting(CatalogCard::externalId).containsExactly(CARD_ID);
+    assertThat(decodeQuery(requests.getFirst())).contains("lang:ja game:paper is:nonfoil");
   }
 
   @Test

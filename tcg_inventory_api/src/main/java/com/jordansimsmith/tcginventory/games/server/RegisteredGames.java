@@ -2,6 +2,7 @@ package com.jordansimsmith.tcginventory.games.server;
 
 import com.jordansimsmith.tcginventory.games.client.Finish;
 import com.jordansimsmith.tcginventory.games.client.Game;
+import com.jordansimsmith.tcginventory.games.client.Language;
 import com.jordansimsmith.tcginventory.games.client.ScanReviewImageRegion;
 import java.util.List;
 import java.util.Map;
@@ -14,6 +15,7 @@ public class RegisteredGames {
           "mtg",
           "Magic: The Gathering",
           "scryfall",
+          Language.ENGLISH,
           true,
           true,
           List.of(
@@ -29,6 +31,7 @@ public class RegisteredGames {
           "pokemon",
           "Pokémon (EN)",
           "tcgplayer",
+          Language.ENGLISH,
           false,
           false,
           List.of(

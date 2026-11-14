@@ -19,6 +19,7 @@ const REGISTERED_GAMES: Game[] = [
   {
     id: 'mtg',
     display_name: 'Magic: The Gathering',
+    language: 'en',
     scanning_enabled: true,
     csv_import_enabled: true,
     scan_review_image_regions: [],
@@ -31,6 +32,7 @@ const REGISTERED_GAMES: Game[] = [
   {
     id: 'pokemon',
     display_name: 'Pokémon (EN)',
+    language: 'en',
     scanning_enabled: false,
     csv_import_enabled: false,
     scan_review_image_regions: [],
@@ -184,6 +186,7 @@ describe('InventoryPage', () => {
       {
         id: 'mtg',
         display_name: 'Registry Supplied Name',
+        language: 'en',
         scanning_enabled: false,
         csv_import_enabled: false,
         scan_review_image_regions: [],

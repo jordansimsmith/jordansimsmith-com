@@ -20,6 +20,7 @@ const REGISTERED_GAMES = [
   {
     id: 'mtg',
     display_name: 'Magic: The Gathering',
+    language: 'en',
     scanning_enabled: true,
     csv_import_enabled: true,
     scan_review_image_regions: [],
@@ -186,6 +187,7 @@ describe('ImportsPage', () => {
       {
         id: 'mtg',
         display_name: 'Legacy Cards',
+        language: 'en',
         scanning_enabled: true,
         csv_import_enabled: false,
         scan_review_image_regions: [],
@@ -194,6 +196,7 @@ describe('ImportsPage', () => {
       {
         id: 'other-game',
         display_name: 'New Cards',
+        language: 'en',
         scanning_enabled: false,
         csv_import_enabled: true,
         scan_review_image_regions: [],
@@ -246,7 +249,7 @@ describe('ImportsPage', () => {
   it('shows API CSV parsing errors without parsing the upload in the browser', async () => {
     const user = userEvent.setup();
     vi.spyOn(clientModule.apiClient, 'createImport').mockRejectedValue(
-      new Error('CSV is missing columns: Name, Quantity'),
+      new Error('row 3: expected language en for mtg, found jp'),
     );
     renderImportsPage();
     await screen.findByText('manabox-today.csv');
@@ -260,7 +263,7 @@ describe('ImportsPage', () => {
 
     expect(await screen.findByText('Upload failed')).toBeDefined();
     expect(
-      screen.getByText('CSV is missing columns: Name, Quantity'),
+      screen.getByText('row 3: expected language en for mtg, found jp'),
     ).toBeDefined();
     expect(clientModule.apiClient.createImport).toHaveBeenCalledWith(
       'mtg',

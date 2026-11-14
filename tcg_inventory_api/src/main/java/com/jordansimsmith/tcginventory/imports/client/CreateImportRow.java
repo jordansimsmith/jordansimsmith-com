@@ -10,5 +10,4 @@ public record CreateImportRow(
     @JsonProperty("set_name") String setName,
     @JsonProperty("collector_number") String collectorNumber,
     @JsonProperty("finish") String finish,
-    @JsonProperty("condition") Condition condition,
-    @JsonProperty("language") Language language) {}
+    @JsonProperty("condition") Condition condition) {}

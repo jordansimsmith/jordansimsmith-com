@@ -6,7 +6,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.jordansimsmith.service.NotFoundException;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.tcginventory.games.client.FindGamesRequest;
+import com.jordansimsmith.tcginventory.games.client.Game;
 import com.jordansimsmith.tcginventory.games.client.GetGameRequest;
+import com.jordansimsmith.tcginventory.games.client.Language;
 import org.junit.jupiter.api.Test;
 
 public class RegisteredGamesTest {
@@ -18,6 +20,7 @@ public class RegisteredGamesTest {
     assertThat(response.games())
         .containsExactly(RegisteredGames.MAGIC_THE_GATHERING, RegisteredGames.POKEMON_ENGLISH);
     assertThat(response.games().get(0).externalSource()).isEqualTo("scryfall");
+    assertThat(response.games()).extracting(Game::language).containsOnly(Language.ENGLISH);
   }
 
   @Test

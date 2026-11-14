@@ -18,9 +18,6 @@ public class MagicTheGatheringAppraisalResolver implements AppraisalResolver {
 
   @Override
   public AppraisalResult resolve(RequestContext ctx, ImportRowItem row) throws ServiceException {
-    if (!"en".equals(row.getLanguage())) {
-      return review("non-english");
-    }
     var fetchTcgFinish =
         switch (row.getFinish()) {
           case "normal" -> "normal";

@@ -335,7 +335,6 @@ class AppraisalProcessingIntegrationTest {
       row.setSetCode("set");
       row.setCondition("NM");
       row.setFinish("normal");
-      row.setLanguage("en");
       row.setExternalId("opaque-id-" + position);
       rows.add(row);
     }

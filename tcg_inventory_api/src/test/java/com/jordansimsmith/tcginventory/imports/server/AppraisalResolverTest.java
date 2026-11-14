@@ -33,7 +33,7 @@ class AppraisalResolverTest {
             "resolved/card:opaque", "Cafe", null, Map.of("scryfallId", "printing/opaque")));
     fetchTcgService.seedSearchResult("mtg", 42, "Cafe", "foil", results);
     var resolver = resolver(fetchTcgService);
-    var row = row("Café // Aftermath", "etched", "printing/opaque", "en");
+    var row = row("Café // Aftermath", "etched", "printing/opaque");
     row.setSetCode("opaque-set");
 
     var result = resolver.resolve(CTX, row);
@@ -42,18 +42,6 @@ class AppraisalResolverTest {
     assertThat(result.notes()).isNull();
     assertThat(result.cardId()).isEqualTo("resolved/card:opaque");
     assertThat(result.setId()).isEqualTo(42);
-  }
-
-  @Test
-  void resolverShouldReturnReviewForNonEnglishCardsWithoutProviderCalls() throws Exception {
-    var resolver = resolver(new FakeFetchTcgService());
-
-    var result = resolver.resolve(CTX, row("Lightning Bolt", "normal", "id", "ja"));
-
-    assertThat(result.decision()).isEqualTo(AppraisalResult.Decision.REVIEW);
-    assertThat(result.notes()).isEqualTo("non-english");
-    assertThat(result.cardId()).isNull();
-    assertThat(result.setId()).isNull();
   }
 
   @Test
@@ -69,7 +57,7 @@ class AppraisalResolverTest {
         "shared-card",
         new GetCardResponse(
             "shared-card", "Lightning Bolt", null, Map.of("scryfallId", "printing")));
-    var row = row("Lightning Bolt", "foil", "printing", "en");
+    var row = row("Lightning Bolt", "foil", "printing");
     row.setSetCode("multi-set");
 
     // act
@@ -86,7 +74,7 @@ class AppraisalResolverTest {
     // arrange
     var fetchTcgService = new FakeFetchTcgService();
     fetchTcgService.seedSets("mtg", "unmapped-set", List.of());
-    var row = row("Lightning Bolt", "normal", "printing", "en");
+    var row = row("Lightning Bolt", "normal", "printing");
     row.setSetCode("unmapped-set");
 
     // act
@@ -123,11 +111,10 @@ class AppraisalResolverTest {
     missingFetch.seedCard(
         "wrong",
         new GetCardResponse("wrong", "Lightning Bolt", null, Map.of("scryfallId", "other")));
-    var missing =
-        resolver(missingFetch).resolve(CTX, row("Lightning Bolt", "normal", "printing", "en"));
+    var missing = resolver(missingFetch).resolve(CTX, row("Lightning Bolt", "normal", "printing"));
     var ambiguousFetch = fetchWithCandidates(List.of("first", "second"));
     var ambiguous =
-        resolver(ambiguousFetch).resolve(CTX, row("Lightning Bolt", "normal", "printing", "en"));
+        resolver(ambiguousFetch).resolve(CTX, row("Lightning Bolt", "normal", "printing"));
 
     assertThat(missing.decision()).isEqualTo(AppraisalResult.Decision.REVIEW);
     assertThat(missing.notes()).isEqualTo("unresolvable");
@@ -153,14 +140,13 @@ class AppraisalResolverTest {
         fetchTcgService, new FetchTcgCardMatcher(fetchTcgService));
   }
 
-  private static ImportRowItem row(String name, String finish, String externalId, String language) {
+  private static ImportRowItem row(String name, String finish, String externalId) {
     var row = new ImportRowItem();
     row.setName(name);
     row.setSetCode("set");
     row.setFinish(finish);
     row.setCondition("NM");
     row.setExternalId(externalId);
-    row.setLanguage(language);
     return row;
   }
 }

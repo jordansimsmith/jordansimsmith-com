@@ -441,6 +441,7 @@ describe('http client imports', () => {
         {
           id: 'mtg',
           display_name: 'Magic: The Gathering',
+          language: 'en',
           scanning_enabled: true,
           csv_import_enabled: true,
           scan_review_image_regions: [

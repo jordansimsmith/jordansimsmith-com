@@ -26,6 +26,7 @@ import com.jordansimsmith.tcginventory.games.client.Finish;
 import com.jordansimsmith.tcginventory.games.client.Game;
 import com.jordansimsmith.tcginventory.games.client.GamesService;
 import com.jordansimsmith.tcginventory.games.client.GetGameResponse;
+import com.jordansimsmith.tcginventory.games.client.Language;
 import com.jordansimsmith.tcginventory.scans.client.ConfirmScanRequest;
 import com.jordansimsmith.tcginventory.scans.client.CreateScanRequest;
 import com.jordansimsmith.tcginventory.scans.client.DeleteScanRequest;
@@ -154,6 +155,7 @@ class ScanServicesIntegrationTest {
                     "mtg",
                     "Magic",
                     "scryfall",
+                    Language.ENGLISH,
                     true,
                     true,
                     List.of(new Finish("normal", "Normal")),
