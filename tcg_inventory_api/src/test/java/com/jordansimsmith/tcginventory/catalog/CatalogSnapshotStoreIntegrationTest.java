@@ -12,6 +12,7 @@ import com.jordansimsmith.service.ServiceUnavailableException;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
 import com.jordansimsmith.tcginventory.catalog.client.CatalogPrinting;
 import com.jordansimsmith.tcginventory.catalog.client.FindCardsRequest;
+import com.jordansimsmith.tcginventory.catalog.client.GetCardRequest;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -138,12 +139,11 @@ public class CatalogSnapshotStoreIntegrationTest {
                 service.findCards(
                     new RequestContext("alice"), new FindCardsRequest("pokemon", List.of("25"))))
         .isInstanceOf(ServiceUnavailableException.class)
-        .hasMessageContaining("has not been published");
+        .hasMessage("catalog is temporarily unavailable");
     assertThatThrownBy(
             () -> service.getCard(new RequestContext("alice"), new GetCardRequest("pokemon", "25")))
         .isInstanceOf(ServiceUnavailableException.class)
-        .hasMessage("catalog is temporarily unavailable")
-        .hasCauseInstanceOf(ServiceUnavailableException.class);
+        .hasMessage("catalog is temporarily unavailable");
   }
 
   @Test

@@ -23,14 +23,16 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.zip.GZIPInputStream;
+import javax.annotation.Nullable;
 import software.amazon.awssdk.core.exception.SdkException;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
@@ -39,13 +41,7 @@ import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 
 public class PokemonPrintingLookup {
   private static final Duration REGISTRY_CHECK_INTERVAL = Duration.ofMinutes(5);
-
-  public static ImageUrls getCardImages(String externalId) {
-    var encodedExternalId = URLEncoder.encode(externalId, UTF_8).replace("+", "%20");
-    return new ImageUrls(
-        "https://tcgplayer-cdn.tcgplayer.com/product/" + encodedExternalId + "_200w.jpg",
-        "https://tcgplayer-cdn.tcgplayer.com/product/" + encodedExternalId + "_in_1000x1000.jpg");
-  }
+  private static final String UNAVAILABLE = "catalog is temporarily unavailable";
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   private record Snapshot(
@@ -73,7 +69,7 @@ public class PokemonPrintingLookup {
   private final String bucket;
   private final ObjectMapper objectMapper;
   private final Clock clock;
-  private Snapshot snapshot;
+  private Map<String, CatalogPrinting> cachedPrintings;
   private String snapshotId;
   private Instant lastCheckedAt;
 
@@ -92,168 +88,85 @@ public class PokemonPrintingLookup {
     this.clock = clock;
   }
 
-  public Card getCard(Game game, String externalId) throws ServiceException {
-    try {
-      return doGetCard(game, externalId);
-    } catch (IOException | SdkException e) {
-      throw new ServiceUnavailableException("catalog is temporarily unavailable", e);
-    } catch (ServiceUnavailableException e) {
-      throw new ServiceUnavailableException("catalog is temporarily unavailable", e);
-    }
+  public static ImageUrls getCardImages(String externalId) {
+    var encodedExternalId = URLEncoder.encode(externalId, UTF_8).replace("+", "%20");
+    return new ImageUrls(
+        "https://tcgplayer-cdn.tcgplayer.com/product/" + encodedExternalId + "_200w.jpg",
+        "https://tcgplayer-cdn.tcgplayer.com/product/" + encodedExternalId + "_in_1000x1000.jpg");
   }
 
-  private Card doGetCard(Game game, String externalId)
-      throws IOException, NotFoundException, ServiceUnavailableException {
-    var currentSnapshot = loadSnapshot(game.id());
-    var groupsById = new HashMap<Integer, Group>();
-    for (var group : currentSnapshot.groups()) {
-      if (group == null || groupsById.putIfAbsent(group.id(), group) != null) {
-        throw new ServiceUnavailableException("catalog returned inconsistent group data");
-      }
-    }
-
-    Product product = null;
-    for (var candidate : currentSnapshot.products()) {
-      if (candidate == null) {
-        throw new ServiceUnavailableException("catalog returned invalid product data");
-      }
-      if (Integer.toString(candidate.id()).equals(externalId)) {
-        if (product != null) {
-          throw new ServiceUnavailableException("catalog returned duplicate product data");
-        }
-        product = candidate;
-      }
-    }
-    if (product == null) {
-      throw new NotFoundException("card not found");
-    }
-    var group = groupsById.get(product.groupId());
-    if (group == null
-        || group.setCode() == null
-        || group.setName() == null
-        || product.name() == null
-        || product.collectorNumber() == null
-        || product.finishes() == null) {
-      throw new ServiceUnavailableException("catalog returned invalid product data");
-    }
-    var finishes =
-        game.finishes().stream().map(Finish::id).filter(product.finishes()::contains).toList();
-    return new Card(
-        game.id(),
-        externalId,
-        product.name(),
-        group.setCode(),
-        group.setName(),
-        product.collectorNumber(),
-        getCardImages(externalId),
-        finishes);
+  public Card getCard(Game game, String externalId) throws ServiceException {
+    return toCard(getPrinting(loadPrintings(game), externalId));
   }
 
   public List<CatalogPrinting> findCards(Game game, Set<String> externalIds)
       throws ServiceUnavailableException {
-    try {
-      return doFindCards(game, externalIds);
-    } catch (IOException | SdkException e) {
-      throw new ServiceUnavailableException("Pokémon catalog is temporarily unavailable", e);
+    var printings = loadPrintings(game);
+    var cards = new ArrayList<CatalogPrinting>();
+    for (var externalId : externalIds) {
+      var printing = printings.get(externalId);
+      if (printing != null && !printing.availableFinishes().isEmpty()) {
+        cards.add(printing);
+      }
     }
+    return List.copyOf(cards);
   }
 
   public SearchCardsResponse searchCards(
-      Game game, String query, String finish, int limit, String continuation)
+      Game game, String query, String finish, int limit, @Nullable String continuation)
       throws ServiceException {
-    try {
-      return doSearchCards(game, query, finish, limit, continuation);
-    } catch (IOException | SdkException e) {
-      throw new ServiceUnavailableException("catalog is temporarily unavailable", e);
-    } catch (ServiceUnavailableException e) {
-      throw new ServiceUnavailableException("catalog is temporarily unavailable", e);
-    }
+    var printings = loadPrintings(game);
+    var normalizedQuery = query.toLowerCase(Locale.ROOT);
+    var matches =
+        printings.values().stream()
+            .filter(printing -> printing.availableFinishes().contains(finish))
+            .filter(
+                printing ->
+                    printing.name().trim().toLowerCase(Locale.ROOT).contains(normalizedQuery))
+            .toList();
+    return page(matches, limit, continuation);
   }
 
   public FindCardAlternativesResponse findCardAlternatives(
-      Game game, String externalId, String finish, int limit, String continuation)
+      Game game, String externalId, String finish, int limit, @Nullable String continuation)
       throws ServiceException {
-    try {
-      var snapshot = loadSnapshot(game.id());
-      Product anchor = null;
-      for (var product : snapshot.products()) {
-        if (product == null) {
-          throw new ServiceUnavailableException("catalog returned invalid product data");
-        }
-        if (Integer.toString(product.id()).equals(externalId)) {
-          if (anchor != null) {
-            throw new ServiceUnavailableException("catalog returned duplicate product data");
-          }
-          anchor = product;
-        }
-      }
-      if (anchor == null) {
-        throw new NotFoundException("card not found");
-      }
-      var anchorProduct = anchor;
-      var products = new ArrayList<Product>();
-      for (var product : snapshot.products()) {
-        if (product == null || product.name() == null || product.finishes() == null) {
-          throw new ServiceUnavailableException("catalog returned invalid product data");
-        }
-        if (product.name().equals(anchorProduct.name()) && product.finishes().contains(finish)) {
-          products.add(product);
-        }
-      }
-      products.sort(Comparator.comparingInt(Product::id));
-      var cards = new ArrayList<Card>();
-      if (anchorProduct.finishes().contains(finish)) {
-        cards.add(toCard(game, snapshot, anchorProduct, Integer.toString(anchorProduct.id())));
-      }
-      for (var product : products) {
-        if (product.id() == anchorProduct.id()) {
-          continue;
-        }
-        cards.add(toCard(game, snapshot, product, Integer.toString(product.id())));
-      }
-      var offset = decodeContinuation(continuation);
-      if (offset > 0 && offset >= cards.size()) {
-        throw new BadRequestException("continuation position is invalid");
-      }
-      var end = Math.min(offset + limit, cards.size());
-      var next = end < cards.size() ? encodeContinuation(end) : null;
-      return new FindCardAlternativesResponse(List.copyOf(cards.subList(offset, end)), next);
-    } catch (IOException | SdkException e) {
-      throw new ServiceUnavailableException("catalog is temporarily unavailable", e);
-    } catch (ServiceUnavailableException e) {
-      throw new ServiceUnavailableException("catalog is temporarily unavailable", e);
+    var printings = loadPrintings(game);
+    var anchor = getPrinting(printings, externalId);
+    var matches = new ArrayList<CatalogPrinting>();
+    if (anchor.availableFinishes().contains(finish)) {
+      matches.add(anchor);
     }
+    for (var printing : printings.values()) {
+      if (!externalId.equals(printing.externalId())
+          && anchor.name().equals(printing.name())
+          && printing.availableFinishes().contains(finish)) {
+        matches.add(printing);
+      }
+    }
+
+    var page = page(matches, limit, continuation);
+    return new FindCardAlternativesResponse(page.cards(), page.nextContinuation());
   }
 
-  private SearchCardsResponse doSearchCards(
-      Game game, String query, String finish, int limit, String continuation)
-      throws IOException, ServiceException {
-    var currentSnapshot = loadSnapshot(game.id());
-    var normalizedQuery = query.toLowerCase(Locale.ROOT);
-    var matchingProducts = new ArrayList<Product>();
-    for (var product : currentSnapshot.products()) {
-      if (product == null || product.name() == null || product.finishes() == null) {
-        throw new ServiceUnavailableException("catalog returned invalid product data");
-      }
-      if (product.name().trim().toLowerCase(Locale.ROOT).contains(normalizedQuery)
-          && product.finishes().contains(finish)) {
-        matchingProducts.add(product);
-      }
+  private CatalogPrinting getPrinting(Map<String, CatalogPrinting> printings, String externalId)
+      throws NotFoundException {
+    var printing = printings.get(externalId);
+    if (printing == null) {
+      throw new NotFoundException("card not found");
     }
-    matchingProducts.sort(Comparator.comparingInt(Product::id));
-    var cards = new ArrayList<Card>();
-    for (var product : matchingProducts) {
-      cards.add(toCard(game, currentSnapshot, product, Integer.toString(product.id())));
-    }
+    return printing;
+  }
 
+  private SearchCardsResponse page(
+      List<CatalogPrinting> matches, int limit, @Nullable String continuation)
+      throws BadRequestException {
     var offset = decodeContinuation(continuation);
-    if (offset > 0 && offset >= cards.size()) {
+    if (offset > 0 && offset >= matches.size()) {
       throw new BadRequestException("continuation position is invalid");
     }
-    var end = Math.min(offset + limit, cards.size());
-    var page = cards.subList(offset, end);
-    var next = end < cards.size() ? encodeContinuation(end) : null;
-    return new SearchCardsResponse(List.copyOf(page), next);
+    var end = Math.min(offset + limit, matches.size());
+    var cards = matches.subList(offset, end).stream().map(this::toCard).toList();
+    return new SearchCardsResponse(cards, end < matches.size() ? encodeContinuation(end) : null);
   }
 
   private String encodeContinuation(int offset) {
@@ -262,14 +175,14 @@ public class PokemonPrintingLookup {
         .encodeToString(Integer.toString(offset).getBytes(UTF_8));
   }
 
-  private int decodeContinuation(String continuation) throws ServiceException {
+  private int decodeContinuation(@Nullable String continuation) throws BadRequestException {
     if (continuation == null) {
       return 0;
     }
     try {
       var offset = Integer.parseInt(new String(Base64.getUrlDecoder().decode(continuation), UTF_8));
       if (offset <= 0) {
-        throw new IllegalArgumentException("continuation position is invalid");
+        throw new BadRequestException("continuation is invalid");
       }
       return offset;
     } catch (IllegalArgumentException e) {
@@ -277,131 +190,120 @@ public class PokemonPrintingLookup {
     }
   }
 
-  private Card toCard(Game game, Snapshot snapshot, Product product, String externalId)
-      throws ServiceUnavailableException {
-    var group =
-        snapshot.groups().stream()
-            .filter(candidate -> candidate.id() == product.groupId())
-            .findFirst()
-            .orElseThrow(
-                () -> new ServiceUnavailableException("catalog returned invalid product data"));
-    if (group.setCode() == null
-        || group.setName() == null
-        || product.name() == null
-        || product.collectorNumber() == null
-        || product.finishes() == null) {
-      throw new ServiceUnavailableException("catalog returned invalid product data");
-    }
-    var finishes =
-        game.finishes().stream().map(Finish::id).filter(product.finishes()::contains).toList();
+  private Card toCard(CatalogPrinting printing) {
     return new Card(
-        game.id(),
-        externalId,
-        product.name(),
-        group.setCode(),
-        group.setName(),
-        product.collectorNumber(),
-        getCardImages(externalId),
-        finishes);
+        printing.game(),
+        printing.externalId(),
+        printing.name(),
+        printing.setCode(),
+        printing.setName(),
+        printing.collectorNumber(),
+        getCardImages(printing.externalId()),
+        printing.availableFinishes());
   }
 
-  private List<CatalogPrinting> doFindCards(Game game, Set<String> externalIds)
-      throws IOException, ServiceUnavailableException {
-    var currentSnapshot = loadSnapshot(game.id());
-    var groupsById = new HashMap<Integer, Group>();
-    for (var group : currentSnapshot.groups()) {
-      if (group == null || groupsById.putIfAbsent(group.id(), group) != null) {
-        throw new ServiceUnavailableException("catalog returned inconsistent group data");
+  private synchronized Map<String, CatalogPrinting> loadPrintings(Game game)
+      throws ServiceUnavailableException {
+    if (cachedPrintings != null
+        && clock.now().isBefore(lastCheckedAt.plus(REGISTRY_CHECK_INTERVAL))) {
+      return cachedPrintings;
+    }
+
+    try {
+      var latest =
+          dynamoDb.query(
+              request ->
+                  request
+                      .tableName(tableName)
+                      .keyConditionExpression("pk = :pk AND begins_with(sk, :prefix)")
+                      .expressionAttributeValues(
+                          Map.of(
+                              ":pk", AttributeValue.fromS("CATALOG#" + game.id()),
+                              ":prefix", AttributeValue.fromS("SNAPSHOT#")))
+                      .scanIndexForward(false)
+                      .limit(1)
+                      .consistentRead(true));
+      if (latest.items().isEmpty()) {
+        throw new ServiceUnavailableException(UNAVAILABLE);
+      }
+
+      var entry = latest.items().getFirst();
+      var latestId = requiredAttribute(entry, "snapshot_id");
+      if (!latestId.equals(snapshotId)) {
+        var key = requiredAttribute(entry, "s3_key");
+        var request = GetObjectRequest.builder().bucket(bucket).key(key).build();
+        Snapshot snapshot;
+        try (var object = s3.getObject(request);
+            var gzip = new GZIPInputStream(object)) {
+          snapshot = objectMapper.readValue(gzip, Snapshot.class);
+        }
+        cachedPrintings = toPrintingIndex(game, snapshot);
+        snapshotId = latestId;
+      }
+      lastCheckedAt = clock.now();
+      return cachedPrintings;
+    } catch (IOException | SdkException e) {
+      throw new ServiceUnavailableException(UNAVAILABLE, e);
+    }
+  }
+
+  private Map<String, CatalogPrinting> toPrintingIndex(Game game, Snapshot snapshot)
+      throws ServiceUnavailableException {
+    if (snapshot == null
+        || !game.id().equals(snapshot.game())
+        || snapshot.groups() == null
+        || snapshot.products() == null) {
+      throw new ServiceUnavailableException(UNAVAILABLE);
+    }
+
+    var groups = new HashMap<Integer, Group>();
+    for (var group : snapshot.groups()) {
+      if (group == null
+          || group.setCode() == null
+          || group.setName() == null
+          || groups.putIfAbsent(group.id(), group) != null) {
+        throw new ServiceUnavailableException(UNAVAILABLE);
       }
     }
 
-    var matchedIds = new HashSet<String>();
-    var cards = new ArrayList<CatalogPrinting>();
-    for (var product : currentSnapshot.products()) {
-      if (product == null) {
-        throw new ServiceUnavailableException("catalog returned invalid product data");
-      }
-      var id = Integer.toString(product.id());
-      if (!externalIds.contains(id)) {
-        continue;
-      }
-      var group = groupsById.get(product.groupId());
-      if (!matchedIds.add(id)
-          || group == null
-          || group.setCode() == null
-          || group.setName() == null
+    var sortedProducts = new ArrayList<>(snapshot.products());
+    if (sortedProducts.contains(null)) {
+      throw new ServiceUnavailableException(UNAVAILABLE);
+    }
+    sortedProducts.sort(Comparator.comparingInt(Product::id));
+    var gameFinishes = game.finishes().stream().map(Finish::id).toList();
+    var printings = new LinkedHashMap<String, CatalogPrinting>();
+    for (var product : sortedProducts) {
+      var group = groups.get(product.groupId());
+      if (group == null
           || product.name() == null
           || product.collectorNumber() == null
           || product.finishes() == null) {
-        throw new ServiceUnavailableException("catalog returned inconsistent product data");
+        throw new ServiceUnavailableException(UNAVAILABLE);
       }
-      var finishes =
-          game.finishes().stream().map(Finish::id).filter(product.finishes()::contains).toList();
-      if (!finishes.isEmpty()) {
-        cards.add(
-            new CatalogPrinting(
-                game.id(),
-                id,
-                product.name(),
-                group.setCode(),
-                group.setName(),
-                product.collectorNumber(),
-                finishes));
-      }
-    }
-    return List.copyOf(cards);
-  }
-
-  private synchronized Snapshot loadSnapshot(String game)
-      throws IOException, ServiceUnavailableException {
-    if (snapshot != null && clock.now().isBefore(lastCheckedAt.plus(REGISTRY_CHECK_INTERVAL))) {
-      return snapshot;
-    }
-
-    var latest =
-        dynamoDb.query(
-            request ->
-                request
-                    .tableName(tableName)
-                    .keyConditionExpression("pk = :pk AND begins_with(sk, :prefix)")
-                    .expressionAttributeValues(
-                        Map.of(
-                            ":pk", AttributeValue.fromS("CATALOG#" + game),
-                            ":prefix", AttributeValue.fromS("SNAPSHOT#")))
-                    .scanIndexForward(false)
-                    .limit(1)
-                    .consistentRead(true));
-    if (latest.items().isEmpty()) {
-      throw new ServiceUnavailableException("catalog has not been published for game: " + game);
-    }
-
-    var entry = latest.items().getFirst();
-    var latestId = requiredAttribute(entry, "snapshot_id");
-    if (!latestId.equals(snapshotId)) {
-      var key = requiredAttribute(entry, "s3_key");
-      var request = GetObjectRequest.builder().bucket(bucket).key(key).build();
-      try (var object = s3.getObject(request);
-          var gzip = new GZIPInputStream(object)) {
-        var loaded = objectMapper.readValue(gzip, Snapshot.class);
-        if (loaded == null
-            || !game.equals(loaded.game())
-            || loaded.groups() == null
-            || loaded.products() == null) {
-          throw new ServiceUnavailableException("catalog returned invalid snapshot data");
-        }
-        snapshot = loaded;
-        snapshotId = latestId;
+      var externalId = Integer.toString(product.id());
+      var finishes = gameFinishes.stream().filter(product.finishes()::contains).toList();
+      var printing =
+          new CatalogPrinting(
+              game.id(),
+              externalId,
+              product.name(),
+              group.setCode(),
+              group.setName(),
+              product.collectorNumber(),
+              finishes);
+      if (printings.putIfAbsent(externalId, printing) != null) {
+        throw new ServiceUnavailableException(UNAVAILABLE);
       }
     }
-    lastCheckedAt = clock.now();
-    return snapshot;
+    return Collections.unmodifiableMap(printings);
   }
 
   private String requiredAttribute(Map<String, AttributeValue> entry, String name)
       throws ServiceUnavailableException {
     var value = entry.get(name);
     if (value == null || value.s() == null || value.s().isBlank()) {
-      throw new ServiceUnavailableException("catalog registry entry is missing " + name);
+      throw new ServiceUnavailableException(UNAVAILABLE);
     }
     return value.s();
   }

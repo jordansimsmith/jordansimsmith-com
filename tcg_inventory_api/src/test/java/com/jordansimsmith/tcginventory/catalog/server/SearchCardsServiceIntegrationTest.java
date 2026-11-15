@@ -12,6 +12,7 @@ import com.jordansimsmith.service.NotFoundException;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceUnavailableException;
 import com.jordansimsmith.tcginventory.catalog.client.FindCardAlternativesRequest;
+import com.jordansimsmith.tcginventory.catalog.client.FindCardsRequest;
 import com.jordansimsmith.tcginventory.catalog.client.GetCardRequest;
 import com.jordansimsmith.tcginventory.catalog.client.SearchCardsRequest;
 import com.jordansimsmith.tcginventory.games.client.FakeGamesService;
@@ -58,6 +59,7 @@ public class SearchCardsServiceIntegrationTest {
   private SearchCardsService searchCardsService;
   private GetCardService getCardService;
   private FindCardAlternativesService findCardAlternativesService;
+  private FindCardsService findCardsService;
 
   @BeforeAll
   static void setUpBeforeClass() {
@@ -116,6 +118,7 @@ public class SearchCardsServiceIntegrationTest {
     searchCardsService = new SearchCardsService(games, null, pokemon);
     getCardService = new GetCardService(games, null, pokemon);
     findCardAlternativesService = new FindCardAlternativesService(games, null, pokemon);
+    findCardsService = new FindCardsService(games, null, pokemon);
   }
 
   @Test
@@ -142,6 +145,7 @@ public class SearchCardsServiceIntegrationTest {
 
     // assert
     assertThat(detail.card().name()).isEqualTo("Pikachu 1");
+    assertThat(first.cards().getFirst()).isEqualTo(detail.card());
     assertThat(first.cards())
         .extracting(card -> card.externalId())
         .containsExactlyElementsOf(
@@ -177,16 +181,42 @@ public class SearchCardsServiceIntegrationTest {
                     new RequestContext("alice"),
                     new SearchCardsRequest("pokemon", "Pikachu", "normal", null, null)))
         .isInstanceOf(ServiceUnavailableException.class)
-        .hasMessage("catalog is temporarily unavailable")
-        .hasCauseInstanceOf(ServiceUnavailableException.class);
+        .hasMessage("catalog is temporarily unavailable");
     assertThatThrownBy(
             () ->
                 findCardAlternativesService.findCardAlternatives(
                     new RequestContext("alice"),
                     new FindCardAlternativesRequest("pokemon", "25", "normal", null, null)))
         .isInstanceOf(ServiceUnavailableException.class)
-        .hasMessage("catalog is temporarily unavailable")
-        .hasCauseInstanceOf(ServiceUnavailableException.class);
+        .hasMessage("catalog is temporarily unavailable");
+  }
+
+  @Test
+  void findCardsShouldRejectSnapshotsWithDuplicateProductsOrMissingGroups() throws Exception {
+    // arrange
+    var context = new RequestContext("alice");
+    var request = new FindCardsRequest("pokemon", List.of("25"));
+    var group = Map.of("group_id", 1, "set_code", "BASE", "set_name", "Base Set");
+    var product =
+        Map.of(
+            "product_id",
+            25,
+            "name",
+            "Pikachu",
+            "group_id",
+            1,
+            "collector_number",
+            "25",
+            "available_finishes",
+            List.of("normal"));
+
+    // act / assert
+    publishSnapshot(SNAPSHOT_ID, List.of(group), List.of(product, product));
+    assertThatThrownBy(() -> findCardsService.findCards(context, request))
+        .isInstanceOf(ServiceUnavailableException.class);
+    publishSnapshot("2026-10-07T20:07:09Z", List.of(), List.of(product));
+    assertThatThrownBy(() -> findCardsService.findCards(context, request))
+        .isInstanceOf(ServiceUnavailableException.class);
   }
 
   @Test
@@ -325,7 +355,6 @@ public class SearchCardsServiceIntegrationTest {
 
   private static void publishSnapshot(String snapshotId, String name, int productCount)
       throws Exception {
-    var updatedAt = Instant.parse(snapshotId);
     var products =
         IntStream.rangeClosed(1, productCount)
             .mapToObj(
@@ -342,6 +371,15 @@ public class SearchCardsServiceIntegrationTest {
                         "available_finishes",
                         List.of("normal", "holofoil")))
             .toList();
+    publishSnapshot(
+        snapshotId,
+        List.of(Map.of("group_id", 1, "set_code", "BASE", "set_name", "Base Set")),
+        products);
+  }
+
+  private static void publishSnapshot(String snapshotId, List<?> groups, List<?> products)
+      throws Exception {
+    var updatedAt = Instant.parse(snapshotId);
     var snapshot =
         Map.ofEntries(
             Map.entry("schema_version", 1),
@@ -357,9 +395,7 @@ public class SearchCardsServiceIntegrationTest {
                     .format(updatedAt)),
             Map.entry("source_updated_at", updatedAt.getEpochSecond()),
             Map.entry("created_at", updatedAt.getEpochSecond()),
-            Map.entry(
-                "groups",
-                List.of(Map.of("group_id", 1, "set_code", "BASE", "set_name", "Base Set"))),
+            Map.entry("groups", groups),
             Map.entry("products", products));
     var json = new ObjectMapper().writeValueAsBytes(snapshot);
     var compressed = new ByteArrayOutputStream();
