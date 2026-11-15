@@ -192,26 +192,6 @@ java_binary(
 )
 
 java_binary(
-    name = "find-catalog-alternatives-handler",
-    srcs = ["src/main/java/com/jordansimsmith/tcginventory/catalog/FindCatalogAlternativesHandler.java"],
-    create_executable = False,
-    resources = ["src/main/resources/logback.xml"],
-    deps = [
-        ":catalog-lib",
-        ":lib",
-        "//lib/http:lib",
-        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
-        "@maven//:ch_qos_logback_logback_classic",
-        "@maven//:ch_qos_logback_logback_core",
-        "@maven//:com_amazonaws_aws_lambda_java_core",
-        "@maven//:com_amazonaws_aws_lambda_java_events",
-        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
-        "@maven//:com_google_guava_guava",
-        "@maven//:org_slf4j_slf4j_api",
-    ],
-)
-
-java_binary(
     name = "fetchtcg-stub-server",
     testonly = True,
     srcs = ["src/test/java/com/jordansimsmith/tcginventory/fetchtcg/FetchTcgStubServer.java"],
@@ -322,7 +302,6 @@ java_test_suite(
     deps = [
         ":catalog-jobs-handler",
         ":catalog-lib",
-        ":find-catalog-alternatives-handler",
         ":lib",
         ":test-lib",
         "//lib/http:lib",
@@ -391,7 +370,6 @@ java_test_suite(
     deps = [
         ":catalog-jobs-handler",
         ":catalog-lib",
-        ":find-catalog-alternatives-handler",
         ":lib",
         ":test-lib",
         "//lib/dynamodb:test-lib",
@@ -450,7 +428,7 @@ localstack_image(
     name = "local",
     handler_jars = [
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/catalog/api:get-card-handler_deploy.jar",
-        ":find-catalog-alternatives-handler_deploy.jar",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/catalog/api:find-card-alternatives-handler_deploy.jar",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/catalog/api:search-cards-handler_deploy.jar",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/catalog/api:find-card-images-handler_deploy.jar",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/imports/api:confirm-import-handler_deploy.jar",

@@ -1,9 +1,9 @@
-package com.jordansimsmith.tcginventory.catalog;
+package com.jordansimsmith.tcginventory.catalog.client;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 import javax.annotation.Nullable;
 
-public record CatalogPage(
-    @JsonProperty("cards") List<CatalogCard> cards,
+public record FindCardAlternativesResponse(
+    @JsonProperty("cards") List<Card> cards,
     @JsonProperty("next_continuation") @Nullable String nextContinuation) {}

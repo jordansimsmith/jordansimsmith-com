@@ -6,8 +6,6 @@ import com.jordansimsmith.queue.FakeQueueClient;
 import com.jordansimsmith.queue.QueueClient;
 import com.jordansimsmith.tcginventory.catalog.CatalogSnapshotItem;
 import com.jordansimsmith.tcginventory.catalog.CatalogSnapshotStore;
-import com.jordansimsmith.tcginventory.catalog.Catalogs;
-import com.jordansimsmith.tcginventory.catalog.FakeCardCatalogs;
 import com.jordansimsmith.tcginventory.catalog.FakeTcgCsvClient;
 import com.jordansimsmith.tcginventory.catalog.TcgCsvClient;
 import com.jordansimsmith.tcginventory.catalog.server.CatalogModule;
@@ -227,18 +225,6 @@ public class TcgInventoryTestModule {
   @Singleton
   FakeGamesService fakeGamesService() {
     return new FakeGamesService();
-  }
-
-  @Provides
-  @Singleton
-  FakeCardCatalogs fakeCardCatalogs() {
-    return new FakeCardCatalogs();
-  }
-
-  @Provides
-  @Singleton
-  Catalogs catalogs(FakeCardCatalogs fakeCardCatalogs) {
-    return fakeCardCatalogs;
   }
 
   @Provides

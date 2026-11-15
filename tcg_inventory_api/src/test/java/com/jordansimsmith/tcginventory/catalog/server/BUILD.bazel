@@ -3,7 +3,9 @@ load("@contrib_rules_jvm//java:defs.bzl", "JUNIT5_DEPS", "java_test_suite")
 java_test_suite(
     name = "server-unit-tests",
     srcs = [
+        "FindCardAlternativesServiceTest.java",
         "FindCardImagesServiceTest.java",
+        "FindCatalogCardsServiceTest.java",
         "GetCardServiceTest.java",
         "SearchCardsServiceTest.java",
     ],

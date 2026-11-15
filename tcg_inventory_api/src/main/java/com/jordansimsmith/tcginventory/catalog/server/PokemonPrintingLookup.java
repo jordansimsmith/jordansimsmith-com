@@ -11,6 +11,7 @@ import com.jordansimsmith.service.ServiceException;
 import com.jordansimsmith.service.ServiceUnavailableException;
 import com.jordansimsmith.tcginventory.catalog.client.Card;
 import com.jordansimsmith.tcginventory.catalog.client.CatalogPrinting;
+import com.jordansimsmith.tcginventory.catalog.client.FindCardAlternativesResponse;
 import com.jordansimsmith.tcginventory.catalog.client.SearchCardsResponse;
 import com.jordansimsmith.tcginventory.games.client.Finish;
 import com.jordansimsmith.tcginventory.games.client.Game;
@@ -153,6 +154,61 @@ public class PokemonPrintingLookup {
       throws ServiceException {
     try {
       return doSearchCards(game, query, finish, limit, continuation);
+    } catch (IOException | SdkException e) {
+      throw new ServiceUnavailableException("catalog is temporarily unavailable", e);
+    } catch (ServiceUnavailableException e) {
+      throw new ServiceUnavailableException("catalog is temporarily unavailable", e);
+    }
+  }
+
+  public FindCardAlternativesResponse findCardAlternatives(
+      Game game, String externalId, String finish, int limit, String continuation)
+      throws ServiceException {
+    try {
+      var snapshot = loadSnapshot(game.id());
+      Product anchor = null;
+      for (var product : snapshot.products()) {
+        if (product == null) {
+          throw new ServiceUnavailableException("catalog returned invalid product data");
+        }
+        if (Integer.toString(product.id()).equals(externalId)) {
+          if (anchor != null) {
+            throw new ServiceUnavailableException("catalog returned duplicate product data");
+          }
+          anchor = product;
+        }
+      }
+      if (anchor == null) {
+        throw new NotFoundException("card not found");
+      }
+      var anchorProduct = anchor;
+      var products = new ArrayList<Product>();
+      for (var product : snapshot.products()) {
+        if (product == null || product.name() == null || product.finishes() == null) {
+          throw new ServiceUnavailableException("catalog returned invalid product data");
+        }
+        if (product.name().equals(anchorProduct.name()) && product.finishes().contains(finish)) {
+          products.add(product);
+        }
+      }
+      products.sort(Comparator.comparingInt(Product::id));
+      var cards = new ArrayList<Card>();
+      if (anchorProduct.finishes().contains(finish)) {
+        cards.add(toCard(game, snapshot, anchorProduct, Integer.toString(anchorProduct.id())));
+      }
+      for (var product : products) {
+        if (product.id() == anchorProduct.id()) {
+          continue;
+        }
+        cards.add(toCard(game, snapshot, product, Integer.toString(product.id())));
+      }
+      var offset = decodeContinuation(continuation);
+      if (offset > 0 && offset >= cards.size()) {
+        throw new BadRequestException("continuation position is invalid");
+      }
+      var end = Math.min(offset + limit, cards.size());
+      var next = end < cards.size() ? encodeContinuation(end) : null;
+      return new FindCardAlternativesResponse(List.copyOf(cards.subList(offset, end)), next);
     } catch (IOException | SdkException e) {
       throw new ServiceUnavailableException("catalog is temporarily unavailable", e);
     } catch (ServiceUnavailableException e) {

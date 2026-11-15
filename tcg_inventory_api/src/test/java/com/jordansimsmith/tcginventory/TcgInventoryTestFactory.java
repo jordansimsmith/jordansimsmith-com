@@ -8,7 +8,6 @@ import com.jordansimsmith.s3.S3TestModule;
 import com.jordansimsmith.secrets.FakeSecrets;
 import com.jordansimsmith.secrets.SecretsTestModule;
 import com.jordansimsmith.tcginventory.catalog.CatalogFactory;
-import com.jordansimsmith.tcginventory.catalog.FakeCardCatalogs;
 import com.jordansimsmith.tcginventory.catalog.FakeTcgCsvClient;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FakeFetchTcgService;
 import com.jordansimsmith.tcginventory.imports.client.ImportService;
@@ -75,8 +74,6 @@ public interface TcgInventoryTestFactory extends CatalogFactory {
   FakeFetchTcgService fakeFetchTcgService();
 
   FakePhotosService fakePhotosService();
-
-  FakeCardCatalogs fakeCardCatalogs();
 
   FakeTcgCsvClient fakeTcgCsvClient();
 

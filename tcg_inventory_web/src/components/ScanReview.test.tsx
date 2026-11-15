@@ -157,7 +157,7 @@ function mockSuggestionLookup(
     .spyOn(apiClient, 'getCard')
     .mockResolvedValue({ card: selectedCard });
   const findAlternatives = vi
-    .spyOn(apiClient, 'findCatalogAlternatives')
+    .spyOn(apiClient, 'findCardAlternatives')
     .mockResolvedValue({
       cards: alternatives,
       next_continuation: nextContinuation,
@@ -250,7 +250,7 @@ describe('ScanReview', () => {
       cards: [counterspell, alternateCounterspell],
       next_continuation: null,
     });
-    vi.spyOn(apiClient, 'findCatalogAlternatives').mockResolvedValue({
+    vi.spyOn(apiClient, 'findCardAlternatives').mockResolvedValue({
       cards: [counterspell],
       next_continuation: null,
     });
@@ -327,7 +327,7 @@ describe('ScanReview', () => {
       [firstCard, secondCard],
       'alternative-next',
     );
-    const findAlternatives = vi.spyOn(apiClient, 'findCatalogAlternatives');
+    const findAlternatives = vi.spyOn(apiClient, 'findCardAlternatives');
     findAlternatives.mockResolvedValueOnce({
       cards: [firstCard, secondCard],
       next_continuation: 'alternative-next',
@@ -389,7 +389,7 @@ describe('ScanReview', () => {
       [firstCard, secondCard],
       'invalid-continuation',
     );
-    const findAlternatives = vi.spyOn(apiClient, 'findCatalogAlternatives');
+    const findAlternatives = vi.spyOn(apiClient, 'findCardAlternatives');
     findAlternatives.mockResolvedValueOnce({
       cards: [firstCard, secondCard],
       next_continuation: 'invalid-continuation',
@@ -433,7 +433,7 @@ describe('ScanReview', () => {
   it('keeps a valid product selectable after related-printing lookup fails', async () => {
     const user = userEvent.setup();
     vi.spyOn(apiClient, 'getCard').mockResolvedValue({ card: firstCard });
-    vi.spyOn(apiClient, 'findCatalogAlternatives').mockRejectedValue(
+    vi.spyOn(apiClient, 'findCardAlternatives').mockRejectedValue(
       new Error('catalog is temporarily unavailable'),
     );
     vi.spyOn(apiClient, 'searchCards').mockResolvedValue({
@@ -529,7 +529,7 @@ describe('ScanReview', () => {
         card: external_id === firstCard.external_id ? firstCard : secondCard,
       }),
     );
-    vi.spyOn(apiClient, 'findCatalogAlternatives').mockImplementation(
+    vi.spyOn(apiClient, 'findCardAlternatives').mockImplementation(
       async ({ external_id }) => ({
         cards: [external_id === firstCard.external_id ? firstCard : secondCard],
         next_continuation: null,

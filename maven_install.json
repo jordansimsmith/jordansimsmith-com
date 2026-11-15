@@ -18,6 +18,7 @@
     "com.google.guava:guava": -1756621521,
     "com.google.j2objc:j2objc-annotations": 2003271689,
     "net.sf.biweekly:biweekly": -637597406,
+    "org.apache.httpcomponents.core5:httpcore5": 526250203,
     "org.assertj:assertj-core": -1145412507,
     "org.awaitility:awaitility": 2074909829,
     "org.jsoup:jsoup": 1981839900,
@@ -84,6 +85,7 @@
     "net.sf.biweekly:biweekly": -562644862,
     "org.apache.commons:commons-compress": -1752394903,
     "org.apache.commons:commons-lang3": 1110126408,
+    "org.apache.httpcomponents.core5:httpcore5": -974588123,
     "org.apiguardian:apiguardian-api": -1579303244,
     "org.assertj:assertj-core": -1692391089,
     "org.awaitility:awaitility": 405038793,
@@ -385,6 +387,12 @@
         "jar": "4eeeae8d20c078abb64b015ec158add383ac581571cddc45c68f0c9ae0230720"
       },
       "version": "3.18.0"
+    },
+    "org.apache.httpcomponents.core5:httpcore5": {
+      "shasums": {
+        "jar": "b08e3c3a440fec2029e89980134c7c787dd6796454641ad1eafb81478d7e8b0b"
+      },
+      "version": "5.4.4"
     },
     "org.apiguardian:apiguardian-api": {
       "shasums": {
@@ -1766,6 +1774,40 @@
       "org.apache.commons.lang3.tuple",
       "org.apache.commons.lang3.util"
     ],
+    "org.apache.httpcomponents.core5:httpcore5": [
+      "org.apache.hc.core5.annotation",
+      "org.apache.hc.core5.concurrent",
+      "org.apache.hc.core5.function",
+      "org.apache.hc.core5.http",
+      "org.apache.hc.core5.http.config",
+      "org.apache.hc.core5.http.impl",
+      "org.apache.hc.core5.http.impl.bootstrap",
+      "org.apache.hc.core5.http.impl.io",
+      "org.apache.hc.core5.http.impl.io.support",
+      "org.apache.hc.core5.http.impl.nio",
+      "org.apache.hc.core5.http.impl.routing",
+      "org.apache.hc.core5.http.io",
+      "org.apache.hc.core5.http.io.entity",
+      "org.apache.hc.core5.http.io.ssl",
+      "org.apache.hc.core5.http.io.support",
+      "org.apache.hc.core5.http.message",
+      "org.apache.hc.core5.http.nio",
+      "org.apache.hc.core5.http.nio.command",
+      "org.apache.hc.core5.http.nio.entity",
+      "org.apache.hc.core5.http.nio.ssl",
+      "org.apache.hc.core5.http.nio.support",
+      "org.apache.hc.core5.http.nio.support.classic",
+      "org.apache.hc.core5.http.protocol",
+      "org.apache.hc.core5.http.ssl",
+      "org.apache.hc.core5.http.support",
+      "org.apache.hc.core5.io",
+      "org.apache.hc.core5.net",
+      "org.apache.hc.core5.pool",
+      "org.apache.hc.core5.reactor",
+      "org.apache.hc.core5.reactor.ssl",
+      "org.apache.hc.core5.ssl",
+      "org.apache.hc.core5.util"
+    ],
     "org.apiguardian:apiguardian-api": ["org.apiguardian.api"],
     "org.assertj:assertj-core": [
       "org.assertj.core.annotation",
@@ -3042,6 +3084,7 @@
       "net.sf.biweekly:biweekly",
       "org.apache.commons:commons-compress",
       "org.apache.commons:commons-lang3",
+      "org.apache.httpcomponents.core5:httpcore5",
       "org.apiguardian:apiguardian-api",
       "org.assertj:assertj-core",
       "org.awaitility:awaitility",

@@ -12,6 +12,7 @@ import com.jordansimsmith.service.ServiceException;
 import com.jordansimsmith.service.ServiceUnavailableException;
 import com.jordansimsmith.tcginventory.catalog.client.Card;
 import com.jordansimsmith.tcginventory.catalog.client.CatalogPrinting;
+import com.jordansimsmith.tcginventory.catalog.client.FindCardAlternativesResponse;
 import com.jordansimsmith.tcginventory.catalog.client.ImageUrls;
 import com.jordansimsmith.tcginventory.catalog.client.SearchCardsResponse;
 import com.jordansimsmith.tcginventory.games.client.Finish;
@@ -29,6 +30,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.regex.Pattern;
+import javax.annotation.Nullable;
+import org.apache.hc.core5.net.URIBuilder;
 
 public class MagicTheGatheringPrintingLookup {
   private static final int COLLECTION_REQUEST_SIZE = 75;
@@ -156,7 +159,7 @@ public class MagicTheGatheringPrintingLookup {
         "name:\"%s\" lang:%s game:paper is:%s"
             .formatted(escapeSearchPhrase(query), game.language().code(), scryfallFinish(finish));
     try {
-      return readSearchPages(game, providerQuery, position, finish, limit);
+      return readSearchPages(game, providerQuery, position, finish, limit, null, null);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new ServiceUnavailableException("catalog is temporarily unavailable", e);
@@ -167,11 +170,66 @@ public class MagicTheGatheringPrintingLookup {
     }
   }
 
+  public FindCardAlternativesResponse findCardAlternatives(
+      Game game, String externalId, String finish, int limit, String continuation)
+      throws ServiceException {
+    if (externalId == null || !EXTERNAL_ID.matcher(externalId).matches()) {
+      throw new BadRequestException("external_id must be a valid Scryfall ID");
+    }
+    try {
+      return doFindCardAlternatives(game, externalId, finish, limit, continuation);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new ServiceUnavailableException("catalog is temporarily unavailable", e);
+    } catch (IOException | ServiceUnavailableException e) {
+      throw new ServiceUnavailableException("catalog is temporarily unavailable", e);
+    }
+  }
+
+  private FindCardAlternativesResponse doFindCardAlternatives(
+      Game game, String externalId, String finish, int limit, String continuation)
+      throws IOException, InterruptedException, ServiceException {
+    var anchor = readCard(externalId);
+    if (anchor.language() == null) {
+      throw new ServiceUnavailableException("catalog returned incomplete card data");
+    }
+    if (!game.language().code().equals(anchor.language())) {
+      throw new NotFoundException("card not found");
+    }
+
+    var anchorCard = toSearchCard(game, anchor);
+    var query =
+        "%s lang:%s game:paper is:%s"
+            .formatted(
+                queryFromPrintsUri(anchor.printsSearchUri()),
+                game.language().code(),
+                scryfallFinish(finish));
+    var position = decodePosition(continuation);
+    var includeAnchor = continuation == null && anchorCard.availableFinishes().contains(finish);
+    var page =
+        readSearchPages(
+            game, query, position, finish, limit, includeAnchor ? anchorCard : null, externalId);
+    return new FindCardAlternativesResponse(page.cards(), page.nextContinuation());
+  }
+
   private SearchCardsResponse readSearchPages(
-      Game game, String query, Position start, String finish, int limit)
+      Game game,
+      String query,
+      Position start,
+      String finish,
+      int limit,
+      @Nullable Card first,
+      @Nullable String excludedId)
       throws IOException, InterruptedException, ServiceException {
     var cards = new ArrayList<Card>();
     var seen = new HashSet<String>();
+    if (first != null) {
+      cards.add(first);
+      seen.add(first.externalId());
+      if (cards.size() == limit) {
+        return new SearchCardsResponse(List.copyOf(cards), encodePosition(start));
+      }
+    }
     int pageNumber = start.page();
     int offset = start.offset();
     int providerPagesRead = 0;
@@ -200,7 +258,9 @@ public class MagicTheGatheringPrintingLookup {
           continue;
         }
         var card = toSearchCard(game, candidate);
-        if (!card.availableFinishes().contains(finish) || !seen.add(card.externalId())) {
+        if ((excludedId != null && excludedId.equals(card.externalId()))
+            || !card.availableFinishes().contains(finish)
+            || !seen.add(card.externalId())) {
           continue;
         }
         cards.add(card);
@@ -319,6 +379,27 @@ public class MagicTheGatheringPrintingLookup {
 
   private String escapeSearchPhrase(String query) {
     return query.replace("\\", "\\\\").replace("\"", "\\\"");
+  }
+
+  private String queryFromPrintsUri(String printsSearchUri) throws ServiceUnavailableException {
+    if (printsSearchUri == null) {
+      throw new ServiceUnavailableException("catalog card is missing printing search data");
+    }
+    try {
+      var uri = new URIBuilder(URI.create(printsSearchUri));
+      if (!baseUri.getScheme().equalsIgnoreCase(uri.getScheme())
+          || !baseUri.getHost().equalsIgnoreCase(uri.getHost())
+          || !"/cards/search".equals(uri.getPath())) {
+        throw new ServiceUnavailableException("catalog returned an invalid printing search URI");
+      }
+      var query = uri.getFirstQueryParam("q");
+      if (query == null) {
+        throw new ServiceUnavailableException("catalog returned an invalid printing search URI");
+      }
+      return query.getValue();
+    } catch (IllegalArgumentException e) {
+      throw new ServiceUnavailableException("catalog returned an invalid printing search URI", e);
+    }
   }
 
   private String encode(String value) {

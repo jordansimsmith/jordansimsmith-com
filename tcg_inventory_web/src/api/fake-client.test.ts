@@ -86,20 +86,22 @@ describe('createFakeClient', () => {
     expect(firstCard.name).toBe('Lightning Bolt');
     expect(firstCard).not.toHaveProperty('external_source');
     await expect(
-      client.findCatalogAlternatives({
+      client.findCardAlternatives({
         game: 'mtg',
         external_id: firstCard.external_id,
         finish: 'normal',
+        limit: 2,
       }),
     ).resolves.toMatchObject({
       cards: [firstCard, expect.objectContaining({ set_code: '2xm' })],
       next_continuation: 'fake:2',
     });
     await expect(
-      client.findCatalogAlternatives({
+      client.findCardAlternatives({
         game: 'mtg',
         external_id: firstCard.external_id,
         finish: 'normal',
+        limit: 2,
         continuation: 'fake:2',
       }),
     ).resolves.toMatchObject({

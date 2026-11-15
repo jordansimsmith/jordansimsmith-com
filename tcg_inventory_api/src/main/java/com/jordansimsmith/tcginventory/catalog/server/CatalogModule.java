@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceException;
 import com.jordansimsmith.tcginventory.catalog.client.CatalogService;
+import com.jordansimsmith.tcginventory.catalog.client.FindCardAlternativesRequest;
+import com.jordansimsmith.tcginventory.catalog.client.FindCardAlternativesResponse;
 import com.jordansimsmith.tcginventory.catalog.client.FindCardImagesRequest;
 import com.jordansimsmith.tcginventory.catalog.client.FindCardImagesResponse;
 import com.jordansimsmith.tcginventory.catalog.client.FindCatalogCardsRequest;
@@ -51,6 +53,8 @@ public class CatalogModule {
     var findCatalogCardsService =
         new FindCatalogCardsService(gamesService, magicTheGathering, pokemon);
     var searchCardsService = new SearchCardsService(gamesService, magicTheGathering, pokemon);
+    var findCardAlternativesService =
+        new FindCardAlternativesService(gamesService, magicTheGathering, pokemon);
     return new CatalogService() {
       @Override
       public GetCardResponse getCard(RequestContext ctx, GetCardRequest request)
@@ -74,6 +78,12 @@ public class CatalogModule {
       public SearchCardsResponse searchCards(RequestContext ctx, SearchCardsRequest request)
           throws ServiceException {
         return searchCardsService.searchCards(ctx, request);
+      }
+
+      @Override
+      public FindCardAlternativesResponse findCardAlternatives(
+          RequestContext ctx, FindCardAlternativesRequest request) throws ServiceException {
+        return findCardAlternativesService.findCardAlternatives(ctx, request);
       }
     };
   }

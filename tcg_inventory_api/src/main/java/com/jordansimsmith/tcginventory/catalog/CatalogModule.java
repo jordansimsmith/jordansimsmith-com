@@ -1,13 +1,11 @@
 package com.jordansimsmith.tcginventory.catalog;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jordansimsmith.time.Clock;
 import dagger.Module;
 import dagger.Provides;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.time.Duration;
-import java.util.Map;
 import javax.inject.Named;
 import javax.inject.Singleton;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
@@ -48,17 +46,6 @@ public class CatalogModule {
 
   @Provides
   @Singleton
-  ScryfallCatalog scryfallCatalog(
-      ObjectMapper objectMapper, HttpClient httpClient, Runnable requestPacer) {
-    var baseUrl = System.getenv("SCRYFALL_BASE_URL");
-    if (baseUrl == null || baseUrl.isBlank()) {
-      baseUrl = "https://api.scryfall.com";
-    }
-    return new ScryfallCatalog(URI.create(baseUrl), httpClient, objectMapper, requestPacer);
-  }
-
-  @Provides
-  @Singleton
   TcgCsvClient tcgCsvClient(
       ObjectMapper objectMapper, HttpClient httpClient, Runnable requestPacer) {
     return new HttpTcgCsvClient(
@@ -88,20 +75,5 @@ public class CatalogModule {
         CatalogSnapshotStore.BUCKET,
         catalogRepository,
         new TcgCsvCatalogArtifactCodec(objectMapper));
-  }
-
-  @Provides
-  @Singleton
-  Catalogs catalogs(
-      ScryfallCatalog scryfallCatalog,
-      CatalogRepository catalogRepository,
-      CatalogSnapshotStore catalogSnapshotStore,
-      Clock clock) {
-    return new Catalogs(
-        Map.of(
-            "mtg",
-            scryfallCatalog,
-            "pokemon",
-            new TcgPlayerCatalog("pokemon", catalogRepository, catalogSnapshotStore, clock)));
   }
 }

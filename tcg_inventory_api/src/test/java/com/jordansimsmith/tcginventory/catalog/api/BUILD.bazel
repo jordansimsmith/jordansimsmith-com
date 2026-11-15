@@ -3,6 +3,7 @@ load("@contrib_rules_jvm//java:defs.bzl", "JUNIT5_DEPS", "java_test_suite")
 java_test_suite(
     name = "api-unit-tests",
     srcs = [
+        "FindCardAlternativesHandlerTest.java",
         "FindCardImagesHandlerTest.java",
         "GetCardHandlerTest.java",
         "SearchCardsHandlerTest.java",
@@ -14,6 +15,7 @@ java_test_suite(
         "//lib/http:lib",
         "//lib/service",
         "//tcg_inventory_api:lib",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/catalog/api:find-card-alternatives-handler",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/catalog/api:find-card-images-handler",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/catalog/api:get-card-handler",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/catalog/api:search-cards-handler",

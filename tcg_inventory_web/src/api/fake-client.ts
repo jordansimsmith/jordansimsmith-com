@@ -2,7 +2,7 @@ import type {
   ApiClient,
   BuyerAddress,
   CatalogCard,
-  CatalogCardsResponse,
+  FindCardAlternativesResponse,
   Condition,
   ConfirmScanRequest,
   CreateImportResponse,
@@ -11,7 +11,7 @@ import type {
   Finish,
   Game,
   GameId,
-  FindCatalogAlternativesParams,
+  FindCardAlternativesRequest,
   SearchCardsRequest,
   SearchCardsResponse,
   FindCardImagesRequest,
@@ -210,7 +210,7 @@ function catalogPage(
   cards: CatalogCard[],
   offset: number,
   limit = FAKE_CATALOG_PAGE_SIZE,
-): CatalogCardsResponse {
+): FindCardAlternativesResponse {
   const page = cards.slice(offset, offset + limit);
   const nextOffset = offset + page.length;
   return {
@@ -2234,9 +2234,9 @@ export function createFakeClient(): ApiClient {
       };
     },
 
-    async findCatalogAlternatives(
-      params: FindCatalogAlternativesParams,
-    ): Promise<CatalogCardsResponse> {
+    async findCardAlternatives(
+      params: FindCardAlternativesRequest,
+    ): Promise<FindCardAlternativesResponse> {
       const anchor = FAKE_CATALOG_CARDS.find(
         (candidate) =>
           candidate.game === params.game &&
@@ -2257,7 +2257,11 @@ export function createFakeClient(): ApiClient {
       if (anchorIndex > 0) {
         cards.unshift(cards.splice(anchorIndex, 1)[0]);
       }
-      return catalogPage(cards, catalogOffset(params.continuation));
+      return catalogPage(
+        cards,
+        catalogOffset(params.continuation),
+        params.limit ?? 20,
+      );
     },
 
     async searchCards(

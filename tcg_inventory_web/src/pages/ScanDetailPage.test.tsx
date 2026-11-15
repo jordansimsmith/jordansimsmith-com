@@ -266,10 +266,10 @@ describe('ScanDetailPage', () => {
     vi.spyOn(clientModule.apiClient, 'getCard').mockResolvedValue({
       card: suggestedProduct,
     });
-    vi.spyOn(
-      clientModule.apiClient,
-      'findCatalogAlternatives',
-    ).mockResolvedValue({ cards: [suggestedProduct], next_continuation: null });
+    vi.spyOn(clientModule.apiClient, 'findCardAlternatives').mockResolvedValue({
+      cards: [suggestedProduct],
+      next_continuation: null,
+    });
     const confirmScan = vi
       .spyOn(clientModule.apiClient, 'confirmScan')
       .mockResolvedValue(undefined);
@@ -303,10 +303,10 @@ describe('ScanDetailPage', () => {
     vi.spyOn(clientModule.apiClient, 'getCard').mockResolvedValue({
       card: suggestedProduct,
     });
-    vi.spyOn(
-      clientModule.apiClient,
-      'findCatalogAlternatives',
-    ).mockResolvedValue({ cards: [suggestedProduct], next_continuation: null });
+    vi.spyOn(clientModule.apiClient, 'findCardAlternatives').mockResolvedValue({
+      cards: [suggestedProduct],
+      next_continuation: null,
+    });
     vi.spyOn(clientModule.apiClient, 'confirmScan').mockResolvedValue(
       undefined,
     );

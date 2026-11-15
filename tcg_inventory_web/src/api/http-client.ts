@@ -8,10 +8,10 @@ import type {
   CreateScanResponse,
   GetCardRequest,
   GetCardResponse,
-  CatalogCardsResponse,
+  FindCardAlternativesResponse,
   FindScansParams,
   FindScansResponse,
-  FindCatalogAlternativesParams,
+  FindCardAlternativesRequest,
   SearchCardsRequest,
   SearchCardsResponse,
   FindCardImagesRequest,
@@ -297,13 +297,16 @@ export function createHttpClient(): ApiClient {
       return response.json();
     },
 
-    async findCatalogAlternatives(
-      params: FindCatalogAlternativesParams,
-    ): Promise<CatalogCardsResponse> {
+    async findCardAlternatives(
+      params: FindCardAlternativesRequest,
+    ): Promise<FindCardAlternativesResponse> {
       const query = new URLSearchParams({
         game: params.game,
         finish: params.finish,
       });
+      if (params.limit !== undefined) {
+        query.set('limit', String(params.limit));
+      }
       if (params.continuation) {
         query.set('continuation', params.continuation);
       }

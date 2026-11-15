@@ -18,7 +18,7 @@ import {
 import { apiClient } from '../api/client';
 import type {
   CatalogCard,
-  CatalogCardsResponse,
+  FindCardAlternativesResponse,
   ScanConfirmationRow,
   ScanDetail,
   ScanRow,
@@ -34,7 +34,7 @@ interface ScanReviewProps {
   onConfirmScan: (rows: ScanConfirmationRow[]) => Promise<void>;
 }
 
-interface AlternativesState extends CatalogCardsResponse {
+interface AlternativesState extends FindCardAlternativesResponse {
   anchorExternalId: string;
 }
 
@@ -265,7 +265,7 @@ export function ScanReview({
           new Map(previous).set(selectedPosition, { card, confirmed: false }),
         );
 
-        const response = await apiClient.findCatalogAlternatives({
+        const response = await apiClient.findCardAlternatives({
           game: scan.game,
           external_id: suggestionId,
           finish: scan.finish,
@@ -542,7 +542,7 @@ export function ScanReview({
     setSearchResults([]);
 
     try {
-      const response = await apiClient.findCatalogAlternatives({
+      const response = await apiClient.findCardAlternatives({
         game: scan.game,
         external_id: card.external_id,
         finish: scan.finish,
@@ -592,7 +592,7 @@ export function ScanReview({
     const anchorVersion = alternativesAnchorVersions.current.get(position);
     setLoadingMorePositions((previous) => new Set(previous).add(position));
     try {
-      const response = await apiClient.findCatalogAlternatives({
+      const response = await apiClient.findCardAlternatives({
         game: scan.game,
         external_id: anchorExternalId,
         finish: scan.finish,

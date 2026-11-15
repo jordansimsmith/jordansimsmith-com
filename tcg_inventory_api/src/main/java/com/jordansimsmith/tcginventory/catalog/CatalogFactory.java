@@ -9,8 +9,6 @@ import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 @Singleton
 @Component(modules = {TcgInventoryModule.class, CatalogModule.class})
 public interface CatalogFactory extends TcgInventoryFactory {
-  Catalogs catalogs();
-
   DynamoDbTable<CatalogSnapshotItem> catalogSnapshotTable();
 
   TcgCsvClient tcgCsvClient();

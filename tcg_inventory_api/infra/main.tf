@@ -134,7 +134,7 @@ module "java_api" {
       artifact = var.artifacts["get_catalog_card"]
     }
     find_catalog_alternatives = {
-      handler  = "com.jordansimsmith.tcginventory.catalog.FindCatalogAlternativesHandler"
+      handler  = "com.jordansimsmith.tcginventory.catalog.api.FindCardAlternativesHandler"
       artifact = var.artifacts["find_catalog_alternatives"]
     }
     find_catalog_cards = {

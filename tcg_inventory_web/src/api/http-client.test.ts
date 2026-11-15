@@ -687,10 +687,11 @@ describe('http client catalog', () => {
     fetchSpy.mockResolvedValue({ ok: true, json });
     const client = createHttpClient();
 
-    await client.findCatalogAlternatives({
+    await client.findCardAlternatives({
       game: 'mtg',
       external_id: 'opaque/id',
       finish: 'reverse holo',
+      limit: 7,
       continuation: 'next/page',
     });
     await expect(
@@ -704,7 +705,7 @@ describe('http client catalog', () => {
     ).resolves.toEqual(response);
 
     expect(fetchSpy.mock.calls[0][0]).toBe(
-      'https://api.tcg-inventory.jordansimsmith.com/catalog/cards/opaque%2Fid/alternatives?game=mtg&finish=reverse+holo&continuation=next%2Fpage',
+      'https://api.tcg-inventory.jordansimsmith.com/catalog/cards/opaque%2Fid/alternatives?game=mtg&finish=reverse+holo&limit=7&continuation=next%2Fpage',
     );
     expect(fetchSpy.mock.calls[1][0]).toBe(
       'https://api.tcg-inventory.jordansimsmith.com/catalog/cards?game=mtg&query=Bolt+%26+Co&finish=normal&limit=7&continuation=next%2Fpage',

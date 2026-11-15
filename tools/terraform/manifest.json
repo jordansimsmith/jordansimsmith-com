@@ -127,7 +127,7 @@
       "path": "tcg_inventory_api/infra",
       "artifacts": {
         "get_catalog_card": "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/catalog/api:get-card-handler_deploy.jar",
-        "find_catalog_alternatives": "//tcg_inventory_api:find-catalog-alternatives-handler_deploy.jar",
+        "find_catalog_alternatives": "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/catalog/api:find-card-alternatives-handler_deploy.jar",
         "find_catalog_cards": "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/catalog/api:search-cards-handler_deploy.jar",
         "find_card_images": "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/catalog/api:find-card-images-handler_deploy.jar",
         "find_photos": "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/photos/api:find-photos-handler_deploy.jar",

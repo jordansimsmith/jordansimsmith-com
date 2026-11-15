@@ -8,8 +8,10 @@ import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.s3.S3Container;
 import com.jordansimsmith.service.BadRequestException;
+import com.jordansimsmith.service.NotFoundException;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceUnavailableException;
+import com.jordansimsmith.tcginventory.catalog.client.FindCardAlternativesRequest;
 import com.jordansimsmith.tcginventory.catalog.client.GetCardRequest;
 import com.jordansimsmith.tcginventory.catalog.client.SearchCardsRequest;
 import com.jordansimsmith.tcginventory.games.client.FakeGamesService;
@@ -55,6 +57,7 @@ public class SearchCardsServiceIntegrationTest {
 
   private SearchCardsService searchCardsService;
   private GetCardService getCardService;
+  private FindCardAlternativesService findCardAlternativesService;
 
   @BeforeAll
   static void setUpBeforeClass() {
@@ -112,6 +115,7 @@ public class SearchCardsServiceIntegrationTest {
     var games = new FakeGamesService();
     searchCardsService = new SearchCardsService(games, null, pokemon);
     getCardService = new GetCardService(games, null, pokemon);
+    findCardAlternativesService = new FindCardAlternativesService(games, null, pokemon);
   }
 
   @Test
@@ -175,6 +179,14 @@ public class SearchCardsServiceIntegrationTest {
         .isInstanceOf(ServiceUnavailableException.class)
         .hasMessage("catalog is temporarily unavailable")
         .hasCauseInstanceOf(ServiceUnavailableException.class);
+    assertThatThrownBy(
+            () ->
+                findCardAlternativesService.findCardAlternatives(
+                    new RequestContext("alice"),
+                    new FindCardAlternativesRequest("pokemon", "25", "normal", null, null)))
+        .isInstanceOf(ServiceUnavailableException.class)
+        .hasMessage("catalog is temporarily unavailable")
+        .hasCauseInstanceOf(ServiceUnavailableException.class);
   }
 
   @Test
@@ -191,6 +203,124 @@ public class SearchCardsServiceIntegrationTest {
     // assert
     assertThat(response.cards()).hasSize(5);
     assertThat(response.nextContinuation()).isNotNull();
+  }
+
+  @Test
+  void findCardAlternativesShouldGroupExactNamesAndKeepAnchorFirstAcrossPages() throws Exception {
+    // arrange
+    publishAlternativesSnapshot(SNAPSHOT_ID);
+    var context = new RequestContext("alice");
+
+    // act
+    var first =
+        findCardAlternativesService.findCardAlternatives(
+            context, new FindCardAlternativesRequest("pokemon", "10", "normal", 1, null));
+    publishSnapshot("2026-10-07T20:07:09Z", "Raichu", 1);
+    var second =
+        findCardAlternativesService.findCardAlternatives(
+            context,
+            new FindCardAlternativesRequest(
+                "pokemon", "10", "normal", 1, first.nextContinuation()));
+
+    // assert
+    assertThat(first.cards()).extracting(card -> card.externalId()).containsExactly("10");
+    assertThat(first.nextContinuation()).isNotNull();
+    assertThat(second.cards()).extracting(card -> card.externalId()).containsExactly("2");
+    assertThat(second.nextContinuation()).isNull();
+    assertThatThrownBy(
+            () ->
+                findCardAlternativesService.findCardAlternatives(
+                    context,
+                    new FindCardAlternativesRequest("pokemon", "999", "normal", null, null)))
+        .isInstanceOf(NotFoundException.class);
+  }
+
+  private static void publishAlternativesSnapshot(String snapshotId) throws Exception {
+    var updatedAt = Instant.parse(snapshotId);
+    var products =
+        List.of(
+            Map.of(
+                "product_id",
+                10,
+                "name",
+                "Pikachu",
+                "group_id",
+                1,
+                "collector_number",
+                "10",
+                "available_finishes",
+                List.of("normal", "holofoil")),
+            Map.of(
+                "product_id",
+                2,
+                "name",
+                "Pikachu",
+                "group_id",
+                1,
+                "collector_number",
+                "2",
+                "available_finishes",
+                List.of("normal")),
+            Map.of(
+                "product_id",
+                4,
+                "name",
+                "Pikachu",
+                "group_id",
+                1,
+                "collector_number",
+                "4",
+                "available_finishes",
+                List.of("holofoil")),
+            Map.of(
+                "product_id",
+                5,
+                "name",
+                "pikachu",
+                "group_id",
+                1,
+                "collector_number",
+                "5",
+                "available_finishes",
+                List.of("normal")));
+    var snapshot =
+        Map.ofEntries(
+            Map.entry("schema_version", 1),
+            Map.entry("game", "pokemon"),
+            Map.entry("external_source", "tcgplayer"),
+            Map.entry("catalog_source", "tcgcsv"),
+            Map.entry("category_id", 3),
+            Map.entry("snapshot_id", snapshotId),
+            Map.entry(
+                "source_marker",
+                DateTimeFormatter.ofPattern("uuuu-MM-dd'T'HH:mm:ssxx")
+                    .withZone(ZoneOffset.UTC)
+                    .format(updatedAt)),
+            Map.entry("source_updated_at", updatedAt.getEpochSecond()),
+            Map.entry("created_at", updatedAt.getEpochSecond()),
+            Map.entry(
+                "groups",
+                List.of(Map.of("group_id", 1, "set_code", "BASE", "set_name", "Base Set"))),
+            Map.entry("products", products));
+    var json = new ObjectMapper().writeValueAsBytes(snapshot);
+    var compressed = new ByteArrayOutputStream();
+    try (var gzip = new GZIPOutputStream(compressed)) {
+      gzip.write(json);
+    }
+    var key = "catalogs/tcgcsv/pokemon/snapshots/" + snapshotId + ".json.gz";
+    s3.putObject(
+        request -> request.bucket(BUCKET).key(key),
+        RequestBody.fromBytes(compressed.toByteArray()));
+    dynamoDb.putItem(
+        request ->
+            request
+                .tableName(TABLE_NAME)
+                .item(
+                    Map.of(
+                        "pk", AttributeValue.fromS("CATALOG#pokemon"),
+                        "sk", AttributeValue.fromS("SNAPSHOT#" + snapshotId),
+                        "snapshot_id", AttributeValue.fromS(snapshotId),
+                        "s3_key", AttributeValue.fromS(key))));
   }
 
   private static void publishSnapshot(String snapshotId, String name, int productCount)

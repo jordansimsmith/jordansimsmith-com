@@ -153,8 +153,8 @@ lambdas = {
         "zip_file": "get-card-handler_deploy.jar",
     },
     "find_catalog_alternatives": {
-        "handler": "com.jordansimsmith.tcginventory.catalog.FindCatalogAlternativesHandler",
-        "zip_file": "find-catalog-alternatives-handler_deploy.jar",
+        "handler": "com.jordansimsmith.tcginventory.catalog.api.FindCardAlternativesHandler",
+        "zip_file": "find-card-alternatives-handler_deploy.jar",
     },
     "find_catalog_cards": {
         "handler": "com.jordansimsmith.tcginventory.catalog.api.SearchCardsHandler",
