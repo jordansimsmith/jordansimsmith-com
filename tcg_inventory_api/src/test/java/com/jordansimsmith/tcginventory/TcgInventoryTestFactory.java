@@ -8,24 +8,12 @@ import com.jordansimsmith.s3.S3TestModule;
 import com.jordansimsmith.secrets.FakeSecrets;
 import com.jordansimsmith.secrets.SecretsTestModule;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FakeFetchTcgService;
-import com.jordansimsmith.tcginventory.imports.client.ImportService;
 import com.jordansimsmith.tcginventory.imports.server.ImportMessage;
 import com.jordansimsmith.tcginventory.inventory.client.FakeInventoryService;
-import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
-import com.jordansimsmith.tcginventory.listings.client.ListingService;
-import com.jordansimsmith.tcginventory.orders.client.OrderService;
 import com.jordansimsmith.tcginventory.orders.server.FulfillmentMessage;
-import com.jordansimsmith.tcginventory.orders.server.FulfillmentMessageHandler;
 import com.jordansimsmith.tcginventory.photos.client.FakePhotosService;
-import com.jordansimsmith.tcginventory.photos.client.PhotosService;
-import com.jordansimsmith.tcginventory.pricing.client.PricingService;
 import com.jordansimsmith.tcginventory.pricing.server.RepricingMessage;
-import com.jordansimsmith.tcginventory.pricing.server.RepricingMessageHandler;
-import com.jordansimsmith.tcginventory.publish.client.PublishService;
 import com.jordansimsmith.tcginventory.publish.server.PublishMessage;
-import com.jordansimsmith.tcginventory.publish.server.PublishMessageHandler;
-import com.jordansimsmith.tcginventory.reports.client.ReportService;
-import com.jordansimsmith.tcginventory.reports.server.ReportMessageHandler;
 import com.jordansimsmith.time.ClockTestModule;
 import com.jordansimsmith.time.FakeClock;
 import com.jordansimsmith.ulid.FakeUlidGenerator;
@@ -36,7 +24,6 @@ import java.net.URI;
 import javax.inject.Named;
 import javax.inject.Singleton;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
-import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 
 @Singleton
 @Component(
@@ -52,8 +39,6 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
     })
 public interface TcgInventoryTestFactory extends TcgInventoryFactory {
   URI UNUSED_S3_ENDPOINT = URI.create("http://localhost:1");
-  URI UNUSED_FIREBASE_TOKEN_URI = URI.create("http://localhost:1/token");
-  URI UNUSED_FETCHTCG_BASE_URI = URI.create("http://localhost:1");
 
   FakeClock fakeClock();
 
@@ -73,47 +58,18 @@ public interface TcgInventoryTestFactory extends TcgInventoryFactory {
 
   FakePhotosService fakePhotosService();
 
-  DynamoDbClient dynamoDbClient();
-
-  PhotosService photosService();
-
   DynamoDbTable<TcgInventoryTableDefinition> tableDefinition();
 
-  OrderService orderService();
-
-  ImportService importService();
-
-  FulfillmentMessageHandler fulfillmentMessageHandler();
-
-  PricingService pricingService();
-
-  RepricingMessageHandler repricingMessageHandler();
-
-  InventoryService inventoryService();
-
   FakeInventoryService fakeInventoryService();
-
-  ListingService listingService();
-
-  ReportService reportService();
-
-  ReportMessageHandler reportMessageHandler();
-
-  PublishService publishService();
-
-  PublishMessageHandler publishMessageHandler();
 
   @Component.Factory
   interface Factory {
     TcgInventoryTestFactory create(
         @BindsInstance @Named("dynamoDbEndpoint") URI dynamoDbEndpoint,
-        @BindsInstance @Named("s3Endpoint") URI s3Endpoint,
-        @BindsInstance @Named("firebaseTokenUri") URI firebaseTokenUri,
-        @BindsInstance @Named("fetchTcgBaseUri") URI fetchTcgBaseUri);
+        @BindsInstance @Named("s3Endpoint") URI s3Endpoint);
   }
 
   static TcgInventoryTestFactory create(URI dynamoDbEndpoint, URI s3Endpoint) {
-    return DaggerTcgInventoryTestFactory.factory()
-        .create(dynamoDbEndpoint, s3Endpoint, UNUSED_FIREBASE_TOKEN_URI, UNUSED_FETCHTCG_BASE_URI);
+    return DaggerTcgInventoryTestFactory.factory().create(dynamoDbEndpoint, s3Endpoint);
   }
 }

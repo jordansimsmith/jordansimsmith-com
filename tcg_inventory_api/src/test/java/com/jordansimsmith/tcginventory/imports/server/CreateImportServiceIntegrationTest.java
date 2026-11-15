@@ -29,6 +29,7 @@ import com.jordansimsmith.tcginventory.inventory.client.Condition;
 import com.jordansimsmith.time.FakeClock;
 import com.jordansimsmith.ulid.FakeUlidGenerator;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -105,7 +106,7 @@ class CreateImportServiceIntegrationTest {
     var response =
         service.createImport(
             new RequestContext("alice"),
-            new CreateImportRequest("operation-1", "mtg", csv(), "bulk.csv", null));
+            new CreateImportRequest("operation-1", "mtg", csv("en"), "bulk.csv", null));
 
     var item = reads.getImport("alice", response.importId());
     var rows = reads.findRows("alice", response.importId());
@@ -222,7 +223,8 @@ class CreateImportServiceIntegrationTest {
             () ->
                 service.createImport(
                     new RequestContext("alice"),
-                    new CreateImportRequest("language-mismatch", "mtg", csv(), "bulk.csv", null)))
+                    new CreateImportRequest(
+                        "language-mismatch", "mtg", csv("ja"), "bulk.csv", null)))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("row 3: expected language en for mtg, found ja");
 
@@ -246,7 +248,8 @@ class CreateImportServiceIntegrationTest {
             "normal",
             "NM",
             "opaque/id");
-    var attributes = TableSchema.fromBean(ImportRowItem.class).itemToMap(legacyRow, true);
+    var attributes =
+        new HashMap<>(TableSchema.fromBean(ImportRowItem.class).itemToMap(legacyRow, true));
     attributes.put("language", AttributeValue.fromS("en"));
     dynamoDbClient.putItem(request -> request.tableName(TABLE_NAME).item(attributes));
 
@@ -415,10 +418,11 @@ class CreateImportServiceIntegrationTest {
     }
   }
 
-  private static String csv() {
+  private static String csv(String secondRowLanguage) {
     return "Name,Set code,Set name,Collector number,Foil,Quantity,Scryfall ID,Condition,Language"
         + "\nOpt,DOM,Dominaria,60,Normal,2,opaque/id,near_mint,en"
-        + "\nSol Ring,CMR,Commander Legends,472,Foil,1,opaque/sol-ring,excellent,en";
+        + "\nSol Ring,CMR,Commander Legends,472,Foil,1,opaque/sol-ring,excellent,"
+        + secondRowLanguage;
   }
 
   private static CreateImportRow normalizedRow(String externalId, String name) {
