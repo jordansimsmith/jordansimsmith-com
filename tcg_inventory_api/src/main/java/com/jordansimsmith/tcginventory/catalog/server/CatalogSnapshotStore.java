@@ -1,4 +1,4 @@
-package com.jordansimsmith.tcginventory.catalog;
+package com.jordansimsmith.tcginventory.catalog.server;
 
 import java.io.IOException;
 import java.security.MessageDigest;
@@ -12,8 +12,6 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 
 public class CatalogSnapshotStore {
-  public static final String BUCKET = "api.tcg-inventory.jordansimsmith.com";
-
   private final S3Client s3Client;
   private final String bucket;
   private final CatalogRepository catalogRepository;

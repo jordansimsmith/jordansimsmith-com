@@ -1,4 +1,4 @@
-package com.jordansimsmith.tcginventory.catalog;
+package com.jordansimsmith.tcginventory.catalog.server;
 
 import com.jordansimsmith.dynamodb.EpochSecondConverter;
 import java.time.Instant;

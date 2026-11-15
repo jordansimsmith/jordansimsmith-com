@@ -1,4 +1,4 @@
-package com.jordansimsmith.tcginventory.catalog;
+package com.jordansimsmith.tcginventory.catalog.server;
 
 import java.time.Instant;
 import java.util.ArrayList;

@@ -5,9 +5,12 @@ java_library(
     srcs = glob(["*.java"]),
     visibility = [
         "//tcg_inventory_api:__pkg__",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/catalog/worker:__pkg__",
         "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/catalog/server:__pkg__",
+        "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/catalog/worker:__pkg__",
     ],
     deps = [
+        "//lib/dynamodb:lib",
         "//lib/service",
         "//lib/time:lib",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/catalog/client",
@@ -18,7 +21,9 @@ java_library(
         "@maven//:com_google_code_findbugs_jsr305",
         "@maven//:com_google_guava_guava",
         "@maven//:org_apache_httpcomponents_core5_httpcore5",
+        "@maven//:org_slf4j_slf4j_api",
         "@maven//:software_amazon_awssdk_dynamodb",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
         "@maven//:software_amazon_awssdk_s3",
         "@maven//:software_amazon_awssdk_sdk_core",
     ],

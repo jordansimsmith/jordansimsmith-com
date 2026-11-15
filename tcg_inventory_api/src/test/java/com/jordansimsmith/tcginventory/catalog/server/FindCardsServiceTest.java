@@ -17,7 +17,6 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -46,9 +45,7 @@ public class FindCardsServiceTest {
     var baseUri = URI.create("http://127.0.0.1:" + server.getAddress().getPort());
     var magic =
         new MagicTheGatheringPrintingLookup(baseUri, HttpClient.newHttpClient(), objectMapper);
-    var pokemon =
-        new PokemonPrintingLookup(null, null, "unused", "unused", objectMapper, Instant::now);
-    service = new FindCardsService(new FakeGamesService(), magic, pokemon);
+    service = new FindCardsService(new FakeGamesService(), magic, null);
     secondStatus = 200;
     secondBody = null;
     collectionBody = null;

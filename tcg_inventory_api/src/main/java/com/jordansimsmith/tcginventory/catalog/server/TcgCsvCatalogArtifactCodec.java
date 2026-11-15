@@ -1,5 +1,6 @@
-package com.jordansimsmith.tcginventory.catalog;
+package com.jordansimsmith.tcginventory.catalog.server;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import java.io.ByteArrayInputStream;
@@ -32,7 +33,10 @@ public class TcgCsvCatalogArtifactCodec {
 
   public TcgCsvCatalogSnapshot decodeGzip(byte[] gzipBytes) throws IOException {
     try (var gzip = new GZIPInputStream(new ByteArrayInputStream(gzipBytes))) {
-      return objectMapper.readValue(gzip, TcgCsvCatalogSnapshot.class);
+      return objectMapper
+          .readerFor(TcgCsvCatalogSnapshot.class)
+          .without(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+          .readValue(gzip);
     }
   }
 }

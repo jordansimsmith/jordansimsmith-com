@@ -1,15 +1,16 @@
-package com.jordansimsmith.tcginventory.catalog;
+package com.jordansimsmith.tcginventory.catalog.server;
 
 import com.jordansimsmith.time.Clock;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class CatalogRefreshProcessor {
-  private static final Logger LOGGER = LoggerFactory.getLogger(CatalogRefreshProcessor.class);
+public class CatalogRefreshMessageHandler {
+  private static final Logger LOGGER = LoggerFactory.getLogger(CatalogRefreshMessageHandler.class);
   private static final int CATEGORY_ID = 3;
   private static final String GAME = "pokemon";
 
@@ -19,7 +20,7 @@ public class CatalogRefreshProcessor {
   private final CatalogRepository catalogRepository;
   private final Clock clock;
 
-  public CatalogRefreshProcessor(
+  public CatalogRefreshMessageHandler(
       TcgCsvClient tcgCsvClient,
       TcgCsvCatalogNormalizer normalizer,
       CatalogSnapshotStore catalogSnapshotStore,
@@ -32,7 +33,21 @@ public class CatalogRefreshProcessor {
     this.clock = clock;
   }
 
-  public void process(String game, Instant scheduledAt) throws IOException, InterruptedException {
+  public void handleMessage(CatalogRefreshMessage message)
+      throws IOException, InterruptedException {
+    if (message.scheduledAt() == null || message.scheduledAt().isBlank()) {
+      throw new IllegalArgumentException("catalog refresh message is missing scheduled_at");
+    }
+    if (!message.scheduledAt().endsWith("Z")) {
+      throw new IllegalArgumentException("scheduled_at must be a UTC timestamp");
+    }
+    Instant scheduledAt;
+    try {
+      scheduledAt = Instant.parse(message.scheduledAt());
+    } catch (DateTimeParseException e) {
+      throw new IllegalArgumentException("invalid scheduled_at: " + message.scheduledAt(), e);
+    }
+    var game = message.game();
     if (!GAME.equals(game)) {
       throw new IllegalArgumentException("unsupported catalog game: " + game);
     }

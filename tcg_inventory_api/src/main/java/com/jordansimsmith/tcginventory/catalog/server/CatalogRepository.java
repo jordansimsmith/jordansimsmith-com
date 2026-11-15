@@ -1,4 +1,4 @@
-package com.jordansimsmith.tcginventory.catalog;
+package com.jordansimsmith.tcginventory.catalog.server;
 
 import javax.annotation.Nullable;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;

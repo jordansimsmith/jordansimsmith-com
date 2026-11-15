@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
 import com.jordansimsmith.tcginventory.catalog.client.CatalogService;
+import com.jordansimsmith.tcginventory.catalog.server.CatalogRefreshMessageHandler;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
 import com.jordansimsmith.tcginventory.games.client.GamesService;
 import com.jordansimsmith.tcginventory.imports.client.ImportService;
@@ -56,6 +57,8 @@ public interface TcgInventoryFactory {
   GamesService gamesService();
 
   CatalogService catalogService();
+
+  CatalogRefreshMessageHandler catalogRefreshMessageHandler();
 
   ScanService scanService();
 

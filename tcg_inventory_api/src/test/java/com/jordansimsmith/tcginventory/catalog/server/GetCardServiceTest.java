@@ -43,8 +43,7 @@ public class GetCardServiceTest {
     var magic =
         new MagicTheGatheringPrintingLookup(
             baseUri, HttpClient.newHttpClient(), new ObjectMapper());
-    var pokemon = new PokemonPrintingLookup(null, null, null, null, null, null);
-    service = new GetCardService(new FakeGamesService(), magic, pokemon);
+    service = new GetCardService(new FakeGamesService(), magic, null);
     body =
         """
         {"id":"%s","name":"Lightning Bolt","lang":"en","set":"lea","set_name":"Limited Edition Alpha","collector_number":"161","finishes":["nonfoil","foil"],"games":["paper"],"image_uris":{"small":"small.jpg","large":"large.jpg"},"card_faces":[{"image_uris":{"normal":"face-normal.jpg","large":"face-large.jpg"}}]}

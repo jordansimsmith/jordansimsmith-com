@@ -2,9 +2,6 @@ package com.jordansimsmith.tcginventory.catalog.server;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.service.BadRequestException;
 import com.jordansimsmith.service.NotFoundException;
 import com.jordansimsmith.service.ServiceException;
@@ -31,60 +28,24 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.zip.GZIPInputStream;
 import javax.annotation.Nullable;
 import software.amazon.awssdk.core.exception.SdkException;
-import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
-import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
-import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 
 public class PokemonPrintingLookup {
   private static final Duration REGISTRY_CHECK_INTERVAL = Duration.ofMinutes(5);
   private static final String UNAVAILABLE = "catalog is temporarily unavailable";
 
-  @JsonIgnoreProperties(ignoreUnknown = true)
-  private record Snapshot(
-      @JsonProperty("game") String game,
-      @JsonProperty("groups") List<Group> groups,
-      @JsonProperty("products") List<Product> products) {}
-
-  @JsonIgnoreProperties(ignoreUnknown = true)
-  private record Group(
-      @JsonProperty("group_id") int id,
-      @JsonProperty("set_code") String setCode,
-      @JsonProperty("set_name") String setName) {}
-
-  @JsonIgnoreProperties(ignoreUnknown = true)
-  private record Product(
-      @JsonProperty("product_id") int id,
-      @JsonProperty("name") String name,
-      @JsonProperty("group_id") int groupId,
-      @JsonProperty("collector_number") String collectorNumber,
-      @JsonProperty("available_finishes") List<String> finishes) {}
-
-  private final DynamoDbClient dynamoDb;
-  private final S3Client s3;
-  private final String tableName;
-  private final String bucket;
-  private final ObjectMapper objectMapper;
+  private final CatalogRepository repository;
+  private final CatalogSnapshotStore snapshotStore;
   private final Clock clock;
   private Map<String, CatalogPrinting> cachedPrintings;
   private String snapshotId;
   private Instant lastCheckedAt;
 
   public PokemonPrintingLookup(
-      DynamoDbClient dynamoDb,
-      S3Client s3,
-      String tableName,
-      String bucket,
-      ObjectMapper objectMapper,
-      Clock clock) {
-    this.dynamoDb = dynamoDb;
-    this.s3 = s3;
-    this.tableName = tableName;
-    this.bucket = bucket;
-    this.objectMapper = objectMapper;
+      CatalogRepository repository, CatalogSnapshotStore snapshotStore, Clock clock) {
+    this.repository = repository;
+    this.snapshotStore = snapshotStore;
     this.clock = clock;
   }
 
@@ -210,79 +171,52 @@ public class PokemonPrintingLookup {
     }
 
     try {
-      var latest =
-          dynamoDb.query(
-              request ->
-                  request
-                      .tableName(tableName)
-                      .keyConditionExpression("pk = :pk AND begins_with(sk, :prefix)")
-                      .expressionAttributeValues(
-                          Map.of(
-                              ":pk", AttributeValue.fromS("CATALOG#" + game.id()),
-                              ":prefix", AttributeValue.fromS("SNAPSHOT#")))
-                      .scanIndexForward(false)
-                      .limit(1)
-                      .consistentRead(true));
-      if (latest.items().isEmpty()) {
+      var latest = repository.getLatestSnapshot(game.id());
+      if (latest == null || latest.getSnapshotId() == null || latest.getSnapshotId().isBlank()) {
         throw new ServiceUnavailableException(UNAVAILABLE);
       }
 
-      var entry = latest.items().getFirst();
-      var latestId = requiredAttribute(entry, "snapshot_id");
+      var latestId = latest.getSnapshotId();
       if (!latestId.equals(snapshotId)) {
-        var key = requiredAttribute(entry, "s3_key");
-        var request = GetObjectRequest.builder().bucket(bucket).key(key).build();
-        Snapshot snapshot;
-        try (var object = s3.getObject(request);
-            var gzip = new GZIPInputStream(object)) {
-          snapshot = objectMapper.readValue(gzip, Snapshot.class);
+        if (latest.getS3Key() == null || latest.getS3Key().isBlank()) {
+          throw new ServiceUnavailableException(UNAVAILABLE);
         }
-        cachedPrintings = toPrintingIndex(game, snapshot);
+        cachedPrintings = toPrintingIndex(game, snapshotStore.getSnapshot(latest));
         snapshotId = latestId;
       }
       lastCheckedAt = clock.now();
       return cachedPrintings;
-    } catch (IOException | SdkException e) {
+    } catch (IOException | SdkException | IllegalArgumentException e) {
       throw new ServiceUnavailableException(UNAVAILABLE, e);
     }
   }
 
-  private Map<String, CatalogPrinting> toPrintingIndex(Game game, Snapshot snapshot)
+  private Map<String, CatalogPrinting> toPrintingIndex(Game game, TcgCsvCatalogSnapshot snapshot)
       throws ServiceUnavailableException {
-    if (snapshot == null
-        || !game.id().equals(snapshot.game())
-        || snapshot.groups() == null
-        || snapshot.products() == null) {
+    if (snapshot == null || !game.id().equals(snapshot.game())) {
       throw new ServiceUnavailableException(UNAVAILABLE);
     }
 
-    var groups = new HashMap<Integer, Group>();
+    var groups = new HashMap<Integer, TcgCsvCatalogSnapshot.Group>();
     for (var group : snapshot.groups()) {
-      if (group == null
-          || group.setCode() == null
+      if (group.setCode() == null
           || group.setName() == null
-          || groups.putIfAbsent(group.id(), group) != null) {
+          || groups.putIfAbsent(group.groupId(), group) != null) {
         throw new ServiceUnavailableException(UNAVAILABLE);
       }
     }
 
     var sortedProducts = new ArrayList<>(snapshot.products());
-    if (sortedProducts.contains(null)) {
-      throw new ServiceUnavailableException(UNAVAILABLE);
-    }
-    sortedProducts.sort(Comparator.comparingInt(Product::id));
+    sortedProducts.sort(Comparator.comparingInt(TcgCsvCatalogSnapshot.Product::productId));
     var gameFinishes = game.finishes().stream().map(Finish::id).toList();
     var printings = new LinkedHashMap<String, CatalogPrinting>();
     for (var product : sortedProducts) {
       var group = groups.get(product.groupId());
-      if (group == null
-          || product.name() == null
-          || product.collectorNumber() == null
-          || product.finishes() == null) {
+      if (group == null || product.name() == null || product.collectorNumber() == null) {
         throw new ServiceUnavailableException(UNAVAILABLE);
       }
-      var externalId = Integer.toString(product.id());
-      var finishes = gameFinishes.stream().filter(product.finishes()::contains).toList();
+      var externalId = Integer.toString(product.productId());
+      var finishes = gameFinishes.stream().filter(product.availableFinishes()::contains).toList();
       var printing =
           new CatalogPrinting(
               game.id(),
@@ -297,14 +231,5 @@ public class PokemonPrintingLookup {
       }
     }
     return Collections.unmodifiableMap(printings);
-  }
-
-  private String requiredAttribute(Map<String, AttributeValue> entry, String name)
-      throws ServiceUnavailableException {
-    var value = entry.get(name);
-    if (value == null || value.s() == null || value.s().isBlank()) {
-      throw new ServiceUnavailableException(UNAVAILABLE);
-    }
-    return value.s();
   }
 }

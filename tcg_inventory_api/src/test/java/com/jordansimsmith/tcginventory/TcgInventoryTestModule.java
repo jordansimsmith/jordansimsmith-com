@@ -4,10 +4,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.queue.FakeQueueClient;
 import com.jordansimsmith.queue.QueueClient;
-import com.jordansimsmith.tcginventory.catalog.CatalogSnapshotItem;
-import com.jordansimsmith.tcginventory.catalog.CatalogSnapshotStore;
-import com.jordansimsmith.tcginventory.catalog.FakeTcgCsvClient;
-import com.jordansimsmith.tcginventory.catalog.TcgCsvClient;
 import com.jordansimsmith.tcginventory.catalog.server.CatalogModule;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FakeFetchTcgService;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
@@ -63,7 +59,7 @@ public class TcgInventoryTestModule {
   @Singleton
   @Named("catalogSnapshotBucket")
   String catalogSnapshotBucket() {
-    return CatalogSnapshotStore.BUCKET;
+    return "api.tcg-inventory.jordansimsmith.com";
   }
 
   @Provides
@@ -116,13 +112,6 @@ public class TcgInventoryTestModule {
       @Named("tcgInventoryTableName") String tableName) {
     var schema = TableSchema.fromBean(TcgInventoryTableDefinition.class);
     return dynamoDbEnhancedClient.table(tableName, schema);
-  }
-
-  @Provides
-  @Singleton
-  DynamoDbTable<CatalogSnapshotItem> catalogSnapshotTable(
-      DynamoDbEnhancedClient client, @Named("tcgInventoryTableName") String tableName) {
-    return client.table(tableName, TableSchema.fromBean(CatalogSnapshotItem.class));
   }
 
   @Provides
@@ -225,17 +214,5 @@ public class TcgInventoryTestModule {
   @Singleton
   FakeGamesService fakeGamesService() {
     return new FakeGamesService();
-  }
-
-  @Provides
-  @Singleton
-  FakeTcgCsvClient fakeTcgCsvClient() {
-    return new FakeTcgCsvClient();
-  }
-
-  @Provides
-  @Singleton
-  TcgCsvClient tcgCsvClient(FakeTcgCsvClient fakeTcgCsvClient) {
-    return fakeTcgCsvClient;
   }
 }

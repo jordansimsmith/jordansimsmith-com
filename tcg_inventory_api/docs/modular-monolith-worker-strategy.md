@@ -2,7 +2,7 @@
 
 This document extends the [modular monolith engineering strategy](modular-monolith-strategy.md) with the ownership, execution, and recovery rules for background work. Each vertical may have synchronous service operations and asynchronous processing. Both belong to the same domain owner.
 
-The [service README](../README.md) describes the runtime currently implemented. Imports, Orders, Pricing, Reports, Publish, and Scans own their workflow records or lifecycle, messages, and queue adapters. Scans owns confirmation admission and dispatch to its Java worker through the Scans FIFO. Historical Imports and Orders `JOB#` records remain stored in DynamoDB without runtime readers or writers. Do not introduce a generic Jobs vertical.
+The [service README](../README.md) describes the runtime currently implemented. Imports, Orders, Pricing, Reports, Publish, and Scans own their workflow records or lifecycle, messages, and queue adapters. Scans owns confirmation admission and dispatch to its Java worker through the Scans FIFO. Catalog owns its TCGCSV refresh message, SQS adapter, and snapshot publication. The Catalog worker builds as a standalone JAR and is exercised by direct invocation. Production infrastructure has no Catalog refresh Lambda, queue, or schedule. Historical Imports and Orders `JOB#` records remain stored in DynamoDB without runtime readers or writers. Do not introduce a generic Jobs vertical.
 
 ## Ownership and public contracts
 
@@ -42,7 +42,7 @@ public void handleMessage(RequestContext ctx, PublishMessage message)
     throws ServiceException;
 ```
 
-The Lambda adapter deserializes the message, constructs `RequestContext` from the queued operation's user scope, and calls `handleMessage`. The message handler owns progress and continuation scheduling. Returning normally means that message's work was handled; the overall operation may still have continuation work remaining. It returns no service response or batch-result object. This internal `void` signature is separate from the request/response requirements for public service operations.
+The Lambda adapter deserializes the message, constructs `RequestContext` for a user-scoped operation, and calls `handleMessage`. A system operation such as Catalog refresh passes only its message to the handler. The message handler owns progress and continuation scheduling. Returning normally means that message's work was handled; the overall operation may still have continuation work remaining. It returns no service response or batch-result object. This internal `void` signature is separate from the request/response requirements for public service operations.
 
 A concrete message handler is sufficient; no worker interface or service wrapper is required merely to cross these packages. Any useful internal worker interface also belongs in `server`. Checked service errors propagate to the Lambda adapter for the default queue-failure handling.
 

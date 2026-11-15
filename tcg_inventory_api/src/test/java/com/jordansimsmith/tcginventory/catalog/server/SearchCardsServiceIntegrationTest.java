@@ -33,6 +33,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
+import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeDefinition;
@@ -111,9 +113,16 @@ public class SearchCardsServiceIntegrationTest {
     s3.listObjectsV2(request -> request.bucket(BUCKET))
         .contents()
         .forEach(object -> s3.deleteObject(request -> request.bucket(BUCKET).key(object.key())));
-    var pokemon =
-        new PokemonPrintingLookup(
-            dynamoDb, s3, TABLE_NAME, BUCKET, new ObjectMapper(), new SystemClock());
+    var table =
+        DynamoDbEnhancedClient.builder()
+            .dynamoDbClient(dynamoDb)
+            .build()
+            .table(TABLE_NAME, TableSchema.fromBean(CatalogSnapshotItem.class));
+    var repository = new CatalogRepository(table, dynamoDb);
+    var store =
+        new CatalogSnapshotStore(
+            s3, BUCKET, repository, new TcgCsvCatalogArtifactCodec(new ObjectMapper()));
+    var pokemon = new PokemonPrintingLookup(repository, store, new SystemClock());
     var games = new FakeGamesService();
     searchCardsService = new SearchCardsService(games, null, pokemon);
     getCardService = new GetCardService(games, null, pokemon);

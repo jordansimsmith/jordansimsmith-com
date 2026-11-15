@@ -8,11 +8,11 @@ The adjacent [worker strategy](modular-monolith-worker-strategy.md) defines back
 
 ## Starting point
 
-Catalog owns exact card detail, search, alternatives, image URL lookup, and bulk printing lookup through its client contract and server module. The HTTP detail, search, and alternatives routes delegate directly to CatalogService. The TCGCSV refresh worker remains in the legacy package and publishes the Pokémon snapshots read by the Catalog server.
+Catalog owns exact card detail, search, alternatives, image URL lookup, and bulk printing lookup through its client contract and server module. The HTTP detail, search, and alternatives routes delegate directly to CatalogService. Catalog owns Pokémon snapshot publication and serving in its server package. Its worker adapter delegates TCGCSV refresh messages to the server.
 
 Scans owns the scan HTTP routes and sends confirmation to its own Java FIFO worker. Identification still dispatches to the Python recognition queue. Confirmation guards per-row selection saves and the parent transition with the scan version. The worker uses the Catalog and Imports clients to resolve printings and create an import with the scan ID as its receipt key.
 
-The shared Jobs runtime has been retired after confirmation moved to Scans. Historical `JOB#` records remain in DynamoDB and are not read or written. The top-level composition root retains package-scoped Bazel visibility to vertical servers for Dagger wiring. TCGCSV snapshot publication remains in the legacy Catalog package while Catalog's read operations use its client and server packages.
+The shared Jobs runtime has been retired after confirmation moved to Scans. Historical `JOB#` records remain in DynamoDB and are not read or written. The top-level composition root retains package-scoped Bazel visibility to vertical servers for Dagger wiring.
 
 Existing import confirmation and order processing already use durable progress and replay to complete work in smaller transactions. Preserve those guarantees while changing ownership; service interfaces alone do not provide them.
 

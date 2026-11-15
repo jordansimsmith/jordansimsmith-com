@@ -7,8 +7,6 @@ import com.jordansimsmith.queue.FakeQueueClient;
 import com.jordansimsmith.s3.S3TestModule;
 import com.jordansimsmith.secrets.FakeSecrets;
 import com.jordansimsmith.secrets.SecretsTestModule;
-import com.jordansimsmith.tcginventory.catalog.CatalogFactory;
-import com.jordansimsmith.tcginventory.catalog.FakeTcgCsvClient;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FakeFetchTcgService;
 import com.jordansimsmith.tcginventory.imports.client.ImportService;
 import com.jordansimsmith.tcginventory.imports.server.ImportMessage;
@@ -52,7 +50,7 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
       S3TestModule.class,
       TcgInventoryTestModule.class
     })
-public interface TcgInventoryTestFactory extends CatalogFactory {
+public interface TcgInventoryTestFactory extends TcgInventoryFactory {
   URI UNUSED_S3_ENDPOINT = URI.create("http://localhost:1");
   URI UNUSED_FIREBASE_TOKEN_URI = URI.create("http://localhost:1/token");
   URI UNUSED_FETCHTCG_BASE_URI = URI.create("http://localhost:1");
@@ -74,8 +72,6 @@ public interface TcgInventoryTestFactory extends CatalogFactory {
   FakeFetchTcgService fakeFetchTcgService();
 
   FakePhotosService fakePhotosService();
-
-  FakeTcgCsvClient fakeTcgCsvClient();
 
   DynamoDbClient dynamoDbClient();
 

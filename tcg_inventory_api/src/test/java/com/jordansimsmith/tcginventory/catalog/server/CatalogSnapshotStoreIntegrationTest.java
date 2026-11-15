@@ -1,4 +1,4 @@
-package com.jordansimsmith.tcginventory.catalog;
+package com.jordansimsmith.tcginventory.catalog.server;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -30,6 +30,8 @@ import org.junit.jupiter.api.Test;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
+import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.ConditionalCheckFailedException;
 import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
@@ -41,19 +43,21 @@ import software.amazon.awssdk.services.s3.model.S3Exception;
 
 @Testcontainers
 public class CatalogSnapshotStoreIntegrationTest {
+  private static final String BUCKET = "api.tcg-inventory.jordansimsmith.com";
   @Container private static final DynamoDbContainer dynamoDbContainer = new DynamoDbContainer();
   @Container private static final S3Container s3Container = new S3Container();
 
   private TcgInventoryTestFactory factory;
   private CatalogSnapshotStore store;
   private CatalogRepository repository;
+  private DynamoDbTable<CatalogSnapshotItem> snapshotTable;
 
   @BeforeAll
   static void setUpBeforeClass() {
     var factory =
         TcgInventoryTestFactory.create(dynamoDbContainer.getEndpoint(), s3Container.getEndpoint());
     DynamoDbUtils.createTable(factory.dynamoDbClient(), factory.tableDefinition());
-    factory.s3Client().createBucket(request -> request.bucket(CatalogSnapshotStore.BUCKET));
+    factory.s3Client().createBucket(request -> request.bucket(BUCKET));
   }
 
   @BeforeEach
@@ -63,24 +67,27 @@ public class CatalogSnapshotStoreIntegrationTest {
     DynamoDbUtils.reset(factory.dynamoDbClient());
     var s3Client = factory.s3Client();
     s3Client
-        .listObjectsV2(
-            request -> request.bucket(CatalogSnapshotStore.BUCKET).prefix("catalogs/tcgcsv/"))
+        .listObjectsV2(request -> request.bucket(BUCKET).prefix("catalogs/tcgcsv/"))
         .contents()
         .forEach(
-            object ->
-                s3Client.deleteObject(
-                    request -> request.bucket(CatalogSnapshotStore.BUCKET).key(object.key())));
-    repository = new CatalogRepository(factory.catalogSnapshotTable(), factory.dynamoDbClient());
+            object -> s3Client.deleteObject(request -> request.bucket(BUCKET).key(object.key())));
+    snapshotTable =
+        factory
+            .dynamoDbEnhancedClient()
+            .table(
+                factory.tableDefinition().tableName(),
+                TableSchema.fromBean(CatalogSnapshotItem.class));
+    repository = new CatalogRepository(snapshotTable, factory.dynamoDbClient());
     store =
         new CatalogSnapshotStore(
             factory.s3Client(),
-            CatalogSnapshotStore.BUCKET,
+            BUCKET,
             repository,
             new TcgCsvCatalogArtifactCodec(factory.objectMapper()));
   }
 
   @Test
-  void findCardsShouldReadSnapshotPublishedByLegacyStore() throws Exception {
+  void findCardsShouldReadSnapshotPublishedByStore() throws Exception {
     // arrange
     store.createSnapshot(snapshot("pokemon", "2026-10-07T20:06:09Z", "Pikachu", 25));
 
@@ -100,7 +107,7 @@ public class CatalogSnapshotStoreIntegrationTest {
   }
 
   @Test
-  void getCardShouldReadSnapshotPublishedByLegacyStoreAndShareItWithBulkLookup() throws Exception {
+  void getCardShouldReadSnapshotPublishedByStoreAndShareItWithBulkLookup() throws Exception {
     // arrange
     store.createSnapshot(snapshot("pokemon", "2026-10-07T20:06:09Z", "Pikachu", 25));
     var service = factory.catalogService();
@@ -126,6 +133,16 @@ public class CatalogSnapshotStoreIntegrationTest {
             () ->
                 service.getCard(new RequestContext("alice"), new GetCardRequest("pokemon", "025")))
         .isInstanceOf(NotFoundException.class);
+
+    // act / assert
+    var clock = factory.fakeClock();
+    clock.setTime(clock.now().plusSeconds(300));
+    assertThat(
+            service
+                .getCard(new RequestContext("alice"), new GetCardRequest("pokemon", "26"))
+                .card()
+                .name())
+        .isEqualTo("Raichu");
   }
 
   @Test
@@ -153,7 +170,7 @@ public class CatalogSnapshotStoreIntegrationTest {
     factory
         .s3Client()
         .putObject(
-            request -> request.bucket(CatalogSnapshotStore.BUCKET).key(item.getS3Key()),
+            request -> request.bucket(BUCKET).key(item.getS3Key()),
             RequestBody.fromBytes(gzip("{not json".getBytes(StandardCharsets.UTF_8))));
 
     // act / assert
@@ -223,9 +240,7 @@ public class CatalogSnapshotStoreIntegrationTest {
   void getSnapshotShouldPropagateMissingArtifact() throws Exception {
     // arrange
     var item = store.createSnapshot(snapshot("pokemon", "2026-10-07T20:06:09Z", "Pikachu", 25));
-    factory
-        .s3Client()
-        .deleteObject(request -> request.bucket(CatalogSnapshotStore.BUCKET).key(item.getS3Key()));
+    factory.s3Client().deleteObject(request -> request.bucket(BUCKET).key(item.getS3Key()));
 
     // act/assert
     assertThatThrownBy(() -> store.getSnapshot(item)).isInstanceOf(NoSuchKeyException.class);
@@ -243,7 +258,7 @@ public class CatalogSnapshotStoreIntegrationTest {
         .putObject(
             request ->
                 request
-                    .bucket(CatalogSnapshotStore.BUCKET)
+                    .bucket(BUCKET)
                     .key(CatalogSnapshotStore.key("pokemon", original.snapshotId()))
                     .contentType("application/gzip"),
             RequestBody.fromBytes(originalBytes));
@@ -305,7 +320,7 @@ public class CatalogSnapshotStoreIntegrationTest {
     var conflictingStore =
         new CatalogSnapshotStore(
             conflictingS3Client,
-            CatalogSnapshotStore.BUCKET,
+            BUCKET,
             repository,
             new TcgCsvCatalogArtifactCodec(factory.objectMapper()));
     var candidate = snapshot("pokemon", "2026-10-08T20:06:09Z", "Raichu", 26);
@@ -330,7 +345,7 @@ public class CatalogSnapshotStoreIntegrationTest {
     var published =
         store.createSnapshot(snapshot("pokemon", "2026-10-07T20:06:09Z", "Pikachu", 25));
     var failingRepository =
-        new CatalogRepository(factory.catalogSnapshotTable(), factory.dynamoDbClient()) {
+        new CatalogRepository(snapshotTable, factory.dynamoDbClient()) {
           @Override
           public CatalogSnapshotItem createSnapshot(CatalogSnapshotItem item) {
             throw new IllegalStateException("registry unavailable");
@@ -339,7 +354,7 @@ public class CatalogSnapshotStoreIntegrationTest {
     var failingStore =
         new CatalogSnapshotStore(
             factory.s3Client(),
-            CatalogSnapshotStore.BUCKET,
+            BUCKET,
             failingRepository,
             new TcgCsvCatalogArtifactCodec(factory.objectMapper()));
     var retry = snapshot("pokemon", "2026-10-08T20:06:09Z", "Raichu", 26);
@@ -362,7 +377,7 @@ public class CatalogSnapshotStoreIntegrationTest {
   void createSnapshotShouldRecoverWhenRegistryWriteAcknowledgementIsLost() throws Exception {
     // arrange
     var lostAcknowledgementRepository =
-        new CatalogRepository(factory.catalogSnapshotTable(), factory.dynamoDbClient()) {
+        new CatalogRepository(snapshotTable, factory.dynamoDbClient()) {
           private boolean loseAcknowledgement = true;
 
           @Override
@@ -378,7 +393,7 @@ public class CatalogSnapshotStoreIntegrationTest {
     var retryingStore =
         new CatalogSnapshotStore(
             factory.s3Client(),
-            CatalogSnapshotStore.BUCKET,
+            BUCKET,
             lostAcknowledgementRepository,
             new TcgCsvCatalogArtifactCodec(factory.objectMapper()));
     var snapshot = snapshot("pokemon", "2026-10-07T20:06:09Z", "Pikachu", 25);
@@ -403,7 +418,7 @@ public class CatalogSnapshotStoreIntegrationTest {
     var snapshot = snapshot("pokemon", "2026-10-07T20:06:09Z", "Pikachu", 25);
     var published = store.createSnapshot(snapshot);
     var repositoryWithStaleRead =
-        new CatalogRepository(factory.catalogSnapshotTable(), factory.dynamoDbClient()) {
+        new CatalogRepository(snapshotTable, factory.dynamoDbClient()) {
           private boolean returnStaleRead = true;
 
           @Override
@@ -418,7 +433,7 @@ public class CatalogSnapshotStoreIntegrationTest {
     var retryingStore =
         new CatalogSnapshotStore(
             factory.s3Client(),
-            CatalogSnapshotStore.BUCKET,
+            BUCKET,
             repositoryWithStaleRead,
             new TcgCsvCatalogArtifactCodec(factory.objectMapper()));
 
