@@ -6,8 +6,6 @@ This file provides guidance to AI coding agents when working with code in this r
 
 Before implementing changes in any service project (e.g., auction_tracker_api, immersion_tracker_api), always read that service's README.md first.
 
-Before implementing or materially revising a user interface, read the nearest applicable service-local `DESIGN.md` when one exists and treat it as the visual design contract. `DESIGN.md` defines visual identity only; product requirements and engineering workflow rules belong in the service `README.md` and this file.
-
 ## Build and test commands
 
 - Build all: `bazel build //...`
@@ -46,7 +44,6 @@ These commands should be run:
 
 When performing the code review step, check for:
 
-- **Import optimization**: Ensure all imports are used instead of fully qualified names (e.g., `import java.util.ArrayList;` instead of `java.util.ArrayList`)
 - **Comment quality**: Remove comments that don't add value over what is already communicated in the code
 - **Code clarity**: Verify that the code is self-explanatory and follows established patterns
 - **Style consistency**: Check that the code follows all style guidelines and matches surrounding code
@@ -106,7 +103,6 @@ When performing the code review step, check for:
 - Integration tests: Use local dependencies (Testcontainers), test component interactions
 - E2E tests: Build local stack of complete system, test real user workflows
 - With DynamoDB test containers, no need to clean up data after tests - containers are reset between tests
-- When a test factory gains a dependency, pass it at every call site even if the test does not use it (for example `UNUSED_S3_ENDPOINT`)
 - Keep test fixtures and setup self-contained in the test file that uses them. Do not extract shared fixture factories or helpers across test files just to reduce duplication; keep construction inline unless a shared test utility has clear value or is explicitly requested.
 - Maintain a testing pyramid: many unit tests, fewer integration tests, fewest E2E tests
 
