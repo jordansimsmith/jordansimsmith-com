@@ -6,8 +6,6 @@ This file provides guidance to AI coding agents when working with code in this r
 
 Before implementing changes in any service project (e.g., auction_tracker_api, immersion_tracker_api), always read that service's README.md first.
 
-For service README authoring and update standards, use the project skill at `.agents/skills/service-readme-authoring/SKILL.md`.
-
 Before implementing or materially revising a user interface, read the nearest applicable service-local `DESIGN.md` when one exists and treat it as the visual design contract. `DESIGN.md` defines visual identity only; product requirements and engineering workflow rules belong in the service `README.md` and this file.
 
 ## Build and test commands
@@ -137,4 +135,3 @@ When performing the code review step, check for:
 
 - Service documentation belongs in `README.md` at the root of each service directory.
 - Use sentence casing for README headings (only capitalize first word and proper nouns).
-- Use `.agents/skills/service-readme-authoring/SKILL.md` as the canonical README structure/workflow standard.
