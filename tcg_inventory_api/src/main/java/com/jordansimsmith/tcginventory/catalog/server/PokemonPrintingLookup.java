@@ -12,11 +12,13 @@ import com.jordansimsmith.service.ServiceUnavailableException;
 import com.jordansimsmith.tcginventory.catalog.client.Card;
 import com.jordansimsmith.tcginventory.catalog.client.CatalogPrinting;
 import com.jordansimsmith.tcginventory.catalog.client.FindCardAlternativesResponse;
+import com.jordansimsmith.tcginventory.catalog.client.ImageUrls;
 import com.jordansimsmith.tcginventory.catalog.client.SearchCardsResponse;
 import com.jordansimsmith.tcginventory.games.client.Finish;
 import com.jordansimsmith.tcginventory.games.client.Game;
 import com.jordansimsmith.time.Clock;
 import java.io.IOException;
+import java.net.URLEncoder;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -37,6 +39,13 @@ import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 
 public class PokemonPrintingLookup {
   private static final Duration REGISTRY_CHECK_INTERVAL = Duration.ofMinutes(5);
+
+  public static ImageUrls getCardImages(String externalId) {
+    var encodedExternalId = URLEncoder.encode(externalId, UTF_8).replace("+", "%20");
+    return new ImageUrls(
+        "https://tcgplayer-cdn.tcgplayer.com/product/" + encodedExternalId + "_200w.jpg",
+        "https://tcgplayer-cdn.tcgplayer.com/product/" + encodedExternalId + "_in_1000x1000.jpg");
+  }
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   private record Snapshot(
@@ -136,7 +145,7 @@ public class PokemonPrintingLookup {
         group.setCode(),
         group.setName(),
         product.collectorNumber(),
-        CardImageUrls.forSource(game.externalSource(), externalId),
+        getCardImages(externalId),
         finishes);
   }
 
@@ -292,7 +301,7 @@ public class PokemonPrintingLookup {
         group.setCode(),
         group.setName(),
         product.collectorNumber(),
-        CardImageUrls.forSource(game.externalSource(), externalId),
+        getCardImages(externalId),
         finishes);
   }
 

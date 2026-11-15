@@ -41,7 +41,15 @@ public class FindCardImagesService {
                 .map(
                     externalId ->
                         new CardImages(
-                            externalId, CardImageUrls.forSource(game.externalSource(), externalId)))
+                            externalId,
+                            switch (game.externalSource()) {
+                              case "scryfall" ->
+                                  MagicTheGatheringPrintingLookup.getCardImages(externalId);
+                              case "tcgplayer" -> PokemonPrintingLookup.getCardImages(externalId);
+                              default ->
+                                  throw new IllegalStateException(
+                                      "no card image URLs for external source");
+                            }))
                 .toList();
     return new FindCardImagesResponse(images);
   }

@@ -66,11 +66,4 @@ public class FindCardImagesServiceTest {
         .isInstanceOf(NotFoundException.class)
         .hasMessage("unsupported game: unknown");
   }
-
-  @Test
-  void cardImageUrlsShouldRejectUnsupportedExternalSource() {
-    assertThatThrownBy(() -> CardImageUrls.forSource("unknown", "card-id"))
-        .isInstanceOf(IllegalStateException.class)
-        .hasMessage("no card image URLs for external source");
-  }
 }

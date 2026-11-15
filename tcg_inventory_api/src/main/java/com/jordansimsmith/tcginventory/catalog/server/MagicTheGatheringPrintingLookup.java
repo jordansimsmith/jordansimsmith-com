@@ -93,6 +93,12 @@ public class MagicTheGatheringPrintingLookup {
     this.objectMapper = objectMapper;
   }
 
+  public static ImageUrls getCardImages(String externalId) {
+    var encodedExternalId = URLEncoder.encode(externalId, UTF_8).replace("+", "%20");
+    var imageUrl = "https://api.scryfall.com/cards/" + encodedExternalId + "?format=image&version=";
+    return new ImageUrls(imageUrl + "small", imageUrl + "normal");
+  }
+
   public Card getCard(Game game, String externalId) throws ServiceException {
     if (externalId == null || !EXTERNAL_ID.matcher(externalId).matches()) {
       throw new BadRequestException("external_id must be a valid Scryfall ID");
