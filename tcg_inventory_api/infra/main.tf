@@ -107,6 +107,14 @@ locals {
       max_receive_count           = 5
       visibility_timeout_seconds  = 960
     }
+    catalog = {
+      name                        = "tcg_inventory_catalog"
+      fifo                        = true
+      dlq                         = true
+      content_based_deduplication = false
+      max_receive_count           = 5
+      visibility_timeout_seconds  = 5400
+    }
   }
 
   queue_lambda_arns = {
@@ -117,6 +125,7 @@ locals {
     imports             = module.java_api.lambda_functions["imports_worker"].qualified_arn
     scans               = module.java_api.lambda_functions["scans_worker"].qualified_arn
     scan_identification = module.scan_worker.lambda_function.qualified_arn
+    catalog             = module.java_api.lambda_functions["catalog_worker"].qualified_arn
   }
 }
 
@@ -325,6 +334,11 @@ module "java_api" {
     imports_worker = {
       handler  = "com.jordansimsmith.tcginventory.imports.worker.ImportsWorkerHandler"
       artifact = var.artifacts["imports_worker"]
+      timeout  = 900
+    }
+    catalog_worker = {
+      handler  = "com.jordansimsmith.tcginventory.catalog.worker.CatalogWorkerHandler"
+      artifact = var.artifacts["catalog_worker"]
       timeout  = 900
     }
   }
@@ -612,11 +626,87 @@ data "aws_iam_policy_document" "lambda_sqs" {
       "sqs:GetQueueUrl",
     ]
   }
+
+  statement {
+    effect    = "Allow"
+    resources = [module.sqs_queue["catalog"].queue_arn]
+    actions = [
+      "sqs:ReceiveMessage",
+      "sqs:DeleteMessage",
+      "sqs:GetQueueUrl",
+      "sqs:GetQueueAttributes",
+    ]
+  }
 }
 
 resource "aws_iam_policy" "lambda_sqs" {
   name   = "${local.application_id}_lambda_sqs"
   policy = data.aws_iam_policy_document.lambda_sqs.json
+}
+
+data "aws_iam_policy_document" "catalog_scheduler_assume_role" {
+  statement {
+    effect  = "Allow"
+    actions = ["sts:AssumeRole"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["scheduler.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "catalog_scheduler" {
+  name               = "${local.application_id}_catalog_scheduler"
+  assume_role_policy = data.aws_iam_policy_document.catalog_scheduler_assume_role.json
+}
+
+data "aws_iam_policy_document" "catalog_scheduler_sqs" {
+  statement {
+    effect    = "Allow"
+    resources = [module.sqs_queue["catalog"].queue_arn]
+    actions   = ["sqs:SendMessage"]
+  }
+}
+
+resource "aws_iam_policy" "catalog_scheduler_sqs" {
+  name   = "${local.application_id}_catalog_scheduler_sqs"
+  policy = data.aws_iam_policy_document.catalog_scheduler_sqs.json
+}
+
+resource "aws_iam_role_policy_attachment" "catalog_scheduler_sqs" {
+  role       = aws_iam_role.catalog_scheduler.name
+  policy_arn = aws_iam_policy.catalog_scheduler_sqs.arn
+}
+
+resource "aws_scheduler_schedule" "catalog_refresh_pokemon" {
+  name                         = "${local.application_id}_refresh_pokemon_catalog"
+  description                  = "Queues the daily Pokémon catalog refresh"
+  schedule_expression          = "cron(0 22 * * ? *)"
+  schedule_expression_timezone = "UTC"
+  depends_on                   = [aws_iam_role_policy_attachment.catalog_scheduler_sqs]
+
+  flexible_time_window {
+    mode = "OFF"
+  }
+
+  target {
+    arn      = "arn:aws:scheduler:::aws-sdk:sqs:sendMessage"
+    role_arn = aws_iam_role.catalog_scheduler.arn
+    input    = <<-JSON
+      {
+        "QueueUrl": "${module.sqs_queue["catalog"].queue_url}",
+        "MessageBody": "{\"game\":\"pokemon\",\"scheduled_at\":\"<aws.scheduler.scheduled-time>\"}",
+        "MessageGroupId": "pokemon",
+        "MessageDeduplicationId": "pokemon#<aws.scheduler.scheduled-time>"
+      }
+    JSON
+
+    retry_policy {
+      maximum_event_age_in_seconds = 3600
+      maximum_retry_attempts       = 5
+    }
+  }
 }
 
 data "aws_iam_policy_document" "lambda_secretsmanager" {
