@@ -8,8 +8,8 @@ import com.jordansimsmith.tcginventory.catalog.client.FindCardAlternativesReques
 import com.jordansimsmith.tcginventory.catalog.client.FindCardAlternativesResponse;
 import com.jordansimsmith.tcginventory.catalog.client.FindCardImagesRequest;
 import com.jordansimsmith.tcginventory.catalog.client.FindCardImagesResponse;
-import com.jordansimsmith.tcginventory.catalog.client.FindCatalogCardsRequest;
-import com.jordansimsmith.tcginventory.catalog.client.FindCatalogCardsResponse;
+import com.jordansimsmith.tcginventory.catalog.client.FindCardsRequest;
+import com.jordansimsmith.tcginventory.catalog.client.FindCardsResponse;
 import com.jordansimsmith.tcginventory.catalog.client.GetCardRequest;
 import com.jordansimsmith.tcginventory.catalog.client.GetCardResponse;
 import com.jordansimsmith.tcginventory.catalog.client.SearchCardsRequest;
@@ -50,8 +50,7 @@ public class CatalogModule {
     var pokemon =
         new PokemonPrintingLookup(dynamoDb, s3, tableName, snapshotBucket, objectMapper, clock);
     var getCardService = new GetCardService(gamesService, magicTheGathering, pokemon);
-    var findCatalogCardsService =
-        new FindCatalogCardsService(gamesService, magicTheGathering, pokemon);
+    var findCardsService = new FindCardsService(gamesService, magicTheGathering, pokemon);
     var searchCardsService = new SearchCardsService(gamesService, magicTheGathering, pokemon);
     var findCardAlternativesService =
         new FindCardAlternativesService(gamesService, magicTheGathering, pokemon);
@@ -69,9 +68,9 @@ public class CatalogModule {
       }
 
       @Override
-      public FindCatalogCardsResponse findCards(RequestContext ctx, FindCatalogCardsRequest request)
+      public FindCardsResponse findCards(RequestContext ctx, FindCardsRequest request)
           throws ServiceException {
-        return findCatalogCardsService.findCards(ctx, request);
+        return findCardsService.findCards(ctx, request);
       }
 
       @Override

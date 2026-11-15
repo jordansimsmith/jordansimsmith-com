@@ -20,8 +20,8 @@ import com.jordansimsmith.service.ServiceUnavailableException;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
 import com.jordansimsmith.tcginventory.catalog.client.CatalogPrinting;
 import com.jordansimsmith.tcginventory.catalog.client.CatalogService;
-import com.jordansimsmith.tcginventory.catalog.client.FindCatalogCardsRequest;
-import com.jordansimsmith.tcginventory.catalog.client.FindCatalogCardsResponse;
+import com.jordansimsmith.tcginventory.catalog.client.FindCardsRequest;
+import com.jordansimsmith.tcginventory.catalog.client.FindCardsResponse;
 import com.jordansimsmith.tcginventory.imports.client.CreateImportRequest;
 import com.jordansimsmith.tcginventory.imports.client.FindImportsRequest;
 import com.jordansimsmith.tcginventory.imports.client.GetImportRequest;
@@ -155,8 +155,8 @@ class ScanConfirmationMessageHandlerIntegrationTest {
     // arrange
     saveScan(List.of(scanRow(3, "id-1")), "confirming");
     when(catalog.findCards(any(), any()))
-        .thenReturn(new FindCatalogCardsResponse(List.of()))
-        .thenReturn(new FindCatalogCardsResponse(List.of(printing("id-1", "foil"))))
+        .thenReturn(new FindCardsResponse(List.of()))
+        .thenReturn(new FindCardsResponse(List.of(printing("id-1", "foil"))))
         .thenThrow(new ServiceUnavailableException("catalog unavailable"));
 
     // act / assert
@@ -224,8 +224,8 @@ class ScanConfirmationMessageHandlerIntegrationTest {
     when(catalog.findCards(any(), any()))
         .thenAnswer(
             invocation -> {
-              FindCatalogCardsRequest request = invocation.getArgument(1);
-              return new FindCatalogCardsResponse(
+              FindCardsRequest request = invocation.getArgument(1);
+              return new FindCardsResponse(
                   request.externalIds().stream().map(id -> printing(id, "normal")).toList());
             });
   }
@@ -234,8 +234,8 @@ class ScanConfirmationMessageHandlerIntegrationTest {
     return new CatalogPrinting("mtg", id, "Card " + id, "dom", "Dominaria", "42", List.of(finish));
   }
 
-  private FindCatalogCardsRequest request(int first, int last) {
-    return new FindCatalogCardsRequest(
+  private FindCardsRequest request(int first, int last) {
+    return new FindCardsRequest(
         "mtg", IntStream.rangeClosed(first, last).mapToObj(i -> "id-" + i).toList());
   }
 }

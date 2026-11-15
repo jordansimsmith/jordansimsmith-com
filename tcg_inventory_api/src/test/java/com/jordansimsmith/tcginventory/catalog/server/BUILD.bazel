@@ -5,7 +5,7 @@ java_test_suite(
     srcs = [
         "FindCardAlternativesServiceTest.java",
         "FindCardImagesServiceTest.java",
-        "FindCatalogCardsServiceTest.java",
+        "FindCardsServiceTest.java",
         "GetCardServiceTest.java",
         "SearchCardsServiceTest.java",
     ],

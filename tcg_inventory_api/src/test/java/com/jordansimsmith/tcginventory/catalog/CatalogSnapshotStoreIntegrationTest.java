@@ -11,7 +11,7 @@ import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceUnavailableException;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
 import com.jordansimsmith.tcginventory.catalog.client.CatalogPrinting;
-import com.jordansimsmith.tcginventory.catalog.client.FindCatalogCardsRequest;
+import com.jordansimsmith.tcginventory.catalog.client.FindCardsRequest;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -89,7 +89,7 @@ public class CatalogSnapshotStoreIntegrationTest {
             .catalogService()
             .findCards(
                 new RequestContext("alice"),
-                new FindCatalogCardsRequest("pokemon", List.of("25", "025", "25", "missing")));
+                new FindCardsRequest("pokemon", List.of("25", "025", "25", "missing")));
 
     // assert
     assertThat(response.cards())
@@ -109,7 +109,7 @@ public class CatalogSnapshotStoreIntegrationTest {
     store.createSnapshot(snapshot("pokemon", "2026-10-07T20:07:09Z", "Raichu", 26));
     var printings =
         service.findCards(
-            new RequestContext("alice"), new FindCatalogCardsRequest("pokemon", List.of("25")));
+            new RequestContext("alice"), new FindCardsRequest("pokemon", List.of("25")));
 
     // assert
     assertThat(card.card().name()).isEqualTo("Pikachu");
@@ -136,8 +136,7 @@ public class CatalogSnapshotStoreIntegrationTest {
     assertThatThrownBy(
             () ->
                 service.findCards(
-                    new RequestContext("alice"),
-                    new FindCatalogCardsRequest("pokemon", List.of("25"))))
+                    new RequestContext("alice"), new FindCardsRequest("pokemon", List.of("25"))))
         .isInstanceOf(ServiceUnavailableException.class)
         .hasMessageContaining("has not been published");
     assertThatThrownBy(

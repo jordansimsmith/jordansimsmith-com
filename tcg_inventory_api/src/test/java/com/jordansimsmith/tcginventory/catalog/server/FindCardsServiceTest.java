@@ -8,7 +8,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.service.BadRequestException;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceUnavailableException;
-import com.jordansimsmith.tcginventory.catalog.client.FindCatalogCardsRequest;
+import com.jordansimsmith.tcginventory.catalog.client.FindCardsRequest;
 import com.jordansimsmith.tcginventory.games.client.FakeGamesService;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
@@ -29,11 +29,11 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-public class FindCatalogCardsServiceTest {
+public class FindCardsServiceTest {
   private final ObjectMapper objectMapper = new ObjectMapper();
   private final List<JsonNode> collectionRequests = new ArrayList<>();
   private HttpServer server;
-  private FindCatalogCardsService service;
+  private FindCardsService service;
   private String collectionBody;
   private int secondStatus;
   private String secondBody;
@@ -48,7 +48,7 @@ public class FindCatalogCardsServiceTest {
         new MagicTheGatheringPrintingLookup(baseUri, HttpClient.newHttpClient(), objectMapper);
     var pokemon =
         new PokemonPrintingLookup(null, null, "unused", "unused", objectMapper, Instant::now);
-    service = new FindCatalogCardsService(new FakeGamesService(), magic, pokemon);
+    service = new FindCardsService(new FakeGamesService(), magic, pokemon);
     secondStatus = 200;
     secondBody = null;
     collectionBody = null;
@@ -66,9 +66,7 @@ public class FindCatalogCardsServiceTest {
 
     // act
     var cards =
-        service
-            .findCards(new RequestContext("alice"), new FindCatalogCardsRequest("mtg", ids))
-            .cards();
+        service.findCards(new RequestContext("alice"), new FindCardsRequest("mtg", ids)).cards();
 
     // assert
     assertThat(cards)
@@ -85,14 +83,14 @@ public class FindCatalogCardsServiceTest {
     var context = new RequestContext("alice");
 
     // act / assert
-    assertThat(service.findCards(context, new FindCatalogCardsRequest("mtg", List.of())).cards())
+    assertThat(service.findCards(context, new FindCardsRequest("mtg", List.of())).cards())
         .isEmpty();
     for (var invalid :
         List.of(
-            new FindCatalogCardsRequest("mtg", Collections.nCopies(101, uuid(1))),
-            new FindCatalogCardsRequest("mtg", Collections.singletonList(null)),
-            new FindCatalogCardsRequest("mtg", List.of(" ")),
-            new FindCatalogCardsRequest("mtg", null))) {
+            new FindCardsRequest("mtg", Collections.nCopies(101, uuid(1))),
+            new FindCardsRequest("mtg", Collections.singletonList(null)),
+            new FindCardsRequest("mtg", List.of(" ")),
+            new FindCardsRequest("mtg", null))) {
       assertThatThrownBy(() -> service.findCards(context, invalid))
           .isInstanceOf(BadRequestException.class);
     }
@@ -122,7 +120,7 @@ public class FindCatalogCardsServiceTest {
         service
             .findCards(
                 context,
-                new FindCatalogCardsRequest(
+                new FindCardsRequest(
                     "mtg", List.of(canonical, upperCase, canonical, uuid(2), uuid(3), uuid(4))))
             .cards();
 
@@ -144,9 +142,7 @@ public class FindCatalogCardsServiceTest {
 
     // act / assert
     assertThatThrownBy(
-            () ->
-                service.findCards(
-                    new RequestContext("alice"), new FindCatalogCardsRequest("mtg", ids)))
+            () -> service.findCards(new RequestContext("alice"), new FindCardsRequest("mtg", ids)))
         .isInstanceOf(ServiceUnavailableException.class);
     assertThat(collectionRequests).hasSize(2);
 
@@ -154,9 +150,7 @@ public class FindCatalogCardsServiceTest {
     secondStatus = 200;
     secondBody = "{\"data\":[],\"not_found\":[]}";
     assertThatThrownBy(
-            () ->
-                service.findCards(
-                    new RequestContext("alice"), new FindCatalogCardsRequest("mtg", ids)))
+            () -> service.findCards(new RequestContext("alice"), new FindCardsRequest("mtg", ids)))
         .isInstanceOf(ServiceUnavailableException.class);
     assertThat(collectionRequests).hasSize(2);
   }

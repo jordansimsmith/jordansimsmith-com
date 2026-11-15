@@ -5,7 +5,7 @@ import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceException;
 import com.jordansimsmith.tcginventory.catalog.client.CatalogPrinting;
 import com.jordansimsmith.tcginventory.catalog.client.CatalogService;
-import com.jordansimsmith.tcginventory.catalog.client.FindCatalogCardsRequest;
+import com.jordansimsmith.tcginventory.catalog.client.FindCardsRequest;
 import com.jordansimsmith.tcginventory.imports.client.CreateImportRequest;
 import com.jordansimsmith.tcginventory.imports.client.CreateImportRow;
 import com.jordansimsmith.tcginventory.imports.client.ImportService;
@@ -88,7 +88,7 @@ public class ScanConfirmationMessageHandler {
     var ids = rows.stream().map(ScanRowItem::getSelectedExternalId).distinct().toList();
     var printings = new HashMap<String, CatalogPrinting>();
     for (var batch : Lists.partition(ids, 100)) {
-      var response = catalogService.findCards(ctx, new FindCatalogCardsRequest(game, batch));
+      var response = catalogService.findCards(ctx, new FindCardsRequest(game, batch));
       for (var printing : response.cards()) {
         printings.put(printing.externalId(), printing);
       }

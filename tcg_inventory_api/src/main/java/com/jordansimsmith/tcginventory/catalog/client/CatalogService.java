@@ -9,8 +9,7 @@ public interface CatalogService {
   FindCardImagesResponse findCardImages(RequestContext ctx, FindCardImagesRequest request)
       throws ServiceException;
 
-  FindCatalogCardsResponse findCards(RequestContext ctx, FindCatalogCardsRequest request)
-      throws ServiceException;
+  FindCardsResponse findCards(RequestContext ctx, FindCardsRequest request) throws ServiceException;
 
   FindCardAlternativesResponse findCardAlternatives(
       RequestContext ctx, FindCardAlternativesRequest request) throws ServiceException;
