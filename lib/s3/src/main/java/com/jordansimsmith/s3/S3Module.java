@@ -15,15 +15,11 @@ public class S3Module {
   @Provides
   @Singleton
   S3Client s3Client() {
-    var client =
-        S3Client.builder()
-            .region(Region.of(System.getenv("AWS_REGION")))
-            .forcePathStyle(true)
-            .httpClientBuilder(AwsCrtHttpClient.builder())
-            .build();
-    // prime the snapshot to optimise cold start times
-    client.listBuckets();
-    return client;
+    return S3Client.builder()
+        .region(Region.of(System.getenv("AWS_REGION")))
+        .forcePathStyle(true)
+        .httpClientBuilder(AwsCrtHttpClient.builder())
+        .build();
   }
 
   @Provides

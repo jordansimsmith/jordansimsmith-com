@@ -385,8 +385,6 @@ module "java_api" {
     aws.us_east_1 = aws.us_east_1
   }
 
-  # snapstart snapshot init resolves the dynamodb table and s3 bucket at startup
-  # the sqs policy attachment depends on queue creation before lambda versions publish
   depends_on = [
     aws_dynamodb_table.tcg_inventory,
     aws_s3_bucket.tcg_inventory,

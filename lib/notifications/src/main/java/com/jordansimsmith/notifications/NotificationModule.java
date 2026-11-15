@@ -17,8 +17,6 @@ public class NotificationModule {
             .region(Region.of(System.getenv("AWS_REGION")))
             .httpClientBuilder(AwsCrtHttpClient.builder())
             .build();
-    // prime the snapshot to optimise cold start times
-    snsClient.listTopics();
     return new SnsNotificationPublisher(snsClient);
   }
 }

@@ -68,7 +68,7 @@ sequenceDiagram
 - One Secrets Manager secret holds all credentials because secrets are priced per secret; the JSON map shape lets other services add namespaced keys later without creating new secrets.
 - A single global `users` list applies to all consumers, avoiding any mapping from API Gateway IDs to services.
 - Consumers reference the authorizer by convention (`arn:aws:lambda:<region>:<account>:function:auth_api_auth:live`) rather than Terraform remote state, keeping service stacks independent.
-- The `live` alias decouples consumer authorizer URIs from published Lambda versions, which change on every deploy because SnapStart requires published versions.
+- The `live` alias gives consumer authorizer URIs a stable target as new Lambda versions are published.
 - Invoke permission is granted account-wide for `apigateway.amazonaws.com` so onboarding a new authenticated API requires no change in this service.
 
 ## Integration contracts
@@ -177,7 +177,6 @@ Other services may add namespaced top-level keys alongside `users`; the authoriz
 ## Performance envelope
 
 - Single-digit requests per second across all consumers; API Gateway caches ALLOW/DENY policies for 300 seconds per credential, so authorizer invocations are far rarer than API requests.
-- SnapStart on published versions keeps cold starts low.
 - One secret and one Lambda keep the fixed monthly cost at a single Secrets Manager secret regardless of how many services consume it.
 
 ## Testing and quality gates

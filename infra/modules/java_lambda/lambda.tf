@@ -47,16 +47,10 @@ resource "aws_lambda_function" "lambda" {
   architectures    = ["x86_64"]
   publish          = true
 
-  snap_start {
-    apply_on = "PublishedVersions"
-  }
-
   tracing_config {
     mode = "Active"
   }
 
-  # snapstart snapshot init runs at publish time and may call aws services,
-  # so role permissions must be attached before any version is published
   depends_on = [
     aws_iam_role_policy_attachment.lambda_basic,
     aws_iam_role_policy_attachment.lambda_xray,
