@@ -30,7 +30,6 @@ public class FindCardAlternativesServiceTest {
   private final ObjectMapper objectMapper = new ObjectMapper();
   private final List<String> requestedUris = new ArrayList<>();
   private HttpServer server;
-  private URI baseUri;
   private String searchBody;
   private String printsSearchUri;
   private List<String> anchorFinishes;
@@ -43,8 +42,8 @@ public class FindCardAlternativesServiceTest {
     server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
     server.createContext("/cards", this::handleRequest);
     server.start();
-    baseUri = URI.create("http://127.0.0.1:" + server.getAddress().getPort());
-    printsSearchUri = baseUri + "/cards/search?order=released&q=oracleid%3Aabc&unique=prints";
+    var baseUri = URI.create("http://127.0.0.1:" + server.getAddress().getPort());
+    printsSearchUri = "https://api.scryfall.com/cards/search?order=released&q=oracleid%3Aabc";
     anchorFinishes = List.of("nonfoil", "foil");
     var magic =
         new MagicTheGatheringPrintingLookup(baseUri, HttpClient.newHttpClient(), objectMapper);
@@ -82,7 +81,7 @@ public class FindCardAlternativesServiceTest {
     assertThat(second.cards()).extracting(card -> card.externalId()).doesNotContain(CARD_ID);
     assertThat(second.nextContinuation()).isNull();
     assertThat(requestedUris.getFirst()).isEqualTo("/cards/" + CARD_ID);
-    assertThat(requestedUris.get(1)).contains("/cards/search?");
+    assertThat(requestedUris.get(1)).startsWith("/cards/search?q=oracleid%3Aabc");
     assertThat(requestedUris.get(1)).contains("page=1");
   }
 
@@ -155,9 +154,9 @@ public class FindCardAlternativesServiceTest {
   }
 
   @Test
-  void findCardAlternativesShouldRejectInvalidPrintingSearchUri() {
+  void findCardAlternativesShouldRejectPrintingSearchUriWithoutQuery() {
     // arrange
-    printsSearchUri = "https://example.com/cards/search?q=oracleid%3Aabc";
+    printsSearchUri = "https://api.scryfall.com/cards/search?order=released";
 
     // act / assert
     assertThatThrownBy(

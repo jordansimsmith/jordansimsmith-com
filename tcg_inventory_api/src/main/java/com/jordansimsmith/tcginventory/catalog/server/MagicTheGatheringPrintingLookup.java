@@ -38,6 +38,7 @@ public class MagicTheGatheringPrintingLookup {
   private static final int PROVIDER_PAGE_SIZE = 175;
   private static final int MAX_PROVIDER_PAGES_PER_REQUEST = 5;
   private static final int MAX_PROVIDER_PAGE_NUMBER = 10000;
+  private static final String UNAVAILABLE = "catalog is temporarily unavailable";
   private static final String USER_AGENT =
       "TcgInventory/1.0 (https://tcg-inventory.jordansimsmith.com)";
   private static final Pattern EXTERNAL_ID =
@@ -94,127 +95,71 @@ public class MagicTheGatheringPrintingLookup {
   }
 
   public static ImageUrls getCardImages(String externalId) {
-    var encodedExternalId = URLEncoder.encode(externalId, UTF_8).replace("+", "%20");
-    var imageUrl = "https://api.scryfall.com/cards/" + encodedExternalId + "?format=image&version=";
+    var imageUrl =
+        "https://api.scryfall.com/cards/" + encode(externalId) + "?format=image&version=";
     return new ImageUrls(imageUrl + "small", imageUrl + "normal");
   }
 
   public Card getCard(Game game, String externalId) throws ServiceException {
-    if (externalId == null || !EXTERNAL_ID.matcher(externalId).matches()) {
-      throw new BadRequestException("external_id must be a valid Scryfall ID");
-    }
-    try {
-      var card = readCard(externalId);
-      if (card.language() == null) {
-        throw new ServiceUnavailableException("catalog returned incomplete card data");
-      }
-      if (!game.language().code().equals(card.language())) {
-        throw new NotFoundException("card not found");
-      }
-      if (card.name() == null
-          || card.setCode() == null
-          || card.setName() == null
-          || card.collectorNumber() == null
-          || card.finishes() == null
-          || card.games() == null) {
-        throw new ServiceUnavailableException("catalog returned incomplete card data");
-      }
-      var finishes =
-          card.games().contains("paper")
-              ? game.finishes().stream()
-                  .map(Finish::id)
-                  .filter(
-                      finish ->
-                          card.finishes().contains("normal".equals(finish) ? "nonfoil" : finish))
-                  .toList()
-              : List.<String>of();
-      return new Card(
-          game.id(),
-          card.id(),
-          card.name(),
-          card.setCode(),
-          card.setName(),
-          card.collectorNumber(),
-          imageUrls(card),
-          finishes);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new ServiceUnavailableException("catalog is temporarily unavailable", e);
-    } catch (IOException | ServiceUnavailableException e) {
-      throw new ServiceUnavailableException("catalog is temporarily unavailable", e);
-    }
+    var card = readCard(game, externalId);
+    return toCard(toPrinting(game, card), card);
   }
 
   public List<CatalogPrinting> findCards(Game game, List<String> externalIds)
       throws ServiceUnavailableException {
-    try {
-      return doFindCards(game, externalIds);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new ServiceUnavailableException("catalog collection lookup was interrupted", e);
-    } catch (IOException e) {
-      throw new ServiceUnavailableException("catalog collection lookup failed", e);
+    var ids = externalIds.stream().filter(id -> EXTERNAL_ID.matcher(id).matches()).toList();
+    var cards = new ArrayList<CatalogPrinting>();
+    for (var chunk : Lists.partition(ids, COLLECTION_REQUEST_SIZE)) {
+      var identifiers = chunk.stream().map(Identifier::new).toList();
+      var response =
+          read("/cards/collection", new CollectionRequest(identifiers), CardCollection.class);
+      if (response == null || response.data() == null) {
+        throw new ServiceUnavailableException(UNAVAILABLE);
+      }
+      var unresolved = new HashSet<>(chunk);
+      for (var card : response.data()) {
+        var eligibleLanguage = matchesLanguage(game, card);
+        resolveId(unresolved, card.id());
+        if (!eligibleLanguage) {
+          continue;
+        }
+        var printing = toPrinting(game, card);
+        if (!printing.availableFinishes().isEmpty()) {
+          cards.add(printing);
+        }
+      }
+      if (response.notFound() != null) {
+        for (var missing : response.notFound()) {
+          resolveId(unresolved, missing == null ? null : missing.id());
+        }
+      }
+      if (!unresolved.isEmpty()) {
+        throw new ServiceUnavailableException(UNAVAILABLE);
+      }
     }
+    return List.copyOf(cards);
   }
 
   public SearchCardsResponse searchCards(
-      Game game, String query, String finish, int limit, String continuation)
+      Game game, String query, String finish, int limit, @Nullable String continuation)
       throws ServiceException {
     var position = decodePosition(continuation);
-    var providerQuery =
-        "name:\"%s\" lang:%s game:paper is:%s"
-            .formatted(escapeSearchPhrase(query), game.language().code(), scryfallFinish(finish));
-    try {
-      return readSearchPages(game, providerQuery, position, finish, limit, null, null);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new ServiceUnavailableException("catalog is temporarily unavailable", e);
-    } catch (IOException e) {
-      throw new ServiceUnavailableException("catalog is temporarily unavailable", e);
-    } catch (ServiceUnavailableException e) {
-      throw new ServiceUnavailableException("catalog is temporarily unavailable", e);
-    }
+    var providerQuery = filteredQuery(game, "name:\"" + escapeSearchPhrase(query) + "\"", finish);
+    return readSearchPages(game, providerQuery, position, finish, limit, null, null);
   }
 
   public FindCardAlternativesResponse findCardAlternatives(
-      Game game, String externalId, String finish, int limit, String continuation)
+      Game game, String externalId, String finish, int limit, @Nullable String continuation)
       throws ServiceException {
-    if (externalId == null || !EXTERNAL_ID.matcher(externalId).matches()) {
-      throw new BadRequestException("external_id must be a valid Scryfall ID");
-    }
-    try {
-      return doFindCardAlternatives(game, externalId, finish, limit, continuation);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new ServiceUnavailableException("catalog is temporarily unavailable", e);
-    } catch (IOException | ServiceUnavailableException e) {
-      throw new ServiceUnavailableException("catalog is temporarily unavailable", e);
-    }
-  }
-
-  private FindCardAlternativesResponse doFindCardAlternatives(
-      Game game, String externalId, String finish, int limit, String continuation)
-      throws IOException, InterruptedException, ServiceException {
-    var anchor = readCard(externalId);
-    if (anchor.language() == null) {
-      throw new ServiceUnavailableException("catalog returned incomplete card data");
-    }
-    if (!game.language().code().equals(anchor.language())) {
-      throw new NotFoundException("card not found");
-    }
-
-    var anchorCard = toSearchCard(game, anchor);
-    var query =
-        "%s lang:%s game:paper is:%s"
-            .formatted(
-                queryFromPrintsUri(anchor.printsSearchUri()),
-                game.language().code(),
-                scryfallFinish(finish));
+    var anchor = readCard(game, externalId);
+    var printing = toPrinting(game, anchor);
+    var query = filteredQuery(game, queryFromPrintsUri(anchor.printsSearchUri()), finish);
     var position = decodePosition(continuation);
-    var includeAnchor = continuation == null && anchorCard.availableFinishes().contains(finish);
-    var page =
-        readSearchPages(
-            game, query, position, finish, limit, includeAnchor ? anchorCard : null, externalId);
+    var first =
+        continuation == null && printing.availableFinishes().contains(finish)
+            ? toCard(printing, anchor)
+            : null;
+    var page = readSearchPages(game, query, position, finish, limit, first, externalId);
     return new FindCardAlternativesResponse(page.cards(), page.nextContinuation());
   }
 
@@ -226,50 +171,38 @@ public class MagicTheGatheringPrintingLookup {
       int limit,
       @Nullable Card first,
       @Nullable String excludedId)
-      throws IOException, InterruptedException, ServiceException {
+      throws ServiceUnavailableException {
     var cards = new ArrayList<Card>();
     var seen = new HashSet<String>();
     if (first != null) {
       cards.add(first);
-      seen.add(first.externalId());
       if (cards.size() == limit) {
         return new SearchCardsResponse(List.copyOf(cards), encodePosition(start));
       }
     }
-    int pageNumber = start.page();
-    int offset = start.offset();
-    int providerPagesRead = 0;
-    while (cards.size() < limit) {
-      if (providerPagesRead == MAX_PROVIDER_PAGES_PER_REQUEST) {
-        return new SearchCardsResponse(
-            List.copyOf(cards), encodePosition(new Position(pageNumber, offset)));
-      }
-      providerPagesRead++;
+    var pageNumber = start.page();
+    var offset = start.offset();
+    for (var pagesRead = 0; pagesRead < MAX_PROVIDER_PAGES_PER_REQUEST; pagesRead++) {
       var page = readSearchPage(query, pageNumber);
       if (page.data() == null
           || page.data().size() > PROVIDER_PAGE_SIZE
-          || page.hasMore() == null) {
-        throw new ServiceUnavailableException("catalog returned invalid search data");
+          || page.hasMore() == null
+          || offset > page.data().size()) {
+        throw new ServiceUnavailableException(UNAVAILABLE);
       }
-      if (offset > page.data().size()) {
-        throw new ServiceUnavailableException("catalog changed while paging results");
-      }
-      for (int index = offset; index < page.data().size(); index++) {
+      for (var index = offset; index < page.data().size(); index++) {
         var candidate = page.data().get(index);
         offset = index + 1;
-        if (candidate == null || candidate.language() == null) {
-          throw new ServiceUnavailableException("catalog returned invalid card data");
-        }
-        if (!game.language().code().equals(candidate.language())) {
+        if (!matchesLanguage(game, candidate)) {
           continue;
         }
-        var card = toSearchCard(game, candidate);
-        if ((excludedId != null && excludedId.equals(card.externalId()))
-            || !card.availableFinishes().contains(finish)
-            || !seen.add(card.externalId())) {
+        var printing = toPrinting(game, candidate);
+        if (printing.externalId().equals(excludedId)
+            || !printing.availableFinishes().contains(finish)
+            || !seen.add(printing.externalId())) {
           continue;
         }
-        cards.add(card);
+        cards.add(toCard(printing, candidate));
         if (cards.size() == limit) {
           var next = nextPosition(pageNumber, offset, page);
           return new SearchCardsResponse(
@@ -282,80 +215,76 @@ public class MagicTheGatheringPrintingLookup {
       pageNumber++;
       offset = 0;
     }
-    throw new IllegalStateException("catalog page exceeded its configured size");
+    return new SearchCardsResponse(
+        List.copyOf(cards), encodePosition(new Position(pageNumber, offset)));
   }
 
   private ScryfallSearchPage readSearchPage(String query, int page)
-      throws IOException, InterruptedException, ServiceUnavailableException {
-    var url =
-        baseUri
-            .resolve(
-                "/cards/search?q="
-                    + encode(query)
-                    + "&unique=prints&include_extras=true&include_variations=true&order=released&dir=desc&page="
-                    + page)
-            .toString();
-    var request =
-        HttpRequest.newBuilder()
-            .uri(URI.create(url))
-            .timeout(Duration.ofSeconds(5))
-            .header("User-Agent", USER_AGENT)
-            .header("Accept", "application/json")
-            .GET()
-            .build();
-    paceRequest();
-    var response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(UTF_8));
-    if (response.statusCode() == 404) {
-      return new ScryfallSearchPage(List.of(), false);
-    }
-    if (response.statusCode() != 200) {
-      throw new ServiceUnavailableException(
-          "catalog provider returned status " + response.statusCode());
-    }
-    var result = objectMapper.readValue(response.body(), ScryfallSearchPage.class);
-    if (result == null || result.data() == null) {
-      throw new ServiceUnavailableException("catalog returned invalid search data");
-    }
-    return result;
+      throws ServiceUnavailableException {
+    var path =
+        "/cards/search?q="
+            + encode(query)
+            + "&unique=prints&include_extras=true&include_variations=true&order=released&dir=desc&page="
+            + page;
+    var result = read(path, null, ScryfallSearchPage.class);
+    return result == null ? new ScryfallSearchPage(List.of(), false) : result;
   }
 
-  private Card toSearchCard(Game game, ScryfallCard card) throws ServiceUnavailableException {
+  private boolean matchesLanguage(Game game, ScryfallCard card) throws ServiceUnavailableException {
+    if (card == null || card.language() == null) {
+      throw new ServiceUnavailableException(UNAVAILABLE);
+    }
+    return game.language().code().equals(card.language());
+  }
+
+  private CatalogPrinting toPrinting(Game game, ScryfallCard card)
+      throws ServiceUnavailableException {
     if (card.id() == null
-        || !EXTERNAL_ID.matcher(card.id()).matches()
         || card.name() == null
         || card.setCode() == null
         || card.setName() == null
         || card.collectorNumber() == null
         || card.finishes() == null
         || card.games() == null) {
-      throw new ServiceUnavailableException("catalog returned incomplete card data");
+      throw new ServiceUnavailableException(UNAVAILABLE);
     }
     var finishes =
         card.games().contains("paper")
             ? game.finishes().stream()
-                .filter(candidate -> card.finishes().contains(scryfallFinish(candidate.id())))
                 .map(Finish::id)
+                .filter(finish -> card.finishes().contains(scryfallFinish(finish)))
                 .toList()
             : List.<String>of();
-    return new Card(
+    return new CatalogPrinting(
         game.id(),
         card.id(),
         card.name(),
         card.setCode(),
         card.setName(),
         card.collectorNumber(),
-        imageUrls(card),
         finishes);
   }
 
-  private Position decodePosition(String continuation) throws ServiceException {
+  private Card toCard(CatalogPrinting printing, ScryfallCard card) {
+    return new Card(
+        printing.game(),
+        printing.externalId(),
+        printing.name(),
+        printing.setCode(),
+        printing.setName(),
+        printing.collectorNumber(),
+        imageUrls(card),
+        printing.availableFinishes());
+  }
+
+  private Position decodePosition(@Nullable String continuation) throws BadRequestException {
     if (continuation == null) {
       return new Position(1, 0);
     }
     try {
       var decoded = new String(Base64.getUrlDecoder().decode(continuation), UTF_8).split(":", -1);
       if (decoded.length != 2) {
-        throw new IllegalArgumentException("continuation position is invalid");
+        throw new BadRequestException("continuation is invalid");
       }
       var page = Integer.parseInt(decoded[0]);
       var offset = Integer.parseInt(decoded[1]);
@@ -363,7 +292,7 @@ public class MagicTheGatheringPrintingLookup {
           || page > MAX_PROVIDER_PAGE_NUMBER
           || offset < 0
           || offset >= PROVIDER_PAGE_SIZE) {
-        throw new IllegalArgumentException("continuation position is invalid");
+        throw new BadRequestException("continuation is invalid");
       }
       return new Position(page, offset);
     } catch (IllegalArgumentException e) {
@@ -389,26 +318,25 @@ public class MagicTheGatheringPrintingLookup {
 
   private String queryFromPrintsUri(String printsSearchUri) throws ServiceUnavailableException {
     if (printsSearchUri == null) {
-      throw new ServiceUnavailableException("catalog card is missing printing search data");
+      throw new ServiceUnavailableException(UNAVAILABLE);
     }
     try {
-      var uri = new URIBuilder(URI.create(printsSearchUri));
-      if (!baseUri.getScheme().equalsIgnoreCase(uri.getScheme())
-          || !baseUri.getHost().equalsIgnoreCase(uri.getHost())
-          || !"/cards/search".equals(uri.getPath())) {
-        throw new ServiceUnavailableException("catalog returned an invalid printing search URI");
-      }
-      var query = uri.getFirstQueryParam("q");
-      if (query == null) {
-        throw new ServiceUnavailableException("catalog returned an invalid printing search URI");
+      var query = new URIBuilder(URI.create(printsSearchUri)).getFirstQueryParam("q");
+      if (query == null || query.getValue() == null || query.getValue().isBlank()) {
+        throw new ServiceUnavailableException(UNAVAILABLE);
       }
       return query.getValue();
     } catch (IllegalArgumentException e) {
-      throw new ServiceUnavailableException("catalog returned an invalid printing search URI", e);
+      throw new ServiceUnavailableException(UNAVAILABLE, e);
     }
   }
 
-  private String encode(String value) {
+  private String filteredQuery(Game game, String phrase, String finish) {
+    return "%s lang:%s game:paper is:%s"
+        .formatted(phrase, game.language().code(), scryfallFinish(finish));
+  }
+
+  private static String encode(String value) {
     return URLEncoder.encode(value, UTF_8).replace("+", "%20");
   }
 
@@ -416,108 +344,57 @@ public class MagicTheGatheringPrintingLookup {
     return "normal".equals(finish) ? "nonfoil" : finish;
   }
 
-  private List<CatalogPrinting> doFindCards(Game game, List<String> externalIds)
-      throws IOException, InterruptedException, ServiceUnavailableException {
-    var ids = externalIds.stream().filter(id -> EXTERNAL_ID.matcher(id).matches()).toList();
-    var cards = new ArrayList<CatalogPrinting>();
-    for (var chunk : Lists.partition(ids, COLLECTION_REQUEST_SIZE)) {
-      var response = readCollection(chunk);
-      var unresolved = new HashSet<>(chunk);
-      for (var card : response.data()) {
-        if (card == null
-            || card.name() == null
-            || card.setCode() == null
-            || card.setName() == null
-            || card.collectorNumber() == null
-            || card.language() == null
-            || card.games() == null
-            || card.finishes() == null) {
-          throw new ServiceUnavailableException("catalog returned incomplete card data");
-        }
-        resolveId(unresolved, card.id());
-        if (game.language().code().equals(card.language()) && card.games().contains("paper")) {
-          var finishes =
-              game.finishes().stream()
-                  .map(Finish::id)
-                  .filter(
-                      finish ->
-                          card.finishes().contains("normal".equals(finish) ? "nonfoil" : finish))
-                  .toList();
-          if (!finishes.isEmpty()) {
-            cards.add(
-                new CatalogPrinting(
-                    game.id(),
-                    card.id(),
-                    card.name(),
-                    card.setCode(),
-                    card.setName(),
-                    card.collectorNumber(),
-                    finishes));
-          }
-        }
-      }
-      if (response.notFound() != null) {
-        for (var missing : response.notFound()) {
-          resolveId(unresolved, missing == null ? null : missing.id());
-        }
-      }
-      if (!unresolved.isEmpty()) {
-        throw new ServiceUnavailableException("catalog returned incomplete collection data");
-      }
+  private ScryfallCard readCard(Game game, String externalId) throws ServiceException {
+    if (!EXTERNAL_ID.matcher(externalId).matches()) {
+      throw new BadRequestException("external_id must be a valid Scryfall ID");
     }
-    return List.copyOf(cards);
-  }
-
-  private CardCollection readCollection(List<String> ids)
-      throws IOException, InterruptedException, ServiceUnavailableException {
-    var identifiers = ids.stream().map(Identifier::new).toList();
-    var body = objectMapper.writeValueAsString(new CollectionRequest(identifiers));
-    var request =
-        HttpRequest.newBuilder()
-            .uri(baseUri.resolve("/cards/collection"))
-            .timeout(Duration.ofSeconds(5))
-            .header("User-Agent", USER_AGENT)
-            .header("Accept", "application/json")
-            .header("Content-Type", "application/json")
-            .POST(HttpRequest.BodyPublishers.ofString(body, UTF_8))
-            .build();
-    paceRequest();
-    var response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(UTF_8));
-    if (response.statusCode() != 200) {
-      throw new ServiceUnavailableException(
-          "catalog provider returned status " + response.statusCode());
-    }
-    var collection = objectMapper.readValue(response.body(), CardCollection.class);
-    if (collection == null || collection.data() == null) {
-      throw new ServiceUnavailableException("catalog returned invalid collection data");
-    }
-    return collection;
-  }
-
-  private ScryfallCard readCard(String externalId)
-      throws IOException, InterruptedException, ServiceException {
-    var request =
-        HttpRequest.newBuilder()
-            .uri(baseUri.resolve("/cards/" + externalId))
-            .timeout(Duration.ofSeconds(5))
-            .header("User-Agent", USER_AGENT)
-            .header("Accept", "application/json")
-            .GET()
-            .build();
-    paceRequest();
-    var response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(UTF_8));
-    if (response.statusCode() == 404) {
+    var card = read("/cards/" + externalId, null, ScryfallCard.class);
+    if (card == null) {
       throw new NotFoundException("card not found");
     }
-    if (response.statusCode() != 200) {
-      throw new ServiceUnavailableException(
-          "catalog provider returned status " + response.statusCode());
+    if (!externalId.equals(card.id())) {
+      throw new ServiceUnavailableException(UNAVAILABLE);
     }
-    var card = objectMapper.readValue(response.body(), ScryfallCard.class);
-    if (card == null || !externalId.equals(card.id())) {
-      throw new ServiceUnavailableException("catalog returned a different card ID");
+    if (!matchesLanguage(game, card)) {
+      throw new NotFoundException("card not found");
     }
     return card;
+  }
+
+  @Nullable
+  private <T> T read(String path, @Nullable CollectionRequest body, Class<T> type)
+      throws ServiceUnavailableException {
+    var request =
+        HttpRequest.newBuilder(baseUri.resolve(path))
+            .timeout(Duration.ofSeconds(5))
+            .header("User-Agent", USER_AGENT)
+            .header("Accept", "application/json");
+    try {
+      if (body != null) {
+        request
+            .header("Content-Type", "application/json")
+            .POST(
+                HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body), UTF_8));
+      }
+      paceRequest();
+      var response = httpClient.send(request.build(), HttpResponse.BodyHandlers.ofString(UTF_8));
+      if (response.statusCode() == 404 && body == null) {
+        return null;
+      }
+      if (response.statusCode() != 200) {
+        throw new IOException("Scryfall returned HTTP " + response.statusCode());
+      }
+      var result = objectMapper.readValue(response.body(), type);
+      if (result == null) {
+        throw new ServiceUnavailableException(UNAVAILABLE);
+      }
+      return result;
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new ServiceUnavailableException(UNAVAILABLE, e);
+    } catch (IOException e) {
+      throw new ServiceUnavailableException(UNAVAILABLE, e);
+    }
   }
 
   private ImageUrls imageUrls(ScryfallCard card) {
@@ -547,7 +424,7 @@ public class MagicTheGatheringPrintingLookup {
 
   private void resolveId(Set<String> unresolved, String id) throws ServiceUnavailableException {
     if (!unresolved.remove(id)) {
-      throw new ServiceUnavailableException("catalog returned inconsistent collection data");
+      throw new ServiceUnavailableException(UNAVAILABLE);
     }
   }
 }

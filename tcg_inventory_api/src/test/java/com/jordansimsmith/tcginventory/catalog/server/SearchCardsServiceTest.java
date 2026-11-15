@@ -155,7 +155,7 @@ public class SearchCardsServiceTest {
                     new SearchCardsRequest("mtg", "Lightning Bolt", "normal", null, null)))
         .isInstanceOf(ServiceUnavailableException.class)
         .hasMessage("catalog is temporarily unavailable")
-        .hasCauseInstanceOf(ServiceUnavailableException.class);
+        .hasRootCauseMessage("Scryfall returned HTTP 503");
   }
 
   @Test

@@ -134,13 +134,12 @@ public class GetCardServiceTest {
     assertThatThrownBy(() -> service.getCard(new RequestContext("alice"), request))
         .isInstanceOf(ServiceUnavailableException.class)
         .hasMessage("catalog is temporarily unavailable")
-        .hasCauseInstanceOf(ServiceUnavailableException.class);
+        .hasRootCauseMessage("Scryfall returned HTTP 429");
     status = 200;
     body = body.replace(CARD_ID, "c83275d7-0d4e-4e25-b8b8-433e9d2a9290");
     assertThatThrownBy(() -> service.getCard(new RequestContext("alice"), request))
         .isInstanceOf(ServiceUnavailableException.class)
-        .hasMessage("catalog is temporarily unavailable")
-        .hasCauseInstanceOf(ServiceUnavailableException.class);
+        .hasMessage("catalog is temporarily unavailable");
   }
 
   private void handleRequest(HttpExchange exchange) throws IOException {
