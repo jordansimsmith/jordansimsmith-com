@@ -2,10 +2,12 @@ package com.jordansimsmith.tcginventory;
 
 import com.jordansimsmith.localstack.LocalStackContainer;
 import java.net.URI;
+import java.time.Duration;
 
 public class TcgInventoryContainer extends LocalStackContainer<TcgInventoryContainer> {
   public TcgInventoryContainer() {
     super("test.properties", "tcginventory.image.name", "tcginventory.image.loader");
+    this.withStartupTimeout(Duration.ofMinutes(5));
   }
 
   @SuppressWarnings("HttpUrlsUsage")
