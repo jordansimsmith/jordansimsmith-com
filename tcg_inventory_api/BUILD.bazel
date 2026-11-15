@@ -36,30 +36,6 @@ filegroup(
     ],
 )
 
-COMMON_DEPS = [
-    "//lib/dynamodb:lib",
-    "//lib/http:lib",
-    "//lib/json:lib",
-    "//lib/queue:lib",
-    "//lib/s3:lib",
-    "//lib/secrets:lib",
-    "//lib/time:lib",
-    "//lib/ulid:lib",
-    "//third_party/dagger",
-    "@maven//:com_fasterxml_jackson_core_jackson_annotations",
-    "@maven//:com_fasterxml_jackson_core_jackson_core",
-    "@maven//:com_fasterxml_jackson_core_jackson_databind",
-    "@maven//:com_google_code_findbugs_jsr305",
-    "@maven//:com_google_guava_guava",
-    "@maven//:org_slf4j_slf4j_api",
-    "@maven//:software_amazon_awssdk_aws_crt_client",
-    "@maven//:software_amazon_awssdk_dynamodb",
-    "@maven//:software_amazon_awssdk_dynamodb_enhanced",
-    "@maven//:software_amazon_awssdk_regions",
-    "@maven//:software_amazon_awssdk_s3",
-    "@maven//:software_amazon_awssdk_sqs",
-]
-
 E2E_TESTS = glob(["src/test/java/**/*E2ETest.java"])
 
 java_library(
@@ -111,6 +87,14 @@ java_library(
         "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/scans/api:__pkg__",
     ],
     deps = [
+        "//lib/dynamodb:lib",
+        "//lib/http:lib",
+        "//lib/json:lib",
+        "//lib/queue:lib",
+        "//lib/s3:lib",
+        "//lib/secrets:lib",
+        "//lib/time:lib",
+        "//lib/ulid:lib",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/catalog/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/catalog/server",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/client",
@@ -135,7 +119,20 @@ java_library(
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/reports/server",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/scans/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/scans/server",
-    ] + COMMON_DEPS,
+        "//third_party/dagger",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_fasterxml_jackson_core_jackson_core",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:software_amazon_awssdk_aws_crt_client",
+        "@maven//:software_amazon_awssdk_dynamodb",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+        "@maven//:software_amazon_awssdk_regions",
+        "@maven//:software_amazon_awssdk_s3",
+        "@maven//:software_amazon_awssdk_sqs",
+    ],
 )
 
 java_binary(
