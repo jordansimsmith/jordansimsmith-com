@@ -119,7 +119,7 @@ public class HttpFetchTcgPricingLookupTest {
         createResponse(
             200,
             """
-            {"searchResults":{"content":[{"id":42,"condition":"raw-nm","listedPrice":3.98,"listedCurrency":"AUD","listedPriceInRequestedCurrency":5.25,"requestedCurrency":"NZD","sellerProfileName":"seller"}],"number":1,"size":2,"totalElements":3,"totalPages":2,"last":true}}
+            {"searchResults":{"content":[{"id":42,"condition":"raw-nm","listedPrice":3.98,"listedCurrency":"AUD","listedPriceInRequestedCurrency":5.25,"requestedCurrency":"NZD","sellerProfileName":"seller","details":"Japanese"}],"number":1,"size":2,"totalElements":3,"totalPages":2,"last":true}}
             """);
     when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
         .thenReturn(response);
@@ -134,6 +134,7 @@ public class HttpFetchTcgPricingLookupTest {
     assertThat(result.content()).hasSize(1);
     assertThat(result.content().getFirst().listedPriceInRequestedCurrency())
         .isEqualByComparingTo("5.25");
+    assertThat(result.content().getFirst().details()).isEqualTo("Japanese");
     var requestCaptor = ArgumentCaptor.forClass(HttpRequest.class);
     verify(httpClient).send(requestCaptor.capture(), eq(HttpResponse.BodyHandlers.ofString()));
     var request = requestCaptor.getValue();
@@ -144,6 +145,27 @@ public class HttpFetchTcgPricingLookupTest {
     assertThat(request.headers().firstValue("Authorization")).isEmpty();
     assertThat(request.headers().firstValue("Accept")).contains("application/json");
     assertThat(pacerCalls.get()).isEqualTo(1);
+  }
+
+  @Test
+  void findCardListingsShouldPreserveEmptyAndAbsentDetails()
+      throws IOException, InterruptedException, ServiceException {
+    // arrange
+    var response =
+        createResponse(
+            200,
+            """
+            {"searchResults":{"content":[{"id":1,"condition":"raw-nm","listedPriceInRequestedCurrency":2.50,"sellerProfileName":"empty","details":""},{"id":2,"condition":"raw-nm","listedPriceInRequestedCurrency":2.70,"sellerProfileName":"absent"}],"number":0,"size":2,"last":true}}
+            """);
+    when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
+        .thenReturn(response);
+
+    // act
+    var result = client.findCardListings("card", 2, 0);
+
+    // assert
+    assertThat(result.content().get(0).details()).isEmpty();
+    assertThat(result.content().get(1).details()).isNull();
   }
 
   @Test

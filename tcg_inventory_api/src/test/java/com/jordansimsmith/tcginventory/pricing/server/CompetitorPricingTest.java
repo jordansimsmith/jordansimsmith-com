@@ -88,6 +88,44 @@ class CompetitorPricingTest {
   }
 
   @Test
+  void findCompetitorPriceTiersShouldExcludeNotesAndContinueToLaterPages() throws ServiceException {
+    // arrange
+    var listings = new ArrayList<CardListing>();
+    listings.add(listing(1, "raw-nm", "2.45", "noted", "Japanese"));
+    listings.add(listing(2, "raw-nm", "2.50", "empty", ""));
+    listings.add(listing(3, "raw-nm", "2.60", "whitespace", "  "));
+    while (listings.size() < 100) {
+      listings.add(listing(listings.size() + 1, "raw-nm", "1.00", "noted", "Japanese"));
+    }
+    listings.add(listing(101, "raw-nm", "2.70", "absent", null));
+    fetchTcgService.seedListings("card-1", listings);
+
+    // act
+    var tiers = competitorPricing.findCompetitorPriceTiers(ctx, "card-1", Condition.NM, "jordan");
+
+    // assert
+    assertThat(tiers)
+        .containsExactly(
+            new CompetitorPricing.CompetitorPriceTier(new BigDecimal("2.50"), Set.of("empty")),
+            new CompetitorPricing.CompetitorPriceTier(new BigDecimal("2.60"), Set.of("whitespace")),
+            new CompetitorPricing.CompetitorPriceTier(new BigDecimal("2.70"), Set.of("absent")));
+  }
+
+  @Test
+  void findCompetitorPriceTiersShouldReturnNoRivalsWhenEveryListingHasANote()
+      throws ServiceException {
+    // arrange
+    fetchTcgService.seedListings(
+        "card-1", List.of(listing(1, "raw-nm", "2.45", "noted", "Japanese")));
+
+    // act
+    var tiers = competitorPricing.findCompetitorPriceTiers(ctx, "card-1", Condition.NM, "jordan");
+
+    // assert
+    assertThat(tiers).isEmpty();
+  }
+
+  @Test
   void findCompetitorPriceTiersShouldPropagateLaterPageFailure() throws ServiceException {
     // arrange
     var fetchTcgService = mock(FetchTcgService.class);
@@ -109,6 +147,11 @@ class CompetitorPricingTest {
   }
 
   private static CardListing listing(int id, String condition, String price, String seller) {
-    return new CardListing(id, condition, new BigDecimal(price), seller);
+    return listing(id, condition, price, seller, null);
+  }
+
+  private static CardListing listing(
+      int id, String condition, String price, String seller, String details) {
+    return new CardListing(id, condition, new BigDecimal(price), seller, details);
   }
 }

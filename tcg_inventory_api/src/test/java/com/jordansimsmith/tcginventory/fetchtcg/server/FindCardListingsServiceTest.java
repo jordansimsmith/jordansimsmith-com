@@ -24,7 +24,8 @@ public class FindCardListingsServiceTest {
   void findCardListingsShouldDefaultToOneHundredAndEncodeNextPage() throws ServiceException {
     // arrange
     var providerListing =
-        new HttpFetchTcgClient.ProviderCardListing(1, "raw-nm", new BigDecimal("1.25"), "seller");
+        new HttpFetchTcgClient.ProviderCardListing(
+            1, "raw-nm", new BigDecimal("1.25"), "seller", "Japanese");
     when(fetchTcgClient.findCardListings("card", 100, 0))
         .thenReturn(new HttpFetchTcgClient.ListingsPage(0, 100, false, List.of(providerListing)));
 
@@ -34,6 +35,7 @@ public class FindCardListingsServiceTest {
     // assert
     assertThat(response.listings()).hasSize(1);
     assertThat(response.listings().getFirst().sellerUsername()).isEqualTo("seller");
+    assertThat(response.listings().getFirst().details()).isEqualTo("Japanese");
     assertThat(response.nextContinuation()).isEqualTo("1");
   }
 

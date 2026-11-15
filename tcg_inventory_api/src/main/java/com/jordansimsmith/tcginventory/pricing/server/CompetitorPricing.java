@@ -31,6 +31,10 @@ public class CompetitorPricing {
           fetchTcgService.findCardListings(
               ctx, new FindCardListingsRequest(cardId, 100, continuation));
       for (var listing : response.listings()) {
+        // listing details can disclose a different language than the catalog card.
+        if (listing.details() != null && !listing.details().isBlank()) {
+          continue;
+        }
         if (sellerUsername.equals(listing.sellerUsername())) {
           continue;
         }

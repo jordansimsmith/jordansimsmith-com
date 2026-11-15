@@ -7,4 +7,5 @@ public record CardListing(
     @JsonProperty("id") int id,
     @JsonProperty("condition") String condition,
     @JsonProperty("listed_price") BigDecimal listedPrice,
-    @JsonProperty("seller_username") String sellerUsername) {}
+    @JsonProperty("seller_username") String sellerUsername,
+    @JsonProperty("details") String details) {}

@@ -55,7 +55,8 @@ public class FindCardListingsService {
                         listing.id(),
                         listing.condition(),
                         listing.listedPriceInRequestedCurrency(),
-                        listing.sellerProfileName()))
+                        listing.sellerProfileName(),
+                        listing.details()))
             .toList();
     if (!page.last() && pageOffset == Integer.MAX_VALUE) {
       throw new IllegalStateException("FetchTCG listings response exceeded the page range");

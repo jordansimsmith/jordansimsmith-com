@@ -427,7 +427,8 @@ public class HttpFetchTcgClient {
       @JsonProperty("condition") @Nullable String condition,
       @JsonProperty("listedPriceInRequestedCurrency") @Nullable
           BigDecimal listedPriceInRequestedCurrency,
-      @JsonProperty("sellerProfileName") @Nullable String sellerProfileName) {}
+      @JsonProperty("sellerProfileName") @Nullable String sellerProfileName,
+      @JsonProperty("details") @Nullable String details) {}
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   public record ProviderOffer(

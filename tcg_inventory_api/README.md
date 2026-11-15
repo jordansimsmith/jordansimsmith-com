@@ -1026,7 +1026,7 @@ price = max(price_floor, round_nearest_half_up(benchmark, 0.05))
 ```
 
 - Market price source: FetchTCG `pricingData.NZ.tcgMarketPrice`.
-- Rival evidence: active New Zealand listings for the exact card in the SKU's condition or strictly better, excluding the authenticated account's own listings. Condition quality order: `raw-d < raw-hp < raw-mp < raw-lp < raw-nm < raw-m`.
+- Rival evidence: active New Zealand listings for the exact card in the SKU's condition or strictly better, excluding the authenticated account's own listings and listings with nonblank FetchTCG `details`. Null, empty, and whitespace-only details remain eligible. Condition quality order: `raw-d < raw-hp < raw-mp < raw-lp < raw-nm < raw-m`.
 - Two-seller supported floor: the first ascending same-or-better-condition price at which at least two distinct sellers are cumulatively available.
 - Deep-discount guard: a lowest rival below 80% of market is not undercut.
 - Sole-source premium: 15% over market when no rival exists and market ≥ NZ$2.00.

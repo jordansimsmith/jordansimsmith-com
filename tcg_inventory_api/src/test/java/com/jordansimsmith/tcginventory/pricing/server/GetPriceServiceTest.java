@@ -41,8 +41,8 @@ class GetPriceServiceTest {
     fetchTcgService.seedListings(
         "card-1",
         List.of(
-            new CardListing(1, "raw-nm", new BigDecimal("5.00"), "seller-a"),
-            new CardListing(2, "raw-nm", new BigDecimal("5.00"), "seller-b")));
+            new CardListing(1, "raw-nm", new BigDecimal("5.00"), "seller-a", null),
+            new CardListing(2, "raw-nm", new BigDecimal("5.00"), "seller-b", null)));
 
     // act
     var response =
