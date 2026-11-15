@@ -1374,7 +1374,8 @@ Rotated refresh tokens returned by Firebase are written back to the same key.
 ## Local development and smoke checks
 
 - Python worker tests: `bazel test //tcg_inventory_api/src/test/python/tcg_inventory_scan_worker:scan-worker-unit-tests`.
-- Focused Java suites: `bazel test //tcg_inventory_api:unit-tests`, `:integration-tests`, `:e2e-tests`.
+- Focused Java suites: run a package suite such as `bazel test //tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/pricing/api:api-unit-tests` or `bazel test //tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/pricing/api:api-integration-tests`; run the end-to-end suite with `bazel test //tcg_inventory_api:e2e-tests`.
+- Full service tests: `bazel test //tcg_inventory_api/...`.
 - Infrastructure deployment uses `bazel run //:apply -- --path tcg_inventory_api/infra --path platform/infra`. The runner builds Java artifacts and the worker digest, creates the manifest-declared ECR repository through boto3 when missing, pushes the image by digest, and then applies Terraform with the repository name and immutable image URI. The Python scan-recognition DLQ is observable through the platform alarm and has no recovery consumer.
 - Minimal smoke flow (against deployed stack): verify or set the FetchTCG connection through `PUT /fetchtcg/credentials`; `POST /imports` with a single-card CSV; poll the import to `review`; add a photo to the row from a phone (raw JPEG POST); `GET /imports/{import_id}` and verify it renders via the presigned URL; confirm and poll import detail until it is `confirmed`; `POST /publish`; verify the listing appears on FetchTCG at the policy price; then remove the unit via `DELETE` and run publish again to verify the delist. Use only a throwaway low-value card for live smoke checks.
 

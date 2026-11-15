@@ -54,7 +54,10 @@ java_binary(
     srcs = ["GetOrderSettingsHandler.java"],
     create_executable = False,
     resources = ["//tcg_inventory_api:lambda-logback-resource"],
-    visibility = ["//tcg_inventory_api:__pkg__"],
+    visibility = [
+        "//tcg_inventory_api:__pkg__",
+        "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/orders/api:__pkg__",
+    ],
     deps = [
         "//lib/http:lib",
         "//lib/service",
@@ -74,7 +77,10 @@ java_binary(
     srcs = ["UpdateOrderSettingsHandler.java"],
     create_executable = False,
     resources = ["//tcg_inventory_api:lambda-logback-resource"],
-    visibility = ["//tcg_inventory_api:__pkg__"],
+    visibility = [
+        "//tcg_inventory_api:__pkg__",
+        "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/orders/api:__pkg__",
+    ],
     deps = [
         "//lib/http:lib",
         "//lib/service",
