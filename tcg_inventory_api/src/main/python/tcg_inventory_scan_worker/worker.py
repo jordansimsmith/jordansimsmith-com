@@ -14,6 +14,8 @@ import cv2
 import numpy as np
 from collector_vision import Catalog, CatalogV2, NeuralCornerDetector, rotate_card_180
 
+from .scan_image_store import ScanImageStore
+from .scan_queue import ScanQueue
 from .scan_repository import Scan, ScanRepository, ScanRow, ScanSuggestion
 
 LOGGER = logging.getLogger(__name__)
@@ -21,7 +23,6 @@ LOGGER = logging.getLogger(__name__)
 TABLE_ENV = "SCAN_TABLE_NAME"
 BUCKET_ENV = "SCAN_BUCKET_NAME"
 CACHE_ENV = "COLLECTORVISION_CACHE"
-SCAN_IDENTIFICATION_QUEUE_NAME = "tcg_inventory_scan_identification.fifo"
 BATCH_SIZE = 100
 SEARCH_TOP_K = 25
 MAX_SUGGESTIONS = 5
@@ -127,49 +128,18 @@ class PokemonResolver(RecognitionResolver):
             yield ScanSuggestion(record["id"], record["name"], float(record["score"]))
 
 
-class S3ImageStore:
-    def __init__(self, client, bucket: str):
-        self._client = client
-        self._bucket = bucket
-
-    def read(self, key: str) -> bytes:
-        return self._client.get_object(Bucket=self._bucket, Key=key)["Body"].read()
-
-
-class SqsContinuationQueue:
-    def __init__(self, client, queue_name: str = SCAN_IDENTIFICATION_QUEUE_NAME):
-        self._client = client
-        self._queue_name = queue_name
-        self._queue_url: str | None = None
-
-    def send(self, user: str, scan_id: str, next_pending_position: int) -> None:
-        if self._queue_url is None:
-            self._queue_url = self._client.get_queue_url(QueueName=self._queue_name)[
-                "QueueUrl"
-            ]
-        self._client.send_message(
-            QueueUrl=self._queue_url,
-            MessageBody=json.dumps(
-                {"user": user, "scan_id": scan_id},
-                separators=(",", ":"),
-            ),
-            MessageGroupId=scan_id,
-            MessageDeduplicationId=f"{scan_id}#{next_pending_position}",
-        )
-
-
 class RecognitionWorker:
     def __init__(
         self,
         repository: ScanRepository,
-        images,
-        continuations,
+        image_store: ScanImageStore,
+        scan_queue: ScanQueue,
         recognition_loader: Callable[[str], RecognitionResolver],
         logger: logging.Logger | None = None,
     ):
         self._repository = repository
-        self._images = images
-        self._continuations = continuations
+        self._image_store = image_store
+        self._scan_queue = scan_queue
         self._recognition_loader = recognition_loader
         self._logger = logger or LOGGER
 
@@ -207,7 +177,7 @@ class RecognitionWorker:
         row: ScanRow,
         resolver: RecognitionResolver,
     ) -> None:
-        image_bytes = self._images.read(row.s3_key)
+        image_bytes = self._image_store.get_image(row.s3_key)
         try:
             if not image_bytes.startswith(b"\xff\xd8\xff"):
                 raise ValueError("unsupported image format")
@@ -249,7 +219,7 @@ class RecognitionWorker:
             next_pending_position = min(
                 row.scan_position for row in rows if row.status == "pending"
             )
-            self._continuations.send(scan.user, scan.scan_id, next_pending_position)
+            self._scan_queue.send(scan.user, scan.scan_id, next_pending_position)
             return
         if statuses <= {"suggested", "needs_review"}:
             self._repository.update_scan_for_review(
@@ -292,8 +262,8 @@ class LambdaRuntime:
             bucket_name = os.environ[BUCKET_ENV]
             self._worker = RecognitionWorker(
                 repository=ScanRepository(boto3.client("dynamodb"), table_name),
-                images=S3ImageStore(boto3.client("s3"), bucket_name),
-                continuations=SqsContinuationQueue(boto3.client("sqs")),
+                image_store=ScanImageStore(boto3.client("s3"), bucket_name),
+                scan_queue=ScanQueue(boto3.client("sqs")),
                 recognition_loader=self._load_recognition,
             )
         return self._worker

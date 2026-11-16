@@ -6,6 +6,8 @@ py_library(
     name = "scan-worker-lib",
     srcs = [
         "__init__.py",
+        "scan_image_store.py",
+        "scan_queue.py",
         "scan_repository.py",
         "worker.py",
     ],
@@ -23,6 +25,8 @@ collectorvision_image(
     name = "scan-worker-image",
     application_files = {
         "__init__.py": "tcg_inventory_scan_worker/__init__.py",
+        "scan_image_store.py": "tcg_inventory_scan_worker/scan_image_store.py",
+        "scan_queue.py": "tcg_inventory_scan_worker/scan_queue.py",
         "scan_repository.py": "tcg_inventory_scan_worker/scan_repository.py",
         "worker.py": "tcg_inventory_scan_worker/worker.py",
     },

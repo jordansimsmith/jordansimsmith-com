@@ -12,6 +12,7 @@ from botocore.stub import Stubber
 from PIL import Image
 
 from tcg_inventory_scan_worker import worker as scan_worker
+from tcg_inventory_scan_worker.scan_queue import ScanQueue
 from tcg_inventory_scan_worker.scan_repository import (
     Scan,
     ScanRepository,
@@ -23,7 +24,6 @@ from tcg_inventory_scan_worker.worker import (
     MagicTheGatheringResolver,
     PokemonResolver,
     RecognitionWorker,
-    SqsContinuationQueue,
 )
 
 
@@ -121,7 +121,7 @@ class FakeImages:
         self.content = content
         self.read_keys: list[str] = []
 
-    def read(self, key: str) -> bytes:
+    def get_image(self, key: str) -> bytes:
         self.read_keys.append(key)
         return self.content
 
@@ -204,8 +204,8 @@ def _worker(store, images=None, catalog=None, detector=None, queue=None, loader=
 
     return RecognitionWorker(
         repository=store,
-        images=images or FakeImages(),
-        continuations=queue or FakeQueue(),
+        image_store=images or FakeImages(),
+        scan_queue=queue or FakeQueue(),
         recognition_loader=load_recognition,
     )
 
@@ -291,11 +291,11 @@ def test_partial_batch_retry_leaves_written_rows_terminal():
             super().__init__()
             self.calls = 0
 
-        def read(self, key: str) -> bytes:
+        def get_image(self, key: str) -> bytes:
             self.calls += 1
             if self.calls == 51:
                 raise RuntimeError("s3 unavailable")
-            return super().read(key)
+            return super().get_image(key)
 
     store = FakeScanRepository(_scan_rows(101))
 
@@ -627,7 +627,7 @@ def test_unsupported_image_failure_propagates_without_marking_row_finished():
 
 def test_image_store_failure_propagates_without_marking_row_finished():
     class BrokenImages:
-        def read(self, key: str) -> bytes:
+        def get_image(self, key: str) -> bytes:
             raise RuntimeError("s3 unavailable")
 
     store = FakeScanRepository(_scan_rows(1))
@@ -691,7 +691,7 @@ def test_continuation_failure_leaves_pending_rows_for_recovery():
 
 def test_continuation_queue_resolves_url_once_and_preserves_message_shape():
     client = FakeSqsClient()
-    queue = SqsContinuationQueue(client)
+    queue = ScanQueue(client)
 
     queue.send("jordan", "scan-1", 101)
     queue.send("jordan", "scan-1", 101)
