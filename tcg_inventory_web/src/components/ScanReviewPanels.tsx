@@ -127,8 +127,7 @@ function Crop({
 }
 
 function catalogSetLabel(card: CatalogCard): string {
-  const code = card.set_code ? `${card.set_code.toUpperCase()} ` : '';
-  return `${card.set_name} · ${code}#${card.collector_number}`;
+  return `${card.set_name} · ${card.set_code.toUpperCase()} #${card.collector_number}`;
 }
 
 function ProductThumbnail({ card }: { card: CatalogCard }) {

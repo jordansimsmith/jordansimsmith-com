@@ -13,6 +13,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.s3.S3Container;
+import com.jordansimsmith.service.NotFoundException;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
 import com.jordansimsmith.tcginventory.catalog.client.GetCardRequest;
@@ -148,13 +149,11 @@ public class CatalogWorkerHandlerIntegrationTest {
             new TcgCsvCatalogArtifactCodec(new ObjectMapper()));
     var lookup = new TcgCsvPrintingLookup(readerRepository, readerStore, factory.clock());
     var service = new GetCardService(factory.gamesService(), null, lookup);
-    var card =
-        service
-            .getCard(new RequestContext("alice"), new GetCardRequest("pokemon", "451396"))
-            .card();
-    assertThat(card.setCode()).isNull();
-    assertThat(card.name()).isEqualTo("Lugia VSTAR");
-    assertThat(card.availableFinishes()).containsExactly("holofoil");
+    assertThatThrownBy(
+            () ->
+                service.getCard(
+                    new RequestContext("alice"), new GetCardRequest("pokemon", "451396")))
+        .isInstanceOf(NotFoundException.class);
     assertThat(factory.tableDefinition().scan().stream().flatMap(page -> page.items().stream()))
         .singleElement()
         .extracting(item -> item.getPk() + "/" + item.getSk())

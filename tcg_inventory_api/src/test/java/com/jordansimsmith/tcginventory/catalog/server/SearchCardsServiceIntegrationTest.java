@@ -292,12 +292,12 @@ public class SearchCardsServiceIntegrationTest {
         "pokemon_jp",
         85,
         SNAPSHOT_ID,
-        List.of(Map.of("group_id", 3413, "set_name", "Pokémon Card 151")),
+        List.of(Map.of("group_id", 23599, "set_code", "SV2a", "set_name", "Pokémon Card 151")),
         List.of(
-            product(566488, "Snorlax", 3413, "143/165", List.of("normal")),
-            product(566685, "Snorlax (Poké Ball)", 3413, "143/165", List.of("holofoil")),
-            product(566838, "Snorlax (Master Ball)", 3413, "143/165", List.of("holofoil")),
-            product(566839, "Snorlax (Master Ball)", 3413, "143/165", List.of("holofoil"))));
+            product(566488, "Snorlax", 23599, "143/165", List.of("normal")),
+            product(566685, "Snorlax (Poké Ball)", 23599, "143/165", List.of("holofoil")),
+            product(566838, "Snorlax (Master Ball)", 23599, "143/165", List.of("holofoil")),
+            product(566839, "Snorlax (Master Ball)", 23599, "143/165", List.of("holofoil"))));
     var context = new RequestContext("alice");
 
     // act
@@ -323,7 +323,7 @@ public class SearchCardsServiceIntegrationTest {
     assertThat(detail.card().game()).isEqualTo("pokemon_jp");
     assertThat(detail.card().name()).isEqualTo("Snorlax (Master Ball)");
     assertThat(detail.card().collectorNumber()).isEqualTo("143/165");
-    assertThat(detail.card().setCode()).isNull();
+    assertThat(detail.card().setCode()).isEqualTo("SV2a");
     assertThat(detail.card().setName()).isEqualTo("Pokémon Card 151");
     assertThat(detail.card().availableFinishes()).containsExactly("holofoil");
     assertThat(detail.card().imageUrls().small())
@@ -352,6 +352,59 @@ public class SearchCardsServiceIntegrationTest {
                     new FindCardAlternativesRequest(
                         "pokemon_jp", "566838", "reverse_holofoil", null, null)))
         .isInstanceOf(BadRequestException.class);
+  }
+
+  @Test
+  void pokemonCatalogShouldRequireSetCodesAndRetainPrintingsWithSharedCodes() throws Exception {
+    // arrange
+    var groups =
+        List.of(
+            Map.of("group_id", 1, "set_code", "BW8", "set_name", "Spiral Force"),
+            Map.of("group_id", 2, "set_code", "BW8", "set_name", "Thunder Knuckle"),
+            Map.of("group_id", 3, "set_name", "Missing code"),
+            Map.of("group_id", 4, "set_code", "", "set_name", "Empty code"),
+            Map.of("group_id", 5, "set_code", "  ", "set_name", "Whitespace code"));
+    var products =
+        List.of(
+            product(1, "Pikachu", 1, "001", List.of("normal")),
+            product(2, "Pikachu", 2, "001", List.of("normal")),
+            product(3, "Pikachu", 3, "001", List.of("normal")),
+            product(4, "Pikachu", 4, "001", List.of("normal")),
+            product(5, "Pikachu", 5, "001", List.of("normal")));
+    publishSnapshot("pokemon", 3, SNAPSHOT_ID, groups, products);
+    publishSnapshot("pokemon_jp", 85, SNAPSHOT_ID, groups, products);
+    var context = new RequestContext("alice");
+
+    for (var game : List.of("pokemon", "pokemon_jp")) {
+      // act
+      var bulk =
+          findCardsService.findCards(
+              context, new FindCardsRequest(game, List.of("1", "2", "3", "4", "5")));
+      var search =
+          searchCardsService.searchCards(
+              context, new SearchCardsRequest(game, "Pikachu", "normal", null, null));
+      var alternatives =
+          findCardAlternativesService.findCardAlternatives(
+              context, new FindCardAlternativesRequest(game, "1", "normal", null, null));
+
+      // assert
+      assertThat(bulk.cards()).extracting(card -> card.externalId()).containsExactly("1", "2");
+      assertThat(search.cards()).extracting(card -> card.externalId()).containsExactly("1", "2");
+      assertThat(alternatives.cards())
+          .extracting(card -> card.externalId())
+          .containsExactly("1", "2");
+      for (var excludedId : List.of("3", "4", "5")) {
+        assertThatThrownBy(
+                () -> getCardService.getCard(context, new GetCardRequest(game, excludedId)))
+            .isInstanceOf(NotFoundException.class);
+        assertThatThrownBy(
+                () ->
+                    findCardAlternativesService.findCardAlternatives(
+                        context,
+                        new FindCardAlternativesRequest(game, excludedId, "normal", null, null)))
+            .isInstanceOf(NotFoundException.class);
+      }
+    }
   }
 
   @Test

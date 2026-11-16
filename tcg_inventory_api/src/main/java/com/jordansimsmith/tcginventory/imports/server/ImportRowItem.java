@@ -244,7 +244,7 @@ public class ImportRowItem {
       String importId,
       int position,
       String name,
-      @Nullable String setCode,
+      String setCode,
       String setName,
       String collectorNumber,
       String finish,

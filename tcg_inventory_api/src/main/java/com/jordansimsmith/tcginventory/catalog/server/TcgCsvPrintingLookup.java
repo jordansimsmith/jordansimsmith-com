@@ -23,6 +23,7 @@ import java.util.Base64;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -232,10 +233,18 @@ public class TcgCsvPrintingLookup {
     sortedProducts.sort(Comparator.comparingInt(TcgCsvCatalogSnapshot.Product::productId));
     var gameFinishes = game.finishes().stream().map(Finish::id).toList();
     var printings = new LinkedHashMap<String, CatalogPrinting>();
+    var productIds = new HashSet<Integer>();
     for (var product : sortedProducts) {
       var group = groups.get(product.groupId());
-      if (group == null || product.name() == null || product.collectorNumber() == null) {
+      if (group == null
+          || product.name() == null
+          || product.collectorNumber() == null
+          || !productIds.add(product.productId())) {
         throw new ServiceUnavailableException(UNAVAILABLE);
+      }
+      var setCode = group.setCode();
+      if (setCode == null || setCode.isBlank()) {
+        continue;
       }
       var externalId = Integer.toString(product.productId());
       var finishes = gameFinishes.stream().filter(product.availableFinishes()::contains).toList();
@@ -244,13 +253,11 @@ public class TcgCsvPrintingLookup {
               game.id(),
               externalId,
               product.name(),
-              group.setCode(),
+              setCode,
               group.setName(),
               product.collectorNumber(),
               finishes);
-      if (printings.putIfAbsent(externalId, printing) != null) {
-        throw new ServiceUnavailableException(UNAVAILABLE);
-      }
+      printings.put(externalId, printing);
     }
     return Collections.unmodifiableMap(printings);
   }

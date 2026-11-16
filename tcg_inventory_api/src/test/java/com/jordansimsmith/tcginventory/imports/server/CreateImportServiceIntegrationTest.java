@@ -29,6 +29,7 @@ import com.jordansimsmith.tcginventory.inventory.client.Condition;
 import com.jordansimsmith.time.FakeClock;
 import com.jordansimsmith.ulid.FakeUlidGenerator;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -260,24 +261,32 @@ class CreateImportServiceIntegrationTest {
   }
 
   @Test
-  void createImportShouldPersistNormalizedRowsWithoutSetCodes() throws Exception {
+  void createImportShouldRejectRowsWithoutSetCodes() {
     // arrange
     var context = new RequestContext("alice");
-    var row =
-        new CreateImportRow(
-            "opaque/bolt", "Lightning Bolt", null, "Magic 2010", "146", "normal", Condition.NM);
 
-    // act
-    var response =
-        service.createImport(
-            context, new CreateImportRequest("operation-1", "mtg", null, null, List.of(row)));
+    for (var setCode : Arrays.asList(null, "", "  ")) {
+      var row =
+          new CreateImportRow(
+              "opaque/bolt",
+              "Lightning Bolt",
+              setCode,
+              "Magic 2010",
+              "146",
+              "normal",
+              Condition.NM);
 
-    // assert
-    var imported = reads.getRow("alice", response.importId(), 1);
-    assertThat(imported.getSetCode()).isNull();
-    assertThat(imported.getSetName()).isEqualTo("Magic 2010");
-    assertThat(queue.getSends().getFirst().message())
-        .isEqualTo(new ImportMessage("alice", response.importId(), ImportMessageType.APPRAISE));
+      // act / assert
+      assertThatThrownBy(
+              () ->
+                  service.createImport(
+                      context,
+                      new CreateImportRequest("operation-1", "mtg", null, null, List.of(row))))
+          .isInstanceOf(BadRequestException.class)
+          .hasMessage("row identity and metadata are required");
+    }
+    assertThat(reads.getCreateImportOperation("alice", "operation-1")).isNull();
+    assertThat(queue.getSends()).isEmpty();
   }
 
   @Test

@@ -123,6 +123,28 @@ class ImportReadServiceIntegrationTest {
   }
 
   @Test
+  void getImportShouldReadLegacyRowsWithoutSetCodes() throws Exception {
+    // arrange
+    importTable.putItem(item("alice", "legacy", "scan", "review", 1, 1_700_000_001L));
+    var legacyRow = row("alice", "legacy", 1, "Pikachu", "review", null, null, null, List.of());
+    legacyRow.setSetCode(null);
+    importRowTable.putItem(legacyRow);
+
+    // act
+    var response =
+        getImportService.getImport(new RequestContext("alice"), new GetImportRequest("legacy"));
+
+    // assert
+    assertThat(response.rows())
+        .singleElement()
+        .satisfies(
+            importRow -> {
+              assertThat(importRow.setCode()).isNull();
+              assertThat(importRow.setName()).isEqualTo("Set Name");
+            });
+  }
+
+  @Test
   void findImportsReturnsEmptyListForUserWithoutImports() throws Exception {
     importTable.putItem(item("alice", "1", "first.csv", "review", 2, 1_700_000_001L));
 
