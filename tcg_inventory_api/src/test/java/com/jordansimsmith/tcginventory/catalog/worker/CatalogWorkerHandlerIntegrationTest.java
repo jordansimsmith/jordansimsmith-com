@@ -22,13 +22,13 @@ import com.jordansimsmith.tcginventory.catalog.server.CatalogRepository;
 import com.jordansimsmith.tcginventory.catalog.server.CatalogSnapshotItem;
 import com.jordansimsmith.tcginventory.catalog.server.CatalogSnapshotStore;
 import com.jordansimsmith.tcginventory.catalog.server.GetCardService;
-import com.jordansimsmith.tcginventory.catalog.server.PokemonPrintingLookup;
 import com.jordansimsmith.tcginventory.catalog.server.TcgCsvCatalogArtifactCodec;
 import com.jordansimsmith.tcginventory.catalog.server.TcgCsvCatalogDefinition;
 import com.jordansimsmith.tcginventory.catalog.server.TcgCsvCatalogDefinition.FinishMapping;
 import com.jordansimsmith.tcginventory.catalog.server.TcgCsvCatalogNormalizer;
 import com.jordansimsmith.tcginventory.catalog.server.TcgCsvCatalogSnapshot;
 import com.jordansimsmith.tcginventory.catalog.server.TcgCsvClient;
+import com.jordansimsmith.tcginventory.catalog.server.TcgCsvPrintingLookup;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
@@ -146,7 +146,7 @@ public class CatalogWorkerHandlerIntegrationTest {
             BUCKET,
             readerRepository,
             new TcgCsvCatalogArtifactCodec(new ObjectMapper()));
-    var lookup = new PokemonPrintingLookup(readerRepository, readerStore, factory.clock());
+    var lookup = new TcgCsvPrintingLookup(readerRepository, readerStore, factory.clock());
     var service = new GetCardService(factory.gamesService(), null, lookup);
     var card =
         service

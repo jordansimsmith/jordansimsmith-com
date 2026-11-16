@@ -10,16 +10,14 @@ import com.jordansimsmith.tcginventory.games.client.GetGameRequest;
 
 public class GetCardService {
   private final GamesService gamesService;
-  private final MagicTheGatheringPrintingLookup magicTheGathering;
-  private final PokemonPrintingLookup pokemon;
+  private final ScryfallPrintingLookup scryfall;
+  private final TcgCsvPrintingLookup tcgCsv;
 
   public GetCardService(
-      GamesService gamesService,
-      MagicTheGatheringPrintingLookup magicTheGathering,
-      PokemonPrintingLookup pokemon) {
+      GamesService gamesService, ScryfallPrintingLookup scryfall, TcgCsvPrintingLookup tcgCsv) {
     this.gamesService = gamesService;
-    this.magicTheGathering = magicTheGathering;
-    this.pokemon = pokemon;
+    this.scryfall = scryfall;
+    this.tcgCsv = tcgCsv;
   }
 
   public GetCardResponse getCard(RequestContext ctx, GetCardRequest request)
@@ -34,8 +32,10 @@ public class GetCardService {
     var game = gamesService.getGame(ctx, new GetGameRequest(request.game())).game();
     var card =
         switch (game.id()) {
-          case "mtg" -> magicTheGathering.getCard(game, request.externalId());
-          case "pokemon" -> pokemon.getCard(game, request.externalId());
+          case "mtg" -> scryfall.getCard(game, request.externalId());
+          case "pokemon", "pokemon_jp" ->
+              tcgCsv.getCard(
+                  game, TcgCsvCatalogDefinition.forGame(game.id()), request.externalId());
           default -> throw new BadRequestException("no catalog configured for game: " + game.id());
         };
     return new GetCardResponse(card);

@@ -45,8 +45,7 @@ public class FindCardAlternativesServiceTest {
     var baseUri = URI.create("http://127.0.0.1:" + server.getAddress().getPort());
     printsSearchUri = "https://api.scryfall.com/cards/search?order=released&q=oracleid%3Aabc";
     anchorFinishes = List.of("nonfoil", "foil");
-    var magic =
-        new MagicTheGatheringPrintingLookup(baseUri, HttpClient.newHttpClient(), objectMapper);
+    var magic = new ScryfallPrintingLookup(baseUri, HttpClient.newHttpClient(), objectMapper);
     service = new FindCardAlternativesService(new FakeGamesService(), magic, null);
     searchBody = searchPage(25, false, true);
     cardStatus = 200;

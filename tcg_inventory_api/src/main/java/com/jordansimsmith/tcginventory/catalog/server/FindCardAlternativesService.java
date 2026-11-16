@@ -13,16 +13,14 @@ public class FindCardAlternativesService {
   private static final int MAX_LIMIT = 100;
 
   private final GamesService gamesService;
-  private final MagicTheGatheringPrintingLookup magicTheGathering;
-  private final PokemonPrintingLookup pokemon;
+  private final ScryfallPrintingLookup scryfall;
+  private final TcgCsvPrintingLookup tcgCsv;
 
   public FindCardAlternativesService(
-      GamesService gamesService,
-      MagicTheGatheringPrintingLookup magicTheGathering,
-      PokemonPrintingLookup pokemon) {
+      GamesService gamesService, ScryfallPrintingLookup scryfall, TcgCsvPrintingLookup tcgCsv) {
     this.gamesService = gamesService;
-    this.magicTheGathering = magicTheGathering;
-    this.pokemon = pokemon;
+    this.scryfall = scryfall;
+    this.tcgCsv = tcgCsv;
   }
 
   public FindCardAlternativesResponse findCardAlternatives(
@@ -47,11 +45,16 @@ public class FindCardAlternativesService {
     }
     return switch (game.id()) {
       case "mtg" ->
-          magicTheGathering.findCardAlternatives(
+          scryfall.findCardAlternatives(
               game, request.externalId(), request.finish(), limit, request.continuation());
-      case "pokemon" ->
-          pokemon.findCardAlternatives(
-              game, request.externalId(), request.finish(), limit, request.continuation());
+      case "pokemon", "pokemon_jp" ->
+          tcgCsv.findCardAlternatives(
+              game,
+              TcgCsvCatalogDefinition.forGame(game.id()),
+              request.externalId(),
+              request.finish(),
+              limit,
+              request.continuation());
       default -> throw new BadRequestException("no catalog configured for game: " + game.id());
     };
   }

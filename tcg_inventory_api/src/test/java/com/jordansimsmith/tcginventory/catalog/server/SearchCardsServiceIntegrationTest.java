@@ -12,11 +12,16 @@ import com.jordansimsmith.service.NotFoundException;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceUnavailableException;
 import com.jordansimsmith.tcginventory.catalog.client.FindCardAlternativesRequest;
+import com.jordansimsmith.tcginventory.catalog.client.FindCardImagesRequest;
 import com.jordansimsmith.tcginventory.catalog.client.FindCardsRequest;
 import com.jordansimsmith.tcginventory.catalog.client.GetCardRequest;
 import com.jordansimsmith.tcginventory.catalog.client.SearchCardsRequest;
 import com.jordansimsmith.tcginventory.games.client.FakeGamesService;
-import com.jordansimsmith.time.SystemClock;
+import com.jordansimsmith.tcginventory.games.client.Finish;
+import com.jordansimsmith.tcginventory.games.client.Game;
+import com.jordansimsmith.tcginventory.games.client.Language;
+import com.jordansimsmith.tcginventory.games.client.ScanReviewImageRegion;
+import com.jordansimsmith.time.FakeClock;
 import java.io.ByteArrayOutputStream;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -62,6 +67,8 @@ public class SearchCardsServiceIntegrationTest {
   private GetCardService getCardService;
   private FindCardAlternativesService findCardAlternativesService;
   private FindCardsService findCardsService;
+  private FindCardImagesService findCardImagesService;
+  private FakeClock clock;
 
   @BeforeAll
   static void setUpBeforeClass() {
@@ -122,12 +129,16 @@ public class SearchCardsServiceIntegrationTest {
     var store =
         new CatalogSnapshotStore(
             s3, BUCKET, repository, new TcgCsvCatalogArtifactCodec(new ObjectMapper()));
-    var pokemon = new PokemonPrintingLookup(repository, store, new SystemClock());
+    clock = new FakeClock();
+    clock.setTime(Instant.parse("2026-10-07T21:00:00Z"));
+    var pokemon = new TcgCsvPrintingLookup(repository, store, clock);
     var games = new FakeGamesService();
+    games.seed(japanesePokemonGame());
     searchCardsService = new SearchCardsService(games, null, pokemon);
     getCardService = new GetCardService(games, null, pokemon);
     findCardAlternativesService = new FindCardAlternativesService(games, null, pokemon);
     findCardsService = new FindCardsService(games, null, pokemon);
+    findCardImagesService = new FindCardImagesService(games);
   }
 
   @Test
@@ -274,8 +285,221 @@ public class SearchCardsServiceIntegrationTest {
         .isInstanceOf(NotFoundException.class);
   }
 
+  @Test
+  void japanesePokemonCatalogShouldSupportDetailBulkSearchAlternativesAndImages() throws Exception {
+    // arrange
+    publishSnapshot(
+        "pokemon_jp",
+        85,
+        SNAPSHOT_ID,
+        List.of(Map.of("group_id", 3413, "set_name", "Pokémon Card 151")),
+        List.of(
+            product(566488, "Snorlax", 3413, "143/165", List.of("normal")),
+            product(566685, "Snorlax (Poké Ball)", 3413, "143/165", List.of("holofoil")),
+            product(566838, "Snorlax (Master Ball)", 3413, "143/165", List.of("holofoil")),
+            product(566839, "Snorlax (Master Ball)", 3413, "143/165", List.of("holofoil"))));
+    var context = new RequestContext("alice");
+
+    // act
+    var detail = getCardService.getCard(context, new GetCardRequest("pokemon_jp", "566838"));
+    var bulk =
+        findCardsService.findCards(
+            context, new FindCardsRequest("pokemon_jp", List.of("566838", "missing")));
+    var holofoils =
+        searchCardsService.searchCards(
+            context, new SearchCardsRequest("pokemon_jp", "Snorlax", "holofoil", null, null));
+    var normals =
+        searchCardsService.searchCards(
+            context, new SearchCardsRequest("pokemon_jp", "Snorlax", "normal", null, null));
+    var alternatives =
+        findCardAlternativesService.findCardAlternatives(
+            context,
+            new FindCardAlternativesRequest("pokemon_jp", "566838", "holofoil", null, null));
+    var images =
+        findCardImagesService.findCardImages(
+            context, new FindCardImagesRequest("pokemon_jp", List.of("566838")));
+
+    // assert
+    assertThat(detail.card().game()).isEqualTo("pokemon_jp");
+    assertThat(detail.card().name()).isEqualTo("Snorlax (Master Ball)");
+    assertThat(detail.card().collectorNumber()).isEqualTo("143/165");
+    assertThat(detail.card().setCode()).isNull();
+    assertThat(detail.card().setName()).isEqualTo("Pokémon Card 151");
+    assertThat(detail.card().availableFinishes()).containsExactly("holofoil");
+    assertThat(detail.card().imageUrls().small())
+        .isEqualTo("https://tcgplayer-cdn.tcgplayer.com/product/566838_200w.jpg");
+    assertThat(bulk.cards()).extracting(card -> card.externalId()).containsExactly("566838");
+    assertThat(holofoils.cards())
+        .extracting(card -> card.externalId())
+        .containsExactly("566685", "566838", "566839");
+    assertThat(normals.cards()).extracting(card -> card.externalId()).containsExactly("566488");
+    assertThat(alternatives.cards())
+        .extracting(card -> card.externalId())
+        .containsExactly("566838", "566839");
+    assertThat(images.images().getFirst().imageUrls().normal())
+        .isEqualTo("https://tcgplayer-cdn.tcgplayer.com/product/566838_in_1000x1000.jpg");
+    assertThatThrownBy(
+            () ->
+                searchCardsService.searchCards(
+                    context,
+                    new SearchCardsRequest(
+                        "pokemon_jp", "Snorlax", "reverse_holofoil", null, null)))
+        .isInstanceOf(BadRequestException.class);
+    assertThatThrownBy(
+            () ->
+                findCardAlternativesService.findCardAlternatives(
+                    context,
+                    new FindCardAlternativesRequest(
+                        "pokemon_jp", "566838", "reverse_holofoil", null, null)))
+        .isInstanceOf(BadRequestException.class);
+  }
+
+  @Test
+  void pokemonCatalogCacheShouldRefreshEachGameIndependently() throws Exception {
+    // arrange
+    publishSnapshot(
+        "pokemon", 3, SNAPSHOT_ID, List.of(group("EN Set")), List.of(product(1, "English old")));
+    publishSnapshot(
+        "pokemon_jp",
+        85,
+        SNAPSHOT_ID,
+        List.of(group("JP Set")),
+        List.of(product(1, "Japanese old")));
+    var context = new RequestContext("alice");
+    var englishOld = getCardService.getCard(context, new GetCardRequest("pokemon", "1"));
+    clock.setTime(clock.now().plusSeconds(120));
+    var japaneseOld = getCardService.getCard(context, new GetCardRequest("pokemon_jp", "1"));
+    publishSnapshot(
+        "pokemon",
+        3,
+        "2026-10-07T20:07:09Z",
+        List.of(group("EN Set")),
+        List.of(product(1, "English new")));
+    publishSnapshot(
+        "pokemon_jp",
+        85,
+        "2026-10-07T20:07:09Z",
+        List.of(group("JP Set")),
+        List.of(product(1, "Japanese new")));
+
+    // act
+    clock.setTime(clock.now().plusSeconds(180));
+    var englishNew = getCardService.getCard(context, new GetCardRequest("pokemon", "1"));
+    var japaneseStillCached =
+        getCardService.getCard(context, new GetCardRequest("pokemon_jp", "1"));
+    clock.setTime(clock.now().plusSeconds(120));
+    var japaneseNew = getCardService.getCard(context, new GetCardRequest("pokemon_jp", "1"));
+
+    // assert
+    assertThat(englishOld.card().name()).isEqualTo("English old");
+    assertThat(japaneseOld.card().name()).isEqualTo("Japanese old");
+    assertThat(englishNew.card().name()).isEqualTo("English new");
+    assertThat(japaneseStillCached.card().name()).isEqualTo("Japanese old");
+    assertThat(japaneseNew.card().name()).isEqualTo("Japanese new");
+  }
+
+  @Test
+  void missingJapaneseCatalogShouldNotAffectEnglishAndCanLoadAfterPublication() throws Exception {
+    // arrange
+    publishSnapshot(
+        "pokemon", 3, SNAPSHOT_ID, List.of(group("EN Set")), List.of(product(1, "English card")));
+    var context = new RequestContext("alice");
+
+    // act / assert
+    assertThatThrownBy(() -> getCardService.getCard(context, new GetCardRequest("pokemon_jp", "1")))
+        .isInstanceOf(ServiceUnavailableException.class);
+    assertThat(getCardService.getCard(context, new GetCardRequest("pokemon", "1")).card().name())
+        .isEqualTo("English card");
+    publishSnapshot(
+        "pokemon_jp",
+        85,
+        SNAPSHOT_ID,
+        List.of(group("JP Set")),
+        List.of(product(1, "Japanese card")));
+    assertThat(getCardService.getCard(context, new GetCardRequest("pokemon_jp", "1")).card().name())
+        .isEqualTo("Japanese card");
+  }
+
+  @Test
+  void japaneseCatalogShouldRejectMismatchedSnapshotMetadataWithoutAffectingEnglish()
+      throws Exception {
+    // arrange
+    publishSnapshot(
+        "pokemon", 3, SNAPSHOT_ID, List.of(group("EN Set")), List.of(product(1, "English card")));
+    publishSnapshot(
+        "pokemon_jp",
+        3,
+        SNAPSHOT_ID,
+        List.of(group("Wrong category")),
+        List.of(product(1, "Wrong card")));
+    var context = new RequestContext("alice");
+
+    // act / assert
+    assertThatThrownBy(() -> getCardService.getCard(context, new GetCardRequest("pokemon_jp", "1")))
+        .isInstanceOf(ServiceUnavailableException.class);
+    publishSnapshot(
+        "pokemon_jp",
+        85,
+        "2026-10-07T20:07:09Z",
+        List.of(group("Wrong external source")),
+        List.of(product(1, "Wrong source card")),
+        "other_source",
+        "tcgcsv");
+    assertThatThrownBy(() -> getCardService.getCard(context, new GetCardRequest("pokemon_jp", "1")))
+        .isInstanceOf(ServiceUnavailableException.class);
+    publishSnapshot(
+        "pokemon_jp",
+        85,
+        "2026-10-07T20:08:09Z",
+        List.of(group("Wrong catalog source")),
+        List.of(product(1, "Wrong catalog card")),
+        "tcgplayer",
+        "other_catalog");
+    assertThatThrownBy(() -> getCardService.getCard(context, new GetCardRequest("pokemon_jp", "1")))
+        .isInstanceOf(ServiceUnavailableException.class);
+    assertThat(getCardService.getCard(context, new GetCardRequest("pokemon", "1")).card().name())
+        .isEqualTo("English card");
+    publishSnapshot(
+        "pokemon_jp",
+        85,
+        "2026-10-07T20:09:09Z",
+        List.of(group("JP Set")),
+        List.of(product(1, "Japanese corrected card")));
+    assertThat(getCardService.getCard(context, new GetCardRequest("pokemon_jp", "1")).card().name())
+        .isEqualTo("Japanese corrected card");
+  }
+
+  private static Game japanesePokemonGame() {
+    return new Game(
+        "pokemon_jp",
+        "Pokémon (JP)",
+        "tcgplayer",
+        Language.JAPANESE,
+        true,
+        false,
+        List.of(new Finish("normal", "Normal"), new Finish("holofoil", "Holofoil")),
+        List.of(new ScanReviewImageRegion("set_and_number", "Set and number", 0, 0.88, 0.5, 0.12)));
+  }
+
+  private static Map<String, Object> group(String name) {
+    return Map.of("group_id", 1, "set_code", "SET", "set_name", name);
+  }
+
+  private static Map<String, Object> product(int id, String name) {
+    return product(id, name, 1, Integer.toString(id), List.of("normal", "holofoil"));
+  }
+
+  private static Map<String, Object> product(
+      int id, String name, int groupId, String collectorNumber, List<String> finishes) {
+    return Map.of(
+        "product_id", id,
+        "name", name,
+        "group_id", groupId,
+        "collector_number", collectorNumber,
+        "available_finishes", finishes);
+  }
+
   private static void publishAlternativesSnapshot(String snapshotId) throws Exception {
-    var updatedAt = Instant.parse(snapshotId);
     var products =
         List.of(
             Map.of(
@@ -322,44 +546,12 @@ public class SearchCardsServiceIntegrationTest {
                 "5",
                 "available_finishes",
                 List.of("normal")));
-    var snapshot =
-        Map.ofEntries(
-            Map.entry("schema_version", 1),
-            Map.entry("game", "pokemon"),
-            Map.entry("external_source", "tcgplayer"),
-            Map.entry("catalog_source", "tcgcsv"),
-            Map.entry("category_id", 3),
-            Map.entry("snapshot_id", snapshotId),
-            Map.entry(
-                "source_marker",
-                DateTimeFormatter.ofPattern("uuuu-MM-dd'T'HH:mm:ssxx")
-                    .withZone(ZoneOffset.UTC)
-                    .format(updatedAt)),
-            Map.entry("source_updated_at", updatedAt.getEpochSecond()),
-            Map.entry("created_at", updatedAt.getEpochSecond()),
-            Map.entry(
-                "groups",
-                List.of(Map.of("group_id", 1, "set_code", "BASE", "set_name", "Base Set"))),
-            Map.entry("products", products));
-    var json = new ObjectMapper().writeValueAsBytes(snapshot);
-    var compressed = new ByteArrayOutputStream();
-    try (var gzip = new GZIPOutputStream(compressed)) {
-      gzip.write(json);
-    }
-    var key = "catalogs/tcgcsv/pokemon/snapshots/" + snapshotId + ".json.gz";
-    s3.putObject(
-        request -> request.bucket(BUCKET).key(key),
-        RequestBody.fromBytes(compressed.toByteArray()));
-    dynamoDb.putItem(
-        request ->
-            request
-                .tableName(TABLE_NAME)
-                .item(
-                    Map.of(
-                        "pk", AttributeValue.fromS("CATALOG#pokemon"),
-                        "sk", AttributeValue.fromS("SNAPSHOT#" + snapshotId),
-                        "snapshot_id", AttributeValue.fromS(snapshotId),
-                        "s3_key", AttributeValue.fromS(key))));
+    publishSnapshot(
+        "pokemon",
+        3,
+        snapshotId,
+        List.of(Map.of("group_id", 1, "set_code", "BASE", "set_name", "Base Set")),
+        products);
   }
 
   private static void publishSnapshot(String snapshotId, String name, int productCount)
@@ -381,6 +573,8 @@ public class SearchCardsServiceIntegrationTest {
                         List.of("normal", "holofoil")))
             .toList();
     publishSnapshot(
+        "pokemon",
+        3,
         snapshotId,
         List.of(Map.of("group_id", 1, "set_code", "BASE", "set_name", "Base Set")),
         products);
@@ -388,14 +582,32 @@ public class SearchCardsServiceIntegrationTest {
 
   private static void publishSnapshot(String snapshotId, List<?> groups, List<?> products)
       throws Exception {
+    publishSnapshot("pokemon", 3, snapshotId, groups, products);
+  }
+
+  private static void publishSnapshot(
+      String game, int categoryId, String snapshotId, List<?> groups, List<?> products)
+      throws Exception {
+    publishSnapshot(game, categoryId, snapshotId, groups, products, "tcgplayer", "tcgcsv");
+  }
+
+  private static void publishSnapshot(
+      String game,
+      int categoryId,
+      String snapshotId,
+      List<?> groups,
+      List<?> products,
+      String externalSource,
+      String catalogSource)
+      throws Exception {
     var updatedAt = Instant.parse(snapshotId);
     var snapshot =
         Map.ofEntries(
             Map.entry("schema_version", 1),
-            Map.entry("game", "pokemon"),
-            Map.entry("external_source", "tcgplayer"),
-            Map.entry("catalog_source", "tcgcsv"),
-            Map.entry("category_id", 3),
+            Map.entry("game", game),
+            Map.entry("external_source", externalSource),
+            Map.entry("catalog_source", catalogSource),
+            Map.entry("category_id", categoryId),
             Map.entry("snapshot_id", snapshotId),
             Map.entry(
                 "source_marker",
@@ -411,7 +623,7 @@ public class SearchCardsServiceIntegrationTest {
     try (var gzip = new GZIPOutputStream(compressed)) {
       gzip.write(json);
     }
-    var key = "catalogs/tcgcsv/pokemon/snapshots/" + snapshotId + ".json.gz";
+    var key = "catalogs/tcgcsv/" + game + "/snapshots/" + snapshotId + ".json.gz";
     s3.putObject(
         request -> request.bucket(BUCKET).key(key),
         RequestBody.fromBytes(compressed.toByteArray()));
@@ -421,9 +633,9 @@ public class SearchCardsServiceIntegrationTest {
                 .tableName(TABLE_NAME)
                 .item(
                     Map.of(
-                        "pk", AttributeValue.fromS("CATALOG#pokemon"),
+                        "pk", AttributeValue.fromS("CATALOG#" + game),
                         "sk", AttributeValue.fromS("SNAPSHOT#" + snapshotId),
-                        "game", AttributeValue.fromS("pokemon"),
+                        "game", AttributeValue.fromS(game),
                         "snapshot_id", AttributeValue.fromS(snapshotId),
                         "s3_key", AttributeValue.fromS(key),
                         "checksum_sha256", AttributeValue.fromS("snapshot-checksum"),

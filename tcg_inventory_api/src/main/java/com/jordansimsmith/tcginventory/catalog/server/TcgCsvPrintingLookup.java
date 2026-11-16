@@ -31,18 +31,19 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import software.amazon.awssdk.core.exception.SdkException;
 
-public class PokemonPrintingLookup {
+public class TcgCsvPrintingLookup {
   private static final Duration REGISTRY_CHECK_INTERVAL = Duration.ofMinutes(5);
   private static final String UNAVAILABLE = "catalog is temporarily unavailable";
 
   private final CatalogRepository repository;
   private final CatalogSnapshotStore snapshotStore;
   private final Clock clock;
-  private Map<String, CatalogPrinting> cachedPrintings;
-  private String snapshotId;
-  private Instant lastCheckedAt;
+  private final Map<String, CacheEntry> cacheByGame = new HashMap<>();
 
-  public PokemonPrintingLookup(
+  private record CacheEntry(
+      String snapshotId, Instant lastCheckedAt, Map<String, CatalogPrinting> printings) {}
+
+  public TcgCsvPrintingLookup(
       CatalogRepository repository, CatalogSnapshotStore snapshotStore, Clock clock) {
     this.repository = repository;
     this.snapshotStore = snapshotStore;
@@ -56,13 +57,15 @@ public class PokemonPrintingLookup {
         "https://tcgplayer-cdn.tcgplayer.com/product/" + encodedExternalId + "_in_1000x1000.jpg");
   }
 
-  public Card getCard(Game game, String externalId) throws ServiceException {
-    return toCard(getPrinting(loadPrintings(game), externalId));
+  public Card getCard(Game game, TcgCsvCatalogDefinition definition, String externalId)
+      throws ServiceException {
+    return toCard(getPrinting(loadPrintings(game, definition), externalId));
   }
 
-  public List<CatalogPrinting> findCards(Game game, Set<String> externalIds)
+  public List<CatalogPrinting> findCards(
+      Game game, TcgCsvCatalogDefinition definition, Set<String> externalIds)
       throws ServiceUnavailableException {
-    var printings = loadPrintings(game);
+    var printings = loadPrintings(game, definition);
     var cards = new ArrayList<CatalogPrinting>();
     for (var externalId : externalIds) {
       var printing = printings.get(externalId);
@@ -74,9 +77,14 @@ public class PokemonPrintingLookup {
   }
 
   public SearchCardsResponse searchCards(
-      Game game, String query, String finish, int limit, @Nullable String continuation)
+      Game game,
+      TcgCsvCatalogDefinition definition,
+      String query,
+      String finish,
+      int limit,
+      @Nullable String continuation)
       throws ServiceException {
-    var printings = loadPrintings(game);
+    var printings = loadPrintings(game, definition);
     var normalizedQuery = query.toLowerCase(Locale.ROOT);
     var matches =
         printings.values().stream()
@@ -89,9 +97,14 @@ public class PokemonPrintingLookup {
   }
 
   public FindCardAlternativesResponse findCardAlternatives(
-      Game game, String externalId, String finish, int limit, @Nullable String continuation)
+      Game game,
+      TcgCsvCatalogDefinition definition,
+      String externalId,
+      String finish,
+      int limit,
+      @Nullable String continuation)
       throws ServiceException {
-    var printings = loadPrintings(game);
+    var printings = loadPrintings(game, definition);
     var anchor = getPrinting(printings, externalId);
     var matches = new ArrayList<CatalogPrinting>();
     if (anchor.availableFinishes().contains(finish)) {
@@ -163,11 +176,15 @@ public class PokemonPrintingLookup {
         printing.availableFinishes());
   }
 
-  private synchronized Map<String, CatalogPrinting> loadPrintings(Game game)
-      throws ServiceUnavailableException {
-    if (cachedPrintings != null
-        && clock.now().isBefore(lastCheckedAt.plus(REGISTRY_CHECK_INTERVAL))) {
-      return cachedPrintings;
+  private synchronized Map<String, CatalogPrinting> loadPrintings(
+      Game game, TcgCsvCatalogDefinition definition) throws ServiceUnavailableException {
+    if (!definition.gameId().equals(game.id())) {
+      throw new ServiceUnavailableException(UNAVAILABLE);
+    }
+    var cached = cacheByGame.get(game.id());
+    if (cached != null
+        && clock.now().isBefore(cached.lastCheckedAt().plus(REGISTRY_CHECK_INTERVAL))) {
+      return cached.printings();
     }
 
     try {
@@ -177,23 +194,30 @@ public class PokemonPrintingLookup {
       }
 
       var latestId = latest.getSnapshotId();
-      if (!latestId.equals(snapshotId)) {
+      Map<String, CatalogPrinting> printings;
+      if (cached != null && latestId.equals(cached.snapshotId())) {
+        printings = cached.printings();
+      } else {
         if (latest.getS3Key() == null || latest.getS3Key().isBlank()) {
           throw new ServiceUnavailableException(UNAVAILABLE);
         }
-        cachedPrintings = toPrintingIndex(game, snapshotStore.getSnapshot(latest));
-        snapshotId = latestId;
+        printings = toPrintingIndex(game, definition, snapshotStore.getSnapshot(latest));
       }
-      lastCheckedAt = clock.now();
-      return cachedPrintings;
+      cacheByGame.put(game.id(), new CacheEntry(latestId, clock.now(), printings));
+      return printings;
     } catch (IOException | SdkException | IllegalArgumentException e) {
       throw new ServiceUnavailableException(UNAVAILABLE, e);
     }
   }
 
-  private Map<String, CatalogPrinting> toPrintingIndex(Game game, TcgCsvCatalogSnapshot snapshot)
+  private Map<String, CatalogPrinting> toPrintingIndex(
+      Game game, TcgCsvCatalogDefinition definition, TcgCsvCatalogSnapshot snapshot)
       throws ServiceUnavailableException {
-    if (snapshot == null || !game.id().equals(snapshot.game())) {
+    if (snapshot == null
+        || !definition.gameId().equals(snapshot.game())
+        || definition.categoryId() != snapshot.categoryId()
+        || !"tcgplayer".equals(snapshot.externalSource())
+        || !"tcgcsv".equals(snapshot.catalogSource())) {
       throw new ServiceUnavailableException(UNAVAILABLE);
     }
 

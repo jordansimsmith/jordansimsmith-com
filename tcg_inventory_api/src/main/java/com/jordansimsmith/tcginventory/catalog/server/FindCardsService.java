@@ -14,16 +14,14 @@ public class FindCardsService {
   private static final int MAX_EXTERNAL_IDS = 100;
 
   private final GamesService gamesService;
-  private final MagicTheGatheringPrintingLookup magicTheGathering;
-  private final PokemonPrintingLookup pokemon;
+  private final ScryfallPrintingLookup scryfall;
+  private final TcgCsvPrintingLookup tcgCsv;
 
   public FindCardsService(
-      GamesService gamesService,
-      MagicTheGatheringPrintingLookup magicTheGathering,
-      PokemonPrintingLookup pokemon) {
+      GamesService gamesService, ScryfallPrintingLookup scryfall, TcgCsvPrintingLookup tcgCsv) {
     this.gamesService = gamesService;
-    this.magicTheGathering = magicTheGathering;
-    this.pokemon = pokemon;
+    this.scryfall = scryfall;
+    this.tcgCsv = tcgCsv;
   }
 
   public FindCardsResponse findCards(RequestContext ctx, FindCardsRequest request)
@@ -43,8 +41,9 @@ public class FindCardsService {
     var ids = new LinkedHashSet<>(request.externalIds());
     var cards =
         switch (game.id()) {
-          case "mtg" -> magicTheGathering.findCards(game, List.copyOf(ids));
-          case "pokemon" -> pokemon.findCards(game, ids);
+          case "mtg" -> scryfall.findCards(game, List.copyOf(ids));
+          case "pokemon", "pokemon_jp" ->
+              tcgCsv.findCards(game, TcgCsvCatalogDefinition.forGame(game.id()), ids);
           default -> throw new BadRequestException("no catalog configured for game: " + game.id());
         };
     return new FindCardsResponse(cards);

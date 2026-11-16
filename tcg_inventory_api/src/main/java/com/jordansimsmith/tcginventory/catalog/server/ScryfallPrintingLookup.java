@@ -33,7 +33,7 @@ import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.hc.core5.net.URIBuilder;
 
-public class MagicTheGatheringPrintingLookup {
+public class ScryfallPrintingLookup {
   private static final int COLLECTION_REQUEST_SIZE = 75;
   private static final int PROVIDER_PAGE_SIZE = 175;
   private static final int MAX_PROVIDER_PAGES_PER_REQUEST = 5;
@@ -87,8 +87,7 @@ public class MagicTheGatheringPrintingLookup {
   private final ObjectMapper objectMapper;
   private long lastRequestAt;
 
-  public MagicTheGatheringPrintingLookup(
-      URI baseUri, HttpClient httpClient, ObjectMapper objectMapper) {
+  public ScryfallPrintingLookup(URI baseUri, HttpClient httpClient, ObjectMapper objectMapper) {
     this.baseUri = baseUri;
     this.httpClient = httpClient;
     this.objectMapper = objectMapper;

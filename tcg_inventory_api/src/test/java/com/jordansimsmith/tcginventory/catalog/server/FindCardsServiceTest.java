@@ -43,8 +43,7 @@ public class FindCardsServiceTest {
     server.createContext("/cards/collection", this::handleCollection);
     server.start();
     var baseUri = URI.create("http://127.0.0.1:" + server.getAddress().getPort());
-    var magic =
-        new MagicTheGatheringPrintingLookup(baseUri, HttpClient.newHttpClient(), objectMapper);
+    var magic = new ScryfallPrintingLookup(baseUri, HttpClient.newHttpClient(), objectMapper);
     service = new FindCardsService(new FakeGamesService(), magic, null);
     secondStatus = 200;
     secondBody = null;

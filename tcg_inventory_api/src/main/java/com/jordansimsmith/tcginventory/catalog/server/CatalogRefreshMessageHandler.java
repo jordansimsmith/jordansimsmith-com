@@ -1,13 +1,11 @@
 package com.jordansimsmith.tcginventory.catalog.server;
 
-import com.jordansimsmith.tcginventory.catalog.server.TcgCsvCatalogDefinition.FinishMapping;
 import com.jordansimsmith.time.Clock;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
-import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,26 +45,7 @@ public class CatalogRefreshMessageHandler {
     } catch (DateTimeParseException e) {
       throw new IllegalArgumentException("invalid scheduled_at: " + message.scheduledAt(), e);
     }
-    var definition =
-        switch (message.game()) {
-          case "pokemon" ->
-              new TcgCsvCatalogDefinition(
-                  "pokemon",
-                  3,
-                  List.of(
-                      new FinishMapping("Normal", "normal"),
-                      new FinishMapping("Holofoil", "holofoil"),
-                      new FinishMapping("Reverse Holofoil", "reverse_holofoil")));
-          case "pokemon_jp" ->
-              new TcgCsvCatalogDefinition(
-                  "pokemon_jp",
-                  85,
-                  List.of(
-                      new FinishMapping("Normal", "normal"),
-                      new FinishMapping("Holofoil", "holofoil")));
-          case null, default ->
-              throw new IllegalArgumentException("unsupported catalog game: " + message.game());
-        };
+    var definition = TcgCsvCatalogDefinition.forGame(message.game());
     var game = definition.gameId();
     var categoryId = definition.categoryId();
 

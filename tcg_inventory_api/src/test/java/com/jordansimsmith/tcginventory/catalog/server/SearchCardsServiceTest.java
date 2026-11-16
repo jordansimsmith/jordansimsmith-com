@@ -40,8 +40,7 @@ public class SearchCardsServiceTest {
     server.createContext("/cards", this::handleRequest);
     server.start();
     var baseUri = URI.create("http://127.0.0.1:" + server.getAddress().getPort());
-    var magic =
-        new MagicTheGatheringPrintingLookup(baseUri, HttpClient.newHttpClient(), objectMapper);
+    var magic = new ScryfallPrintingLookup(baseUri, HttpClient.newHttpClient(), objectMapper);
     service = new SearchCardsService(new FakeGamesService(), magic, null);
     searchBody = searchPage(searchCards(25), false);
     status = 200;

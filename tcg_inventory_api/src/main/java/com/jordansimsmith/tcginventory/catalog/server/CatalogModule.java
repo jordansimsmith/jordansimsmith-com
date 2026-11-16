@@ -45,14 +45,13 @@ public class CatalogModule {
             .connectTimeout(Duration.ofSeconds(3))
             .followRedirects(HttpClient.Redirect.NEVER)
             .build();
-    var magicTheGathering =
-        new MagicTheGatheringPrintingLookup(scryfallBaseUri, httpClient, objectMapper);
-    var pokemon = new PokemonPrintingLookup(repository, snapshotStore, clock);
-    var getCardService = new GetCardService(gamesService, magicTheGathering, pokemon);
-    var findCardsService = new FindCardsService(gamesService, magicTheGathering, pokemon);
-    var searchCardsService = new SearchCardsService(gamesService, magicTheGathering, pokemon);
+    var scryfall = new ScryfallPrintingLookup(scryfallBaseUri, httpClient, objectMapper);
+    var tcgCsv = new TcgCsvPrintingLookup(repository, snapshotStore, clock);
+    var getCardService = new GetCardService(gamesService, scryfall, tcgCsv);
+    var findCardsService = new FindCardsService(gamesService, scryfall, tcgCsv);
+    var searchCardsService = new SearchCardsService(gamesService, scryfall, tcgCsv);
     var findCardAlternativesService =
-        new FindCardAlternativesService(gamesService, magicTheGathering, pokemon);
+        new FindCardAlternativesService(gamesService, scryfall, tcgCsv);
     return new CatalogService() {
       @Override
       public GetCardResponse getCard(RequestContext ctx, GetCardRequest request)
