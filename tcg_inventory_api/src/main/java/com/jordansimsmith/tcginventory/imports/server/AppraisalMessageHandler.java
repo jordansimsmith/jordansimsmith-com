@@ -76,15 +76,21 @@ public class AppraisalMessageHandler {
         var price =
             pricingService.getPrice(
                 ctx, new GetPriceRequest(result.cardId(), Condition.valueOf(row.getCondition())));
-        marketPrice = price.marketPrice().toPlainString();
-        if (appraisalPolicy.decide(price.marketPrice()) == AppraisalPolicy.Decision.DISCARD) {
-          decision = "discard";
-          reason = "below threshold";
+        var marketPriceValue = price.marketPrice();
+        if (marketPriceValue == null) {
+          decision = "review";
+          reason = "market price unavailable";
         } else {
-          decision = "keep";
-          suggestedPrice = price.suggestedPrice().toPlainString();
-          cardId = result.cardId();
-          setId = result.setId();
+          marketPrice = marketPriceValue.toPlainString();
+          if (appraisalPolicy.decide(marketPriceValue) == AppraisalPolicy.Decision.DISCARD) {
+            decision = "discard";
+            reason = "below threshold";
+          } else {
+            decision = "keep";
+            suggestedPrice = price.suggestedPrice().toPlainString();
+            cardId = result.cardId();
+            setId = result.setId();
+          }
         }
       }
       importMutationRepository.recordAppraisal(

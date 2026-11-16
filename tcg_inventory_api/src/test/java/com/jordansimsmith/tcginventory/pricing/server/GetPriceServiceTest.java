@@ -58,7 +58,7 @@ class GetPriceServiceTest {
   }
 
   @Test
-  void getPriceShouldUseDefaultFloorAndZeroForMissingMarketPrice() throws Exception {
+  void getPriceShouldReturnNoPricesWhenMarketPriceIsMissing() throws Exception {
     // arrange
     var pricingRepository = mock(PricingRepository.class);
     var fetchTcgService = new FakeFetchTcgService();
@@ -70,8 +70,8 @@ class GetPriceServiceTest {
             .getPrice(ctx, new GetPriceRequest("card-1", Condition.LP));
 
     // assert
-    assertThat(response.marketPrice()).isEqualByComparingTo("0.00");
-    assertThat(response.suggestedPrice()).isEqualByComparingTo("0.25");
+    assertThat(response.marketPrice()).isNull();
+    assertThat(response.suggestedPrice()).isNull();
   }
 
   @Test

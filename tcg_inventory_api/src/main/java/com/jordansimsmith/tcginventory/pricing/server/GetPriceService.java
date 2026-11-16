@@ -8,7 +8,6 @@ import com.jordansimsmith.tcginventory.fetchtcg.client.GetAccountRequest;
 import com.jordansimsmith.tcginventory.fetchtcg.client.GetCardRequest;
 import com.jordansimsmith.tcginventory.pricing.client.GetPriceRequest;
 import com.jordansimsmith.tcginventory.pricing.client.GetPriceResponse;
-import java.math.BigDecimal;
 import java.math.RoundingMode;
 
 public class GetPriceService {
@@ -36,12 +35,14 @@ public class GetPriceService {
     var pricingItem = pricingRepository.get(ctx.user());
     var priceFloor =
         PriceFloors.effective(pricingItem == null ? null : pricingItem.getPriceFloor());
-    var sellerUsername = fetchTcgService.getAccount(ctx, new GetAccountRequest()).sellerUsername();
     var cardId = request.fetchtcgCardId();
     var card = fetchTcgService.getCard(ctx, new GetCardRequest(cardId));
-    var marketPrice =
-        (card.marketPrice() == null ? BigDecimal.ZERO : card.marketPrice())
-            .setScale(2, RoundingMode.HALF_UP);
+    var marketPrice = card.marketPrice();
+    if (marketPrice == null) {
+      return new GetPriceResponse(null, null);
+    }
+    marketPrice = marketPrice.setScale(2, RoundingMode.HALF_UP);
+    var sellerUsername = fetchTcgService.getAccount(ctx, new GetAccountRequest()).sellerUsername();
     var competitors =
         competitorPricing.findCompetitorPriceTiers(
             ctx, cardId, request.condition(), sellerUsername);

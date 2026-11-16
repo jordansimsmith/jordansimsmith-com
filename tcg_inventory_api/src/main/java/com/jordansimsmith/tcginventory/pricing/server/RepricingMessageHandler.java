@@ -130,6 +130,11 @@ public class RepricingMessageHandler {
       throw new IllegalStateException("SKU has no FetchTCG card ID: " + skuId);
     }
     var price = pricingService.getPrice(ctx, new GetPriceRequest(cardId, condition));
+    var marketPrice = price.marketPrice();
+    if (marketPrice == null) {
+      LOGGER.info("skipping repricing for SKU {} because market price is unavailable", skuId);
+      return;
+    }
     inventoryService.updateSku(
         ctx, new UpdateSkuRequest(skuId, price.suggestedPrice(), null, null));
   }
