@@ -112,14 +112,39 @@ const FAKE_GAMES: Game[] = [
     id: 'pokemon',
     display_name: 'Pokémon (EN)',
     language: 'en',
-    scanning_enabled: false,
+    scanning_enabled: true,
     csv_import_enabled: false,
     finishes: [
       { id: 'normal', display_name: 'Normal' },
       { id: 'holofoil', display_name: 'Holofoil' },
       { id: 'reverse_holofoil', display_name: 'Reverse Holofoil' },
     ],
-    scan_review_image_regions: [],
+    scan_review_image_regions: [
+      {
+        id: 'set_and_number',
+        display_name: 'Set and number',
+        x: 0,
+        y: 0.88,
+        width: 0.5,
+        height: 0.12,
+      },
+      {
+        id: 'artwork_stamps_left',
+        display_name: 'Left artwork stamps',
+        x: 0,
+        y: 0.32,
+        width: 0.45,
+        height: 0.22,
+      },
+      {
+        id: 'artwork_stamps_right',
+        display_name: 'Right artwork stamps',
+        x: 0.55,
+        y: 0.32,
+        width: 0.45,
+        height: 0.22,
+      },
+    ],
   },
 ];
 const FAKE_CATALOG_CARDS: CatalogCard[] = [
@@ -194,6 +219,26 @@ const FAKE_CATALOG_CARDS: CatalogCard[] = [
     collector_number: '267',
     image_urls: fakeImageUrls('fake-counterspell', 'Counterspell', 'MH2'),
     available_finishes: ['normal', 'foil', 'etched'],
+  },
+  {
+    game: 'pokemon',
+    external_id: '226395',
+    name: 'Charizard',
+    set_code: 'SWSH04',
+    set_name: 'Vivid Voltage',
+    collector_number: '025/185',
+    image_urls: fakeImageUrls('226395', 'Charizard', 'SWSH04'),
+    available_finishes: ['normal', 'reverse_holofoil'],
+  },
+  {
+    game: 'pokemon',
+    external_id: '124026',
+    name: 'Charizard',
+    set_code: 'EVO',
+    set_name: 'Evolutions',
+    collector_number: '11/108',
+    image_urls: fakeImageUrls('124026', 'Charizard', 'EVO'),
+    available_finishes: ['holofoil'],
   },
 ];
 const FAKE_CATALOG_PAGE_SIZE = 2;
@@ -1165,15 +1210,20 @@ function progressFakeScan(scan: FakeScan): void {
     }
     row.status = index % 3 === 1 ? 'needs_review' : 'suggested';
     row.needs_review = row.status === 'needs_review';
-    row.suggestions = [
-      scanSuggestion(
-        index % 2 === 0
-          ? 'f29ba16f-c8fb-42fe-aabf-87089cb214a7'
-          : '6a0b230b-d391-4998-a3f7-7b158a0ec2cd',
-        index % 2 === 0 ? 'Lightning Bolt' : 'Llanowar Elves',
-        index % 3 === 1 ? 0.61 : 0.9,
-      ),
-    ];
+    if (scan.game === POKEMON_ENGLISH.id) {
+      const externalId = scan.finish === 'holofoil' ? '124026' : '226395';
+      row.suggestions = [scanSuggestion(externalId, 'Charizard', 0.9)];
+    } else {
+      row.suggestions = [
+        scanSuggestion(
+          index % 2 === 0
+            ? 'f29ba16f-c8fb-42fe-aabf-87089cb214a7'
+            : '6a0b230b-d391-4998-a3f7-7b158a0ec2cd',
+          index % 2 === 0 ? 'Lightning Bolt' : 'Llanowar Elves',
+          index % 3 === 1 ? 0.61 : 0.9,
+        ),
+      ];
+    }
     row.source_url = fakeScanSourceUrl(scan.scan_id, row.scan_position);
   }
   if (processedCount >= rows.length) {

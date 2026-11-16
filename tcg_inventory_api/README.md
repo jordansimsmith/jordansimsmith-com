@@ -23,9 +23,10 @@ sheets. The main consumer is [TCG inventory web](../tcg_inventory_web/README.md)
   across supported games.
 
 Magic: The Gathering and English Pokémon share the inventory, publishing,
-order, and reporting workflows. CSV and scanner intake are enabled for Magic
-only. The review catalog uses Scryfall for Magic and a published TCGCSV snapshot
-for Pokémon.
+order, and reporting workflows. Magic supports CSV and scanner intake.
+English Pokémon supports scanner intake with one finish per scan and uses
+TCGplayer printings from the published TCGCSV snapshot. Pokémon CSV intake
+remains disabled. The review catalog uses Scryfall for Magic.
 
 ## Build and deployment
 

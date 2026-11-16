@@ -235,6 +235,76 @@ describe('ScanPage', () => {
     expect(finishInput).toHaveProperty('value', 'Gloss B');
   });
 
+  it('offers Pokémon scanning with each registered finish', async () => {
+    const pokemon: Game = {
+      id: 'pokemon',
+      display_name: 'Pokémon (EN)',
+      language: 'en',
+      scanning_enabled: true,
+      csv_import_enabled: false,
+      finishes: [
+        { id: 'normal', display_name: 'Normal' },
+        { id: 'holofoil', display_name: 'Holofoil' },
+        { id: 'reverse_holofoil', display_name: 'Reverse Holofoil' },
+      ],
+      scan_review_image_regions: [
+        {
+          id: 'set_and_number',
+          display_name: 'Set and number',
+          x: 0,
+          y: 0.88,
+          width: 0.5,
+          height: 0.12,
+        },
+        {
+          id: 'artwork_stamps_left',
+          display_name: 'Left artwork stamps',
+          x: 0,
+          y: 0.32,
+          width: 0.45,
+          height: 0.22,
+        },
+        {
+          id: 'artwork_stamps_right',
+          display_name: 'Right artwork stamps',
+          x: 0.55,
+          y: 0.32,
+          width: 0.45,
+          height: 0.22,
+        },
+      ],
+    };
+    const user = userEvent.setup();
+    renderScanPage([...REGISTERED_GAMES, pokemon]);
+
+    const jobs = screen.getByRole('region', { name: 'Scan jobs' });
+    const gameInput = within(jobs).getByRole('textbox', { name: 'Game' });
+    const finishInput = within(jobs).getByRole('textbox', { name: 'Finish' });
+    await user.click(gameInput);
+    fireEvent.click(
+      screen.getByRole('option', { name: 'Pokémon (EN)', hidden: true }),
+    );
+    expect(finishInput).toHaveProperty('value', 'Normal');
+    expect(
+      within(jobs).queryByText('Scanning is unavailable for Pokémon (EN).'),
+    ).toBeNull();
+
+    await user.click(finishInput);
+    fireEvent.click(
+      screen.getByRole('option', { name: 'Holofoil', hidden: true }),
+    );
+    expect(finishInput).toHaveProperty('value', 'Holofoil');
+
+    await user.click(finishInput);
+    fireEvent.click(
+      screen.getByRole('option', {
+        name: 'Reverse Holofoil',
+        hidden: true,
+      }),
+    );
+    expect(finishInput).toHaveProperty('value', 'Reverse Holofoil');
+  });
+
   it('refreshes the table then uploads, verifies, identifies, and navigates', async () => {
     const created = createScanResponse();
     const verified = scanDetail({

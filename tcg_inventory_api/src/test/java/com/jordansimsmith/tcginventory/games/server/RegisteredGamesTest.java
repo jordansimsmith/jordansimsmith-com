@@ -21,6 +21,8 @@ public class RegisteredGamesTest {
         .containsExactly(RegisteredGames.MAGIC_THE_GATHERING, RegisteredGames.POKEMON_ENGLISH);
     assertThat(response.games().get(0).externalSource()).isEqualTo("scryfall");
     assertThat(response.games()).extracting(Game::language).containsOnly(Language.ENGLISH);
+    assertThat(RegisteredGames.POKEMON_ENGLISH.scanningEnabled()).isTrue();
+    assertThat(RegisteredGames.POKEMON_ENGLISH.csvImportEnabled()).isFalse();
   }
 
   @Test

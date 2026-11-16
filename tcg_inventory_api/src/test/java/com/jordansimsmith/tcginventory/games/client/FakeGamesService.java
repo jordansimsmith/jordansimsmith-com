@@ -31,7 +31,7 @@ public class FakeGamesService implements GamesService {
           "Pokémon (EN)",
           "tcgplayer",
           Language.ENGLISH,
-          false,
+          true,
           false,
           List.of(
               new Finish("normal", "Normal"),

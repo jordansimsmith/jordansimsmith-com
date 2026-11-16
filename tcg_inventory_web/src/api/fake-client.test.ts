@@ -61,9 +61,34 @@ describe('createFakeClient', () => {
           id: 'pokemon',
           display_name: 'Pokémon (EN)',
           language: 'en',
-          scanning_enabled: false,
+          scanning_enabled: true,
           csv_import_enabled: false,
-          scan_review_image_regions: [],
+          scan_review_image_regions: [
+            {
+              id: 'set_and_number',
+              display_name: 'Set and number',
+              x: 0,
+              y: 0.88,
+              width: 0.5,
+              height: 0.12,
+            },
+            {
+              id: 'artwork_stamps_left',
+              display_name: 'Left artwork stamps',
+              x: 0,
+              y: 0.32,
+              width: 0.45,
+              height: 0.22,
+            },
+            {
+              id: 'artwork_stamps_right',
+              display_name: 'Right artwork stamps',
+              x: 0.55,
+              y: 0.32,
+              width: 0.45,
+              height: 0.22,
+            },
+          ],
           finishes: [
             { id: 'normal', display_name: 'Normal' },
             { id: 'holofoil', display_name: 'Holofoil' },
@@ -400,14 +425,39 @@ describe('createFakeClient pokemon inventory', () => {
       id: 'pokemon',
       display_name: 'Pokémon (EN)',
       language: 'en',
-      scanning_enabled: false,
+      scanning_enabled: true,
       csv_import_enabled: false,
       finishes: [
         { id: 'normal', display_name: 'Normal' },
         { id: 'holofoil', display_name: 'Holofoil' },
         { id: 'reverse_holofoil', display_name: 'Reverse Holofoil' },
       ],
-      scan_review_image_regions: [],
+      scan_review_image_regions: [
+        {
+          id: 'set_and_number',
+          display_name: 'Set and number',
+          x: 0,
+          y: 0.88,
+          width: 0.5,
+          height: 0.12,
+        },
+        {
+          id: 'artwork_stamps_left',
+          display_name: 'Left artwork stamps',
+          x: 0,
+          y: 0.32,
+          width: 0.45,
+          height: 0.22,
+        },
+        {
+          id: 'artwork_stamps_right',
+          display_name: 'Right artwork stamps',
+          x: 0.55,
+          y: 0.32,
+          width: 0.45,
+          height: 0.22,
+        },
+      ],
     });
 
     const inventory = await client.findSkus({ game: 'pokemon' });
@@ -750,6 +800,10 @@ describe('createFakeClient imports', () => {
 });
 
 describe('createFakeClient scans', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('seeds scan jobs in newest-first order', async () => {
     const client = createFakeClient();
 
@@ -836,6 +890,49 @@ describe('createFakeClient scans', () => {
     await expect(client.identifyScan(created.scan_id)).resolves.toBeUndefined();
     expect((await client.getScan(created.scan_id)).status).toBe('identifying');
   });
+
+  it.each([
+    ['normal', '226395', 'SWSH04', '025/185'],
+    ['reverse_holofoil', '226395', 'SWSH04', '025/185'],
+    ['holofoil', '124026', 'EVO', '11/108'],
+  ] as const)(
+    'identifies and confirms a Pokémon %s scan into its matching import',
+    async (finish, externalId, setCode, collectorNumber) => {
+      vi.useFakeTimers();
+      const client = createFakeClient();
+      const created = await client.createScan({
+        game: 'pokemon',
+        condition: 'NM',
+        finish,
+        files: [{ filename: '001.jpg', size_bytes: 100 }],
+      });
+
+      await client.identifyScan(created.scan_id);
+      vi.advanceTimersByTime(1_000);
+      const identified = await client.getScan(created.scan_id);
+      expect(identified.status).toBe('reviewing');
+      expect(identified.rows[0].suggestions).toEqual([
+        expect.objectContaining({ external_id: externalId, name: 'Charizard' }),
+      ]);
+
+      await client.confirmScan(created.scan_id, {
+        rows: [{ scan_position: 1, external_id: externalId }],
+      });
+      const confirmed = await client.getScan(created.scan_id);
+      const imported = await client.getImport(confirmed.import_id!);
+
+      expect(imported.game).toBe('pokemon');
+      expect(imported.rows).toMatchObject([
+        {
+          external_id: externalId,
+          name: 'Charizard',
+          set_code: setCode,
+          collector_number: collectorNumber,
+          finish,
+        },
+      ]);
+    },
+  );
 
   it('confirms a reviewing scan once and creates rows in scan order', async () => {
     const client = createFakeClient();

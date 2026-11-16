@@ -17,8 +17,10 @@ Import review, placement, and order picking support one-handed use at the boxes.
   and use location-ordered pull sheets and shipping details to fulfill orders.
 - **Reports.** View stock, valuation, and sales across games.
 
-Magic: The Gathering supports CSV and scanner intake. English Pokémon shares
-the inventory, pricing, publishing, order, and reporting workflows.
+Magic: The Gathering supports CSV and scanner intake. English Pokémon supports
+scanner intake with Normal, Holofoil, or Reverse Holofoil selected for each
+scan. Pokémon shares the inventory, pricing, publishing, order, and reporting
+workflows, and CSV intake remains disabled.
 
 ## Local development, build, and deployment
 
