@@ -147,7 +147,7 @@ const FAKE_GAMES: Game[] = [
     ],
   },
 ];
-const FAKE_CATALOG_CARDS: CatalogCard[] = [
+const FAKE_CATALOG_CARDS = [
   {
     game: 'mtg',
     external_id: 'f29ba16f-c8fb-42fe-aabf-87089cb214a7',
@@ -240,7 +240,7 @@ const FAKE_CATALOG_CARDS: CatalogCard[] = [
     image_urls: fakeImageUrls('124026', 'Charizard', 'EVO'),
     available_finishes: ['holofoil'],
   },
-];
+] satisfies CatalogCard[];
 const FAKE_CATALOG_PAGE_SIZE = 2;
 
 function copyCatalogCard(card: CatalogCard): CatalogCard {

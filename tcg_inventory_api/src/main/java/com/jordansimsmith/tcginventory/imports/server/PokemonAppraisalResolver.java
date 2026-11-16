@@ -25,7 +25,11 @@ public class PokemonAppraisalResolver implements AppraisalResolver {
           default ->
               throw new IllegalArgumentException("unsupported finish for game: " + row.getFinish());
         };
-    var sets = fetchTcgService.findSets(ctx, new FindSetsRequest("poke", row.getSetCode())).sets();
+    var setCode = row.getSetCode();
+    if (setCode == null || setCode.isBlank()) {
+      return review("unmapped set");
+    }
+    var sets = fetchTcgService.findSets(ctx, new FindSetsRequest("poke", setCode)).sets();
     if (sets.isEmpty()) {
       return review("unmapped set");
     }

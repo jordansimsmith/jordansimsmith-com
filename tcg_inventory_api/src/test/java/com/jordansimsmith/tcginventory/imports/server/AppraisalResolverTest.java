@@ -255,6 +255,22 @@ class AppraisalResolverTest {
             new AppraisalResult(AppraisalResult.Decision.REVIEW, "ambiguous match", null, null));
   }
 
+  @Test
+  void pokemonResolverShouldReturnReviewWhenSetCodeIsMissing() throws Exception {
+    // arrange
+    var row = row("Pikachu", "normal", "25");
+    row.setSetCode(null);
+    var resolver = pokemonResolver(new FakeFetchTcgService());
+
+    // act
+    var result = resolver.resolve(CTX, row);
+
+    // assert
+    assertThat(result)
+        .isEqualTo(
+            new AppraisalResult(AppraisalResult.Decision.REVIEW, "unmapped set", null, null));
+  }
+
   private static PokemonAppraisalResolver pokemonResolver(FakeFetchTcgService fetchTcgService) {
     return new PokemonAppraisalResolver(fetchTcgService, new FetchTcgCardMatcher(fetchTcgService));
   }

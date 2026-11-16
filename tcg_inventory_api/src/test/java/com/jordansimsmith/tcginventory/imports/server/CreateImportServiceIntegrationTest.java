@@ -260,6 +260,27 @@ class CreateImportServiceIntegrationTest {
   }
 
   @Test
+  void createImportShouldPersistNormalizedRowsWithoutSetCodes() throws Exception {
+    // arrange
+    var context = new RequestContext("alice");
+    var row =
+        new CreateImportRow(
+            "opaque/bolt", "Lightning Bolt", null, "Magic 2010", "146", "normal", Condition.NM);
+
+    // act
+    var response =
+        service.createImport(
+            context, new CreateImportRequest("operation-1", "mtg", null, null, List.of(row)));
+
+    // assert
+    var imported = reads.getRow("alice", response.importId(), 1);
+    assertThat(imported.getSetCode()).isNull();
+    assertThat(imported.getSetName()).isEqualTo("Magic 2010");
+    assertThat(queue.getSends().getFirst().message())
+        .isEqualTo(new ImportMessage("alice", response.importId(), ImportMessageType.APPRAISE));
+  }
+
+  @Test
   void writesImportsLargerThanOnePage() throws Exception {
     var rows =
         IntStream.range(0, 101)

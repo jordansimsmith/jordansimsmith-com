@@ -816,7 +816,12 @@ export function ScanReview({
                 rowSuggestion?.name ??
                 'Manual selection required';
               const rowMetadata = rowSelection
-                ? `${rowSelection.card.set_code.toUpperCase()} · ${rowSelection.card.collector_number}`
+                ? [
+                    rowSelection.card.set_code?.toUpperCase(),
+                    rowSelection.card.collector_number,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')
                 : row.filename;
               return (
                 <button

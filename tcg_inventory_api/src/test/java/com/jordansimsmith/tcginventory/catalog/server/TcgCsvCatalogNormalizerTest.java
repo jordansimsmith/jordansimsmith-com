@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.jordansimsmith.tcginventory.catalog.server.TcgCsvCatalogDefinition.FinishMapping;
 import java.io.ByteArrayInputStream;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -17,6 +18,15 @@ public class TcgCsvCatalogNormalizerTest {
   private static final TcgCsvClient.UpdateMarker MARKER =
       new TcgCsvClient.UpdateMarker("2026-10-07T20:06:09+0000", UPDATED_AT);
   private static final Instant CREATED_AT = Instant.parse("2026-10-08T01:00:00Z");
+
+  private static final TcgCsvCatalogDefinition ENGLISH =
+      new TcgCsvCatalogDefinition(
+          "pokemon",
+          3,
+          List.of(
+              new FinishMapping("Normal", "normal"),
+              new FinishMapping("Holofoil", "holofoil"),
+              new FinishMapping("Reverse Holofoil", "reverse_holofoil")));
 
   private final TcgCsvCatalogNormalizer normalizer = new TcgCsvCatalogNormalizer();
 
@@ -97,7 +107,7 @@ public class TcgCsvCatalogNormalizerTest {
   }
 
   @Test
-  void normalizeShouldExcludeGroupsWithMissingEmptyOrBlankSetCodes() {
+  void normalizeShouldRetainEnglishGroupsWithMissingEmptyOrBlankSetCodes() {
     // arrange
     var groups =
         List.of(
@@ -117,11 +127,17 @@ public class TcgCsvCatalogNormalizerTest {
             .toList();
 
     // act
-    var result = normalizer.normalize(MARKER, CREATED_AT, groups, sources);
+    var result = normalizer.normalize(ENGLISH, MARKER, CREATED_AT, groups, sources);
 
     // assert
-    assertThat(result.groups()).isEmpty();
-    assertThat(result.products()).isEmpty();
+    assertThat(result.groups())
+        .containsExactly(
+            new TcgCsvCatalogSnapshot.Group(999, null, "New Set"),
+            new TcgCsvCatalogSnapshot.Group(1000, null, "Another Set"),
+            new TcgCsvCatalogSnapshot.Group(23330, null, "My First Battle"));
+    assertThat(result.products())
+        .extracting(TcgCsvCatalogSnapshot.Product::groupId)
+        .containsExactly(999, 1000, 23330);
   }
 
   @Test
@@ -191,8 +207,7 @@ public class TcgCsvCatalogNormalizerTest {
 
     // act / assert
     assertThatThrownBy(() -> normalize(List.of(group), source))
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("TCGCSV product has no extended data list: 35");
+        .isInstanceOf(NullPointerException.class);
   }
 
   @Test
@@ -276,14 +291,15 @@ public class TcgCsvCatalogNormalizerTest {
   }
 
   @Test
-  void normalizeShouldExcludeMissingEmptyAndBlankCardTypesDespiteOtherMetadata() {
+  void normalizeShouldAcceptRarityOrEitherCardTypeSpellingForEnglishSingles() {
     // arrange
     var group = group(3170, "SWSH12", "Silver Tempest");
     var products =
         List.of(
             product(61, 3170, "Missing Type", "001", null, "Rarity", "Common"),
             product(63, 3170, "Empty Type", "002", "", "Rarity", "Rare"),
-            product(64, 3170, "Blank Type", "003", "  ", "HP", "100"));
+            product(64, 3170, "Blank Type", "003", "  ", "HP", "100"),
+            product(65, 3170, "Unspaced Type", "004", null, "CardType", "Lightning"));
     var prices =
         products.stream()
             .map(product -> new TcgCsvClient.Price(product.productId(), "Normal"))
@@ -293,11 +309,100 @@ public class TcgCsvCatalogNormalizerTest {
     var result = normalize(List.of(group), source(group, products, prices));
 
     // assert
-    assertThat(result.products()).isEmpty();
+    assertThat(result.products())
+        .extracting(TcgCsvCatalogSnapshot.Product::productId)
+        .containsExactly(61, 63, 65);
   }
 
   @Test
-  void normalizeShouldValidatePriceJoinsEvenForExcludedGroups() {
+  void normalizeShouldRetainJapaneseSinglesAndTheirExactPrintings() {
+    // arrange
+    var definition =
+        new TcgCsvCatalogDefinition(
+            "pokemon_jp",
+            85,
+            List.of(
+                new FinishMapping("Normal", "normal"), new FinishMapping("Holofoil", "holofoil")));
+    var group = new TcgCsvClient.Group(23599, 85, "Pokémon Card 151", "");
+    var numbered = new TcgCsvClient.ExtendedData("Number", "143/165");
+    var products =
+        List.of(
+            new TcgCsvClient.Product(
+                566488,
+                85,
+                23599,
+                "Snorlax - 143/165",
+                List.of(numbered, new TcgCsvClient.ExtendedData("Rarity", "Uncommon"))),
+            new TcgCsvClient.Product(
+                566685,
+                85,
+                23599,
+                "Snorlax (Poke Ball Pattern)",
+                List.of(numbered, new TcgCsvClient.ExtendedData("CardType", "Colorless"))),
+            new TcgCsvClient.Product(
+                566838,
+                85,
+                23599,
+                "Snorlax (Master Ball Pattern)",
+                List.of(numbered, new TcgCsvClient.ExtendedData("Card Type", "Colorless"))),
+            new TcgCsvClient.Product(1, 85, 23599, "Booster Box", List.of()),
+            new TcgCsvClient.Product(
+                2,
+                85,
+                23599,
+                "Basic Energy",
+                List.of(new TcgCsvClient.ExtendedData("CardType", "Energy"))),
+            new TcgCsvClient.Product(
+                3,
+                85,
+                23599,
+                "Edition-only Card",
+                List.of(numbered, new TcgCsvClient.ExtendedData("Rarity", "Common"))));
+    var prices =
+        List.of(
+            new TcgCsvClient.Price(566488, "Holofoil"),
+            new TcgCsvClient.Price(566488, "Reverse Holofoil"),
+            new TcgCsvClient.Price(566488, "Normal"),
+            new TcgCsvClient.Price(566685, "Holofoil"),
+            new TcgCsvClient.Price(566838, "Holofoil"),
+            new TcgCsvClient.Price(1, "Normal"),
+            new TcgCsvClient.Price(2, "Normal"),
+            new TcgCsvClient.Price(3, "Unlimited"));
+    var firstCodedGroup = new TcgCsvClient.Group(24000, 85, "First coded group", "CODE");
+    var secondCodedGroup = new TcgCsvClient.Group(24001, 85, "Second coded group", "CODE");
+
+    // act
+    var result =
+        normalizer.normalize(
+            definition,
+            MARKER,
+            CREATED_AT,
+            List.of(secondCodedGroup, group, firstCodedGroup),
+            List.of(
+                source(group, products, prices),
+                source(firstCodedGroup, List.of(), List.of()),
+                source(secondCodedGroup, List.of(), List.of())));
+
+    // assert
+    assertThat(result.game()).isEqualTo("pokemon_jp");
+    assertThat(result.categoryId()).isEqualTo(85);
+    assertThat(result.groups())
+        .containsExactly(
+            new TcgCsvCatalogSnapshot.Group(23599, null, "Pokémon Card 151"),
+            new TcgCsvCatalogSnapshot.Group(24000, "CODE", "First coded group"),
+            new TcgCsvCatalogSnapshot.Group(24001, "CODE", "Second coded group"));
+    assertThat(result.products())
+        .containsExactly(
+            new TcgCsvCatalogSnapshot.Product(
+                566488, "Snorlax - 143/165", 23599, "143/165", List.of("normal", "holofoil")),
+            new TcgCsvCatalogSnapshot.Product(
+                566685, "Snorlax (Poke Ball Pattern)", 23599, "143/165", List.of("holofoil")),
+            new TcgCsvCatalogSnapshot.Product(
+                566838, "Snorlax (Master Ball Pattern)", 23599, "143/165", List.of("holofoil")));
+  }
+
+  @Test
+  void normalizeShouldValidatePriceJoinsForGroupsWithoutSetCodes() {
     // arrange
     var group = group(23330, "", "My First Battle");
     var card = product(65, 23330, "Pikachu", "001", "Lightning");
@@ -480,19 +585,6 @@ public class TcgCsvCatalogNormalizerTest {
   }
 
   @Test
-  void normalizeShouldRejectConflictingProductMetadata() {
-    // arrange
-    var group = group(3170, "SWSH12", "Silver Tempest");
-    var card = product(79, 3170, "Pikachu", "055/195", "Lightning", "Card Type", "Water");
-    var source = source(group, List.of(card), List.of(new TcgCsvClient.Price(79, "Normal")));
-
-    // act / assert
-    assertThatThrownBy(() -> normalize(List.of(group), source))
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("conflicting Card Type metadata for product 79");
-  }
-
-  @Test
   void normalizeShouldRejectDuplicateGroupsAndWrongCategories() {
     // arrange
     var group = group(3170, "SWSH12", "Silver Tempest");
@@ -544,7 +636,7 @@ public class TcgCsvCatalogNormalizerTest {
 
   private TcgCsvCatalogSnapshot normalize(
       List<TcgCsvClient.Group> groups, TcgCsvCatalogNormalizer.GroupSource... sources) {
-    return normalizer.normalize(MARKER, CREATED_AT, groups, List.of(sources));
+    return normalizer.normalize(ENGLISH, MARKER, CREATED_AT, groups, List.of(sources));
   }
 
   private static TcgCsvClient.Group group(int groupId, String abbreviation, String name) {

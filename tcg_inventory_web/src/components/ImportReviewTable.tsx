@@ -79,7 +79,9 @@ export function ImportReviewTable({
                 </Text>
               </Table.Td>
               <Table.Td data-field="set" data-label="Set" title={row.set_name}>
-                {formatSetNumber(row.set_code, row.collector_number)}
+                {row.set_code
+                  ? formatSetNumber(row.set_code, row.collector_number)
+                  : `${row.set_name} · #${row.collector_number}`}
               </Table.Td>
               <Table.Td data-field="finish" data-label="Finish">
                 {getFinish(game, row.finish)}

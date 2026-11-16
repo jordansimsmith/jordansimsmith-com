@@ -116,12 +116,7 @@ public class CreateImportService {
     }
     var fields =
         new String[] {
-          row.externalId(),
-          row.name(),
-          row.setCode(),
-          row.setName(),
-          row.collectorNumber(),
-          row.finish()
+          row.externalId(), row.name(), row.setName(), row.collectorNumber(), row.finish()
         };
     for (var field : fields) {
       if (field == null || field.isBlank()) {

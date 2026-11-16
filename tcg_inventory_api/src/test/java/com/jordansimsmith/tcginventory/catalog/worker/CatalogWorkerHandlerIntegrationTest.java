@@ -3,8 +3,10 @@ package com.jordansimsmith.tcginventory.catalog.worker;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 
 import com.amazonaws.services.lambda.runtime.events.SQSEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -22,6 +24,8 @@ import com.jordansimsmith.tcginventory.catalog.server.CatalogSnapshotStore;
 import com.jordansimsmith.tcginventory.catalog.server.GetCardService;
 import com.jordansimsmith.tcginventory.catalog.server.PokemonPrintingLookup;
 import com.jordansimsmith.tcginventory.catalog.server.TcgCsvCatalogArtifactCodec;
+import com.jordansimsmith.tcginventory.catalog.server.TcgCsvCatalogDefinition;
+import com.jordansimsmith.tcginventory.catalog.server.TcgCsvCatalogDefinition.FinishMapping;
 import com.jordansimsmith.tcginventory.catalog.server.TcgCsvCatalogNormalizer;
 import com.jordansimsmith.tcginventory.catalog.server.TcgCsvCatalogSnapshot;
 import com.jordansimsmith.tcginventory.catalog.server.TcgCsvClient;
@@ -42,6 +46,10 @@ public class CatalogWorkerHandlerIntegrationTest {
   private static final String REFRESH_BODY =
       """
       {"game":"pokemon","scheduled_at":"2026-10-08T21:00:00Z"}
+      """;
+  private static final String JAPANESE_REFRESH_BODY =
+      """
+      {"game":"pokemon_jp","scheduled_at":"2026-10-08T21:30:00Z"}
       """;
   private static final TcgCsvClient.UpdateMarker CURRENT_MARKER =
       new TcgCsvClient.UpdateMarker(
@@ -100,8 +108,11 @@ public class CatalogWorkerHandlerIntegrationTest {
   }
 
   @Test
-  void handleRequestShouldPublishSnapshotReadableByCatalog() throws Exception {
+  void handleRequestShouldPublishSnapshotWithoutSetCodeReadableByCatalog() throws Exception {
     // arrange
+    doReturn(List.of(new TcgCsvClient.Group(3170, 3, "Silver Tempest", "")))
+        .when(tcgCsvClient)
+        .findGroups(3);
 
     // act
     handler.handleRequest(event(REFRESH_BODY), null);
@@ -112,13 +123,13 @@ public class CatalogWorkerHandlerIntegrationTest {
     var snapshot = store.getSnapshot(latest);
     assertThat(snapshot.sourceMarker()).isEqualTo(CURRENT_MARKER.sourceMarker());
     assertThat(snapshot.groups())
-        .containsExactly(new TcgCsvCatalogSnapshot.Group(3170, "SWSH12", "Silver Tempest"));
+        .containsExactly(new TcgCsvCatalogSnapshot.Group(3170, null, "Silver Tempest"));
     assertThat(snapshot.products())
         .containsExactly(
             new TcgCsvCatalogSnapshot.Product(
                 451396, "Lugia VSTAR", 3170, "139", List.of("holofoil")));
     assertThat(tcgCsvClient.updateMarkerCalls()).isEqualTo(2);
-    assertThat(tcgCsvClient.groupCalls()).isEqualTo(1);
+    verify(tcgCsvClient).findGroups(3);
     assertThat(tcgCsvClient.productCalls()).isEqualTo(1);
     assertThat(tcgCsvClient.priceCalls()).isEqualTo(1);
     var readerRepository =
@@ -141,12 +152,47 @@ public class CatalogWorkerHandlerIntegrationTest {
         service
             .getCard(new RequestContext("alice"), new GetCardRequest("pokemon", "451396"))
             .card();
+    assertThat(card.setCode()).isNull();
     assertThat(card.name()).isEqualTo("Lugia VSTAR");
     assertThat(card.availableFinishes()).containsExactly("holofoil");
     assertThat(factory.tableDefinition().scan().stream().flatMap(page -> page.items().stream()))
         .singleElement()
         .extracting(item -> item.getPk() + "/" + item.getSk())
         .isEqualTo("CATALOG#pokemon/SNAPSHOT#2026-10-07T20:06:09Z");
+  }
+
+  @Test
+  void handleRequestShouldPublishBothGamesIndependentlyAtTheSameMarker() throws IOException {
+    // arrange
+    handler.handleRequest(event(REFRESH_BODY), null);
+
+    // act
+    handler.handleRequest(event(JAPANESE_REFRESH_BODY), null);
+    handler.handleRequest(event(JAPANESE_REFRESH_BODY), null);
+
+    // assert
+    var english = repository.getLatestSnapshot("pokemon");
+    var japanese = repository.getLatestSnapshot("pokemon_jp");
+    assertThat(japanese.getPk()).isEqualTo("CATALOG#pokemon_jp");
+    assertThat(japanese.getSnapshotId()).isEqualTo(english.getSnapshotId());
+    assertThat(japanese.getS3Key())
+        .isEqualTo("catalogs/tcgcsv/pokemon_jp/snapshots/" + english.getSnapshotId() + ".json.gz");
+    assertThat(store.getSnapshot(english).categoryId()).isEqualTo(3);
+    var snapshot = store.getSnapshot(japanese);
+    assertThat(snapshot.game()).isEqualTo("pokemon_jp");
+    assertThat(snapshot.categoryId()).isEqualTo(85);
+    assertThat(snapshot.groups())
+        .containsExactly(new TcgCsvCatalogSnapshot.Group(23599, null, "Pokémon Card 151"));
+    assertThat(snapshot.products())
+        .containsExactly(
+            new TcgCsvCatalogSnapshot.Product(
+                566838, "Snorlax (Master Ball Pattern)", 23599, "143/165", List.of("holofoil")));
+    assertThat(tcgCsvClient.updateMarkerCalls()).isEqualTo(5);
+    assertThat(tcgCsvClient.groupCalls()).isEqualTo(2);
+    assertThat(tcgCsvClient.productCalls()).isEqualTo(2);
+    assertThat(tcgCsvClient.priceCalls()).isEqualTo(2);
+    verify(tcgCsvClient).findGroups(85);
+    verify(tcgCsvClient).findPrices(85, 23599);
   }
 
   @Test
@@ -200,14 +246,14 @@ public class CatalogWorkerHandlerIntegrationTest {
     tcgCsvClient.setUpdateMarkers(CURRENT_MARKER, NEXT_MARKER);
 
     // act / assert
-    assertThatThrownBy(() -> handler.handleRequest(event(REFRESH_BODY), null))
+    assertThatThrownBy(() -> handler.handleRequest(event(JAPANESE_REFRESH_BODY), null))
         .hasCauseInstanceOf(IllegalStateException.class)
         .hasRootCauseMessage(
             "TCGCSV source changed during catalog refresh: "
                 + CURRENT_MARKER.updatedAt()
                 + " -> "
                 + NEXT_MARKER.updatedAt());
-    assertThat(repository.getLatestSnapshot("pokemon")).isNull();
+    assertThat(repository.getLatestSnapshot("pokemon_jp")).isNull();
   }
 
   @Test
@@ -284,27 +330,35 @@ public class CatalogWorkerHandlerIntegrationTest {
   }
 
   @Test
-  void handleRequestShouldCompletePublicationOnRetryAfterRegistryFailure() {
+  void handleRequestShouldKeepPriorJapaneseSnapshotReadableUntilPublicationRetries()
+      throws IOException {
     // arrange
+    handler.handleRequest(event(JAPANESE_REFRESH_BODY), null);
+    var previous = repository.getLatestSnapshot("pokemon_jp");
+    var previousSnapshot = store.getSnapshot(previous);
+    tcgCsvClient.setUpdateMarkers(NEXT_MARKER);
     var failure = DynamoDbException.builder().message("registry unavailable").build();
     doThrow(failure).doCallRealMethod().when(repository).createSnapshot(any());
-    var key = CatalogSnapshotStore.key("pokemon", CURRENT_MARKER.updatedAt().toString());
+    var key = CatalogSnapshotStore.key("pokemon_jp", NEXT_MARKER.updatedAt().toString());
 
     // act / assert
-    assertThatThrownBy(() -> handler.handleRequest(event(REFRESH_BODY), null)).hasCause(failure);
-    assertThat(repository.getLatestSnapshot("pokemon")).isNull();
+    assertThatThrownBy(() -> handler.handleRequest(event(JAPANESE_REFRESH_BODY), null))
+        .hasCause(failure);
+    var latest = repository.getLatestSnapshot("pokemon_jp");
+    assertThat(latest.getSnapshotId()).isEqualTo(previous.getSnapshotId());
+    assertThat(store.getSnapshot(latest)).isEqualTo(previousSnapshot);
     assertThat(factory.s3Client().headObject(request -> request.bucket(BUCKET).key(key)))
         .isNotNull();
 
     // act
     factory.fakeClock().setTime(factory.clock().now().plusSeconds(1));
-    handler.handleRequest(event(REFRESH_BODY), null);
+    handler.handleRequest(event(JAPANESE_REFRESH_BODY), null);
 
     // assert
-    var item = repository.getLatestSnapshot("pokemon");
+    var item = repository.getLatestSnapshot("pokemon_jp");
     assertThat(item.getS3Key()).isEqualTo(key);
     assertThat(item.getCreatedAt()).isEqualTo(factory.clock().now().minusSeconds(1));
-    assertThat(tcgCsvClient.groupCalls()).isEqualTo(2);
+    assertThat(tcgCsvClient.groupCalls()).isEqualTo(3);
   }
 
   @Test
@@ -326,6 +380,8 @@ public class CatalogWorkerHandlerIntegrationTest {
   private TcgCsvCatalogSnapshot snapshot(TcgCsvClient.UpdateMarker marker) {
     return new TcgCsvCatalogNormalizer()
         .normalize(
+            new TcgCsvCatalogDefinition(
+                "pokemon", 3, List.of(new FinishMapping("Holofoil", "holofoil"))),
             marker,
             Instant.parse("2026-10-08T21:01:00Z"),
             List.of(new TcgCsvClient.Group(3170, 3, "Silver Tempest", "SWSH12")),
@@ -369,12 +425,26 @@ public class CatalogWorkerHandlerIntegrationTest {
     @Override
     public List<Group> findGroups(int categoryId) {
       groupCalls++;
+      if (categoryId == 85) {
+        return List.of(new Group(23599, 85, "Pokémon Card 151", ""));
+      }
       return List.of(new Group(3170, categoryId, "Silver Tempest", "SWSH12"));
     }
 
     @Override
     public List<Product> findProducts(int categoryId, int groupId) throws IOException {
       productCalls++;
+      if (categoryId == 85) {
+        return List.of(
+            new Product(
+                566838,
+                85,
+                23599,
+                "Snorlax (Master Ball Pattern)",
+                List.of(
+                    new ExtendedData("CardType", "Colorless"),
+                    new ExtendedData("Number", "143/165"))));
+      }
       return List.of(
           new Product(
               451396,
@@ -388,6 +458,9 @@ public class CatalogWorkerHandlerIntegrationTest {
     @Override
     public List<Price> findPrices(int categoryId, int groupId) {
       priceCalls++;
+      if (categoryId == 85) {
+        return List.of(new Price(566838, "Holofoil"));
+      }
       return List.of(new Price(451396, "Holofoil"));
     }
 

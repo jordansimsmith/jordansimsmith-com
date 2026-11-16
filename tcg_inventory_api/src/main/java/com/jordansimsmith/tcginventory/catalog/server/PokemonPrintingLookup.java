@@ -199,9 +199,7 @@ public class PokemonPrintingLookup {
 
     var groups = new HashMap<Integer, TcgCsvCatalogSnapshot.Group>();
     for (var group : snapshot.groups()) {
-      if (group.setCode() == null
-          || group.setName() == null
-          || groups.putIfAbsent(group.groupId(), group) != null) {
+      if (group.setName() == null || groups.putIfAbsent(group.groupId(), group) != null) {
         throw new ServiceUnavailableException(UNAVAILABLE);
       }
     }

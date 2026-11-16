@@ -1,18 +1,18 @@
 package com.jordansimsmith.tcginventory.catalog.server;
 
+import com.jordansimsmith.tcginventory.catalog.server.TcgCsvCatalogDefinition.FinishMapping;
 import com.jordansimsmith.time.Clock;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class CatalogRefreshMessageHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(CatalogRefreshMessageHandler.class);
-  private static final int CATEGORY_ID = 3;
-  private static final String GAME = "pokemon";
 
   private final TcgCsvClient tcgCsvClient;
   private final TcgCsvCatalogNormalizer normalizer;
@@ -47,10 +47,28 @@ public class CatalogRefreshMessageHandler {
     } catch (DateTimeParseException e) {
       throw new IllegalArgumentException("invalid scheduled_at: " + message.scheduledAt(), e);
     }
-    var game = message.game();
-    if (!GAME.equals(game)) {
-      throw new IllegalArgumentException("unsupported catalog game: " + game);
-    }
+    var definition =
+        switch (message.game()) {
+          case "pokemon" ->
+              new TcgCsvCatalogDefinition(
+                  "pokemon",
+                  3,
+                  List.of(
+                      new FinishMapping("Normal", "normal"),
+                      new FinishMapping("Holofoil", "holofoil"),
+                      new FinishMapping("Reverse Holofoil", "reverse_holofoil")));
+          case "pokemon_jp" ->
+              new TcgCsvCatalogDefinition(
+                  "pokemon_jp",
+                  85,
+                  List.of(
+                      new FinishMapping("Normal", "normal"),
+                      new FinishMapping("Holofoil", "holofoil")));
+          case null, default ->
+              throw new IllegalArgumentException("unsupported catalog game: " + message.game());
+        };
+    var game = definition.gameId();
+    var categoryId = definition.categoryId();
 
     var startedAt = clock.now();
     var marker = tcgCsvClient.getUpdateMarker();
@@ -67,17 +85,17 @@ public class CatalogRefreshMessageHandler {
       return;
     }
 
-    var groups = tcgCsvClient.findGroups(CATEGORY_ID);
+    var groups = tcgCsvClient.findGroups(categoryId);
     var groupSources = new ArrayList<TcgCsvCatalogNormalizer.GroupSource>();
     var rawProductCount = 0;
     for (var group : groups) {
-      var products = tcgCsvClient.findProducts(CATEGORY_ID, group.groupId());
-      var prices = tcgCsvClient.findPrices(CATEGORY_ID, group.groupId());
+      var products = tcgCsvClient.findProducts(categoryId, group.groupId());
+      var prices = tcgCsvClient.findPrices(categoryId, group.groupId());
       rawProductCount += products.size();
       groupSources.add(new TcgCsvCatalogNormalizer.GroupSource(group, products, prices));
     }
 
-    var snapshot = normalizer.normalize(marker, clock.now(), groups, groupSources);
+    var snapshot = normalizer.normalize(definition, marker, clock.now(), groups, groupSources);
     var currentMarker = tcgCsvClient.getUpdateMarker();
     if (!marker.updatedAt().equals(currentMarker.updatedAt())) {
       throw new IllegalStateException(

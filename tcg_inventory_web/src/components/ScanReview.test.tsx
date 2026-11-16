@@ -175,6 +175,17 @@ describe('ScanReview', () => {
     vi.restoreAllMocks();
   });
 
+  it('displays the set name and collector number without a set code', async () => {
+    const card = { ...firstCard, set_code: null };
+    mockSuggestionLookup(card, [card]);
+
+    renderReview(scan([row()]));
+
+    await waitFor(() =>
+      expect(screen.getAllByText('Double Masters 2022 · #117')).toHaveLength(2),
+    );
+  });
+
   it('loads the exact suggestion and displays catalog metadata and configured regions', async () => {
     const { detail, findAlternatives } = mockSuggestionLookup();
 

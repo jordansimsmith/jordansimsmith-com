@@ -164,7 +164,7 @@ export interface FindPhotosResponse {
 export interface ImportRow {
   position: number;
   name: string;
-  set_code: string;
+  set_code: string | null;
   set_name: string;
   collector_number: string;
   finish: Finish;
@@ -254,7 +254,7 @@ export interface CatalogCard {
   game: GameId;
   external_id: string;
   name: string;
-  set_code: string;
+  set_code: string | null;
   set_name: string;
   collector_number: string;
   image_urls: ImageUrls;

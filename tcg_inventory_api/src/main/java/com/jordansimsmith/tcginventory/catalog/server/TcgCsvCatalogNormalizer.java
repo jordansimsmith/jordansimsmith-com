@@ -7,16 +7,9 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 
 public class TcgCsvCatalogNormalizer {
-  private static final int CATEGORY_ID = 3;
-  private static final List<String> FINISH_ORDER =
-      List.of("Normal", "Holofoil", "Reverse Holofoil");
-  private static final Map<String, String> FINISHES =
-      Map.of("Normal", "normal", "Holofoil", "holofoil", "Reverse Holofoil", "reverse_holofoil");
-
   public record GroupSource(
       TcgCsvClient.Group group,
       List<TcgCsvClient.Product> products,
@@ -33,23 +26,24 @@ public class TcgCsvCatalogNormalizer {
       Map<Integer, Set<String>> subtypesByProduct) {}
 
   public TcgCsvCatalogSnapshot normalize(
+      TcgCsvCatalogDefinition definition,
       TcgCsvClient.UpdateMarker marker,
       Instant createdAt,
       List<TcgCsvClient.Group> groups,
       List<GroupSource> groupSources) {
-    validateGroups(groups);
-    var validatedGroups = validateProductsAndFinishes(groupSources);
-    var snapshotProducts = normalizeProducts(validatedGroups);
+    validateGroups(definition.categoryId(), groups);
+    var validatedGroups = validateProductsAndFinishes(definition.categoryId(), groupSources);
+    var snapshotProducts = normalizeProducts(definition, validatedGroups);
     var snapshotGroups = createSnapshotGroups(groups);
 
     snapshotGroups.sort(Comparator.comparingInt(TcgCsvCatalogSnapshot.Group::groupId));
     snapshotProducts.sort(Comparator.comparingInt(TcgCsvCatalogSnapshot.Product::productId));
     return new TcgCsvCatalogSnapshot(
         1,
-        "pokemon",
+        definition.gameId(),
         "tcgplayer",
         "tcgcsv",
-        CATEGORY_ID,
+        definition.categoryId(),
         marker.updatedAt().toString(),
         marker.sourceMarker(),
         marker.updatedAt().getEpochSecond(),
@@ -58,10 +52,10 @@ public class TcgCsvCatalogNormalizer {
         snapshotProducts);
   }
 
-  private void validateGroups(List<TcgCsvClient.Group> groups) {
+  private void validateGroups(int categoryId, List<TcgCsvClient.Group> groups) {
     var groupIds = new HashSet<Integer>();
     for (var group : groups) {
-      if (group.categoryId() != CATEGORY_ID
+      if (group.categoryId() != categoryId
           || group.groupId() <= 0
           || group.name() == null
           || group.name().isBlank()
@@ -74,29 +68,28 @@ public class TcgCsvCatalogNormalizer {
   private List<TcgCsvCatalogSnapshot.Group> createSnapshotGroups(List<TcgCsvClient.Group> groups) {
     var snapshotGroups = new ArrayList<TcgCsvCatalogSnapshot.Group>();
     for (var group : groups) {
-      var setCode = group.abbreviation();
-      if (setCode != null && !setCode.isBlank()) {
-        snapshotGroups.add(new TcgCsvCatalogSnapshot.Group(group.groupId(), setCode, group.name()));
-      }
+      var setCode = hasText(group.abbreviation()) ? group.abbreviation() : null;
+      snapshotGroups.add(new TcgCsvCatalogSnapshot.Group(group.groupId(), setCode, group.name()));
     }
     return snapshotGroups;
   }
 
-  private List<ValidatedGroup> validateProductsAndFinishes(List<GroupSource> groupSources) {
+  private List<ValidatedGroup> validateProductsAndFinishes(
+      int categoryId, List<GroupSource> groupSources) {
     var productIds = new HashSet<Integer>();
     var validatedGroups = new ArrayList<ValidatedGroup>();
     for (var source : groupSources) {
-      validatedGroups.add(validateGroupProductsAndFinishes(source, productIds));
+      validatedGroups.add(validateGroupProductsAndFinishes(categoryId, source, productIds));
     }
     return validatedGroups;
   }
 
   private ValidatedGroup validateGroupProductsAndFinishes(
-      GroupSource source, Set<Integer> productIds) {
+      int categoryId, GroupSource source, Set<Integer> productIds) {
     var group = source.group();
     var groupProductIds = new HashSet<Integer>();
     for (var product : source.products()) {
-      if (product.categoryId() != CATEGORY_ID
+      if (product.categoryId() != categoryId
           || product.groupId() != group.groupId()
           || product.productId() <= 0
           || product.name() == null
@@ -130,40 +123,33 @@ public class TcgCsvCatalogNormalizer {
   }
 
   private List<TcgCsvCatalogSnapshot.Product> normalizeProducts(
-      List<ValidatedGroup> validatedGroups) {
+      TcgCsvCatalogDefinition definition, List<ValidatedGroup> validatedGroups) {
     var normalizedProducts = new ArrayList<TcgCsvCatalogSnapshot.Product>();
+
     for (var validatedGroup : validatedGroups) {
       var group = validatedGroup.group();
       for (var product : validatedGroup.products()) {
-        if (product.extendedData() == null) {
-          throw new IllegalArgumentException(
-              "TCGCSV product has no extended data list: " + product.productId());
-        }
         var fields = new HashMap<String, String>();
         for (var field : product.extendedData()) {
-          if ("Card Type".equals(field.name()) || "Number".equals(field.name())) {
-            if (fields.containsKey(field.name())
-                && !Objects.equals(fields.get(field.name()), field.value())) {
-              throw new IllegalArgumentException(
-                  "conflicting %s metadata for product %d"
-                      .formatted(field.name(), product.productId()));
-            }
-            fields.put(field.name(), field.value());
-          }
+          fields.put(field.name(), field.value());
         }
-        var cardType = fields.get("Card Type");
         var collectorNumber = fields.get("Number");
-        if (cardType == null
-            || cardType.isBlank()
-            || collectorNumber == null
-            || collectorNumber.isBlank()
-            || group.abbreviation() == null
-            || group.abbreviation().isBlank()) {
+        var isSingle =
+            hasText(collectorNumber)
+                && (hasText(fields.get("Card Type"))
+                    || hasText(fields.get("CardType"))
+                    || hasText(fields.get("Rarity")));
+        if (!isSingle) {
           continue;
         }
+
         var subtypes =
             validatedGroup.subtypesByProduct().getOrDefault(product.productId(), Set.of());
-        var finishes = FINISH_ORDER.stream().filter(subtypes::contains).map(FINISHES::get).toList();
+        var finishes =
+            definition.finishes().stream()
+                .filter(finish -> subtypes.contains(finish.sourceSubtype()))
+                .map(TcgCsvCatalogDefinition.FinishMapping::finishId)
+                .toList();
         if (finishes.isEmpty()) {
           continue;
         }
@@ -173,5 +159,9 @@ public class TcgCsvCatalogNormalizer {
       }
     }
     return normalizedProducts;
+  }
+
+  private boolean hasText(String value) {
+    return value != null && !value.isBlank();
   }
 }

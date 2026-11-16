@@ -93,6 +93,7 @@ public class ImportRowItem {
   }
 
   @DynamoDbAttribute(SET_CODE)
+  @Nullable
   public String getSetCode() {
     return setCode;
   }
@@ -243,7 +244,7 @@ public class ImportRowItem {
       String importId,
       int position,
       String name,
-      String setCode,
+      @Nullable String setCode,
       String setName,
       String collectorNumber,
       String finish,

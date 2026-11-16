@@ -3,6 +3,7 @@ package com.jordansimsmith.tcginventory.catalog.server;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import java.util.List;
+import javax.annotation.Nullable;
 
 @JsonPropertyOrder({
   "schema_version",
@@ -37,7 +38,7 @@ public record TcgCsvCatalogSnapshot(
   @JsonPropertyOrder({"group_id", "set_code", "set_name"})
   public record Group(
       @JsonProperty("group_id") int groupId,
-      @JsonProperty("set_code") String setCode,
+      @JsonProperty("set_code") @Nullable String setCode,
       @JsonProperty("set_name") String setName) {}
 
   @JsonPropertyOrder({"product_id", "name", "group_id", "collector_number", "available_finishes"})

@@ -8,7 +8,7 @@ import javax.annotation.Nullable;
 public record ImportRow(
     @JsonProperty("position") int position,
     @JsonProperty("name") String name,
-    @JsonProperty("set_code") String setCode,
+    @JsonProperty("set_code") @Nullable String setCode,
     @JsonProperty("set_name") String setName,
     @JsonProperty("collector_number") String collectorNumber,
     @JsonProperty("finish") String finish,

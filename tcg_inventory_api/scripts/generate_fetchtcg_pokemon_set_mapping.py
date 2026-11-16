@@ -50,7 +50,7 @@ def load_snapshot(path):
         raise ValueError("expected a version 1 Pokémon TCGCSV Catalog snapshot")
 
     codes_by_group = {
-        group["group_id"]: group["set_code"].lower() for group in snapshot["groups"]
+        group["group_id"]: group.get("set_code") for group in snapshot["groups"]
     }
     codes_by_product = {
         str(product["product_id"]): codes_by_group[product["group_id"]]
@@ -58,7 +58,11 @@ def load_snapshot(path):
     }
     if len(codes_by_product) != len(snapshot["products"]):
         raise ValueError("snapshot has duplicate product IDs")
-    return codes_by_product
+    return {
+        product_id: code.lower()
+        for product_id, code in codes_by_product.items()
+        if code and code.strip()
+    }
 
 
 def fetch_json(url):
@@ -137,7 +141,9 @@ def generate(codes_by_product):
     for code in sorted(product_counts.keys() - mapping.keys()):
         print(f"unmapped Catalog code: {code} ({product_counts[code]} products)")
     covered = sum(product_counts[code] for code in mapping)
-    print(f"set-code coverage: {covered}/{len(codes_by_product)} eligible products")
+    print(
+        f"set-code coverage: {covered}/{len(codes_by_product)} eligible products with a set code"
+    )
     print(f"exact product IDs observed: {len(matched_products)}")
     return dict(sorted(mapping.items()))
 

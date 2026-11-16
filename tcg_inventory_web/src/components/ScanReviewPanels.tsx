@@ -126,6 +126,11 @@ function Crop({
   );
 }
 
+function catalogSetLabel(card: CatalogCard): string {
+  const code = card.set_code ? `${card.set_code.toUpperCase()} ` : '';
+  return `${card.set_name} · ${code}#${card.collector_number}`;
+}
+
 function ProductThumbnail({ card }: { card: CatalogCard }) {
   const [failed, setFailed] = useState(false);
   const image = card.image_urls.small ?? card.image_urls.normal;
@@ -167,10 +172,7 @@ function ProductOption({
       <ProductThumbnail card={card} />
       <span className={classes.productOptionDetails}>
         <strong className={classes.productOptionName}>{card.name}</strong>
-        <small>
-          {card.set_name} · {card.set_code.toUpperCase()} #
-          {card.collector_number}
-        </small>
+        <small>{catalogSetLabel(card)}</small>
         <small
           className={
             finishAvailable ? classes.finishEligible : classes.finishIneligible
@@ -287,7 +289,7 @@ export function ScanReviewPanels({
             <Title order={3}>{currentName}</Title>
             <Text size="sm" c="dimmed">
               {selection
-                ? `${selection.card.set_name} · ${selection.card.set_code.toUpperCase()} #${selection.card.collector_number}`
+                ? catalogSetLabel(selection.card)
                 : selectedRow.needs_review
                   ? 'This card needs a manual printing choice.'
                   : suggestion
