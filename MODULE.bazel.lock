@@ -364,13 +364,13 @@
   "moduleExtensions": {
     "//third_party/collectorvision:repositories.bzl%collectorvision": {
       "general": {
-        "bzlTransitiveDigest": "mZ79SxBPbndtAH7vxti2+nJQExHzylW4S+GB0Qedg5o=",
+        "bzlTransitiveDigest": "OVJuNfcSVqEF6MuaGjBHpqJBGAkns8vfJLDybk563wo=",
         "usagesDigest": "E4kWc0BK8SUsSl32UKHYFtF6FLwZ4Lpe1E3rh8OZ1uY=",
         "recordedInputs": [
           "REPO_MAPPING:,bazel_tools bazel_tools"
         ],
         "generatedRepoSpecs": {
-          "collectorvision_catalog_records": {
+          "collectorvision_magic_the_gathering_records": {
             "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_file",
             "attributes": {
               "downloaded_file_path": "records.jsonl.gz",
@@ -380,13 +380,33 @@
               ]
             }
           },
-          "collectorvision_catalog_embeddings": {
+          "collectorvision_magic_the_gathering_embeddings": {
             "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_file",
             "attributes": {
               "downloaded_file_path": "embeddings.f16.gz",
               "sha256": "bbe2eab30e2db5d1c2811c2429cecb9435a6d537319bd82c521733407becdd40",
               "urls": [
                 "https://hanclinto.github.io/CollectorVisionCatalog/catalog-v2/scryfall-mtg/version/40/base/embeddings.f16.gz"
+              ]
+            }
+          },
+          "collectorvision_pokemon_records": {
+            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_file",
+            "attributes": {
+              "downloaded_file_path": "records.jsonl.gz",
+              "sha256": "aba6b240d61ad48bdb458f9c5128fd22cf6aa1764575902430cb8eb85d9c5676",
+              "urls": [
+                "https://hanclinto.github.io/CollectorVisionCatalog/catalog-v2/tcgplayer-pokemon/version/60/base/records.jsonl.gz"
+              ]
+            }
+          },
+          "collectorvision_pokemon_embeddings": {
+            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_file",
+            "attributes": {
+              "downloaded_file_path": "embeddings.f16.gz",
+              "sha256": "cac33b11bac50b57759ec0cdc5963167fe54ddced55b3011b4c23f152ac08736",
+              "urls": [
+                "https://hanclinto.github.io/CollectorVisionCatalog/catalog-v2/tcgplayer-pokemon/version/60/base/embeddings.f16.gz"
               ]
             }
           },

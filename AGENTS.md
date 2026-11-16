@@ -126,8 +126,3 @@ When performing the code review step, check for:
 - During implementation, maintain consistent naming conventions across similar components
 - Preserve method signatures and parameter ordering where applicable
 - Respect existing error handling and logging patterns
-
-## Documentation standards
-
-- Service documentation belongs in `README.md` at the root of each service directory.
-- Use sentence casing for README headings (only capitalize first word and proper nouns).

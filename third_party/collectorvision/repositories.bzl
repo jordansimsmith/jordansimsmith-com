@@ -3,10 +3,7 @@
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_file")
 load(
     ":pins.bzl",
-    "CATALOG_EMBEDDINGS_SHA256",
-    "CATALOG_EMBEDDINGS_URL",
-    "CATALOG_RECORDS_SHA256",
-    "CATALOG_RECORDS_URL",
+    "CATALOGS",
     "COLLECTORVISION_LICENSE_SHA256",
     "COLLECTORVISION_LICENSE_URL",
     "MILO_SHA256",
@@ -14,18 +11,14 @@ load(
 )
 
 def _repositories(module_ctx):
-    http_file(
-        name = "collectorvision_catalog_records",
-        downloaded_file_path = "records.jsonl.gz",
-        sha256 = CATALOG_RECORDS_SHA256,
-        urls = [CATALOG_RECORDS_URL],
-    )
-    http_file(
-        name = "collectorvision_catalog_embeddings",
-        downloaded_file_path = "embeddings.f16.gz",
-        sha256 = CATALOG_EMBEDDINGS_SHA256,
-        urls = [CATALOG_EMBEDDINGS_URL],
-    )
+    for catalog in CATALOGS.values():
+        for asset in catalog.assets.values():
+            http_file(
+                name = asset.repository,
+                downloaded_file_path = asset.filename,
+                sha256 = asset.sha256,
+                urls = [asset.url],
+            )
     http_file(
         name = "collectorvision_milo",
         downloaded_file_path = "milo.onnx",

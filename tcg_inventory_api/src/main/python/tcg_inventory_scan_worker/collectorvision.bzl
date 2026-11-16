@@ -6,15 +6,7 @@ load("@rules_pkg//pkg:mappings.bzl", "REMOVE_BASE_DIRECTORY", "pkg_attributes", 
 load("@rules_python//python:pip.bzl", "whl_filegroup")
 load(
     "//third_party/collectorvision:pins.bzl",
-    "CATALOG_EMBEDDINGS_SHA256",
-    "CATALOG_EMBEDDINGS_SIZE",
-    "CATALOG_EMBEDDINGS_URL",
-    "CATALOG_RECORDS_SHA256",
-    "CATALOG_RECORDS_SIZE",
-    "CATALOG_RECORDS_URL",
-    "CATALOG_ROWS",
-    "CATALOG_SOURCE_UPDATED_AT",
-    "CATALOG_VERSION",
+    "CATALOGS",
     "COLLECTORVISION_COMMIT",
     "COLLECTORVISION_SOURCE_URL",
     "EMBEDDING",
@@ -22,88 +14,75 @@ load(
     "MILO_SIZE",
 )
 
-_CATALOG_DESCRIPTOR = {
-    "game": "magic-the-gathering",
-    "source": "scryfall",
-    "profile": "default",
-    "description": "English-first paper printings from Scryfall default cards.",
-    "result_identifier": "scryfall_card",
-    "recommended": True,
-}
+def _feed_entry(catalog):
+    assets = {}
+    for asset_name, asset in catalog.assets.items():
+        assets[asset_name] = {
+            "url": asset.url,
+            "size": asset.size,
+            "sha256": asset.sha256,
+        }
+    return {
+        "public_name": catalog.public_name,
+        "descriptor": catalog.descriptor,
+        "current_version": catalog.version,
+        "rows": catalog.rows,
+        "source_updated_at": catalog.source_updated_at,
+        "base": {
+            "version": catalog.version,
+            "rows": catalog.rows,
+            "source_updated_at": catalog.source_updated_at,
+            "assets": assets,
+        },
+        "updates": {},
+    }
 
 def _feed():
     return {
-        "checked_at": CATALOG_SOURCE_UPDATED_AT,
+        "checked_at": max([catalog.source_updated_at for catalog in CATALOGS.values()]),
         "families": {
             "milo1": {
                 "embedding": EMBEDDING,
-                "catalogs": {
-                    "scryfall/mtg": {
-                        "public_name": "scryfall-mtg",
-                        "descriptor": _CATALOG_DESCRIPTOR,
-                        "current_version": CATALOG_VERSION,
-                        "rows": CATALOG_ROWS,
-                        "source_updated_at": CATALOG_SOURCE_UPDATED_AT,
-                        "base": {
-                            "version": CATALOG_VERSION,
-                            "rows": CATALOG_ROWS,
-                            "source_updated_at": CATALOG_SOURCE_UPDATED_AT,
-                            "assets": {
-                                "records": {
-                                    "url": CATALOG_RECORDS_URL,
-                                    "size": CATALOG_RECORDS_SIZE,
-                                    "sha256": CATALOG_RECORDS_SHA256,
-                                },
-                                "embeddings": {
-                                    "url": CATALOG_EMBEDDINGS_URL,
-                                    "size": CATALOG_EMBEDDINGS_SIZE,
-                                    "sha256": CATALOG_EMBEDDINGS_SHA256,
-                                },
-                            },
-                        },
-                        "updates": {},
-                    },
-                },
+                "catalogs": {key: _feed_entry(catalog) for key, catalog in CATALOGS.items()},
             },
         },
     }
 
-def _snapshot():
+def _snapshot(key, catalog):
+    assets = {}
+    for asset_name, asset in catalog.assets.items():
+        assets[asset_name] = {
+            "filename": asset.filename,
+            "size": asset.size,
+            "sha256": asset.sha256,
+        }
     return {
         "schema": 2,
-        "catalog_key": "milo1/scryfall/mtg",
+        "catalog_key": "milo1/" + key,
         "family": "milo1",
-        "version": CATALOG_VERSION,
-        "rows": CATALOG_ROWS,
+        "version": catalog.version,
+        "rows": catalog.rows,
         "embedding": EMBEDDING,
-        "descriptor": _CATALOG_DESCRIPTOR,
+        "descriptor": catalog.descriptor,
         "metadata_loaded": True,
-        "assets": {
-            "records": {
-                "filename": "records.jsonl.gz",
-                "size": CATALOG_RECORDS_SIZE,
-                "sha256": CATALOG_RECORDS_SHA256,
-            },
-            "embeddings": {
-                "filename": "embeddings.f16.gz",
-                "size": CATALOG_EMBEDDINGS_SIZE,
-                "sha256": CATALOG_EMBEDDINGS_SHA256,
-            },
-        },
+        "assets": assets,
     }
 
 def _cache_impl(ctx):
     feed = ctx.outputs.feed
-    snapshot = ctx.outputs.snapshot
+    magic_snapshot = ctx.outputs.magic_snapshot
+    pokemon_snapshot = ctx.outputs.pokemon_snapshot
     ctx.actions.write(output = feed, content = json.encode(_feed()))
-    ctx.actions.write(output = snapshot, content = json.encode(_snapshot()))
-    return [DefaultInfo(files = depset([feed, snapshot]))]
+    ctx.actions.write(output = magic_snapshot, content = json.encode(_snapshot("scryfall/mtg", CATALOGS["scryfall/mtg"])))
+    ctx.actions.write(output = pokemon_snapshot, content = json.encode(_snapshot("tcgplayer/pokemon", CATALOGS["tcgplayer/pokemon"])))
+    return [DefaultInfo(files = depset([feed, magic_snapshot, pokemon_snapshot]))]
 
 collectorvision_cache = rule(
     implementation = _cache_impl,
     attrs = {
         "feed": attr.output(mandatory = True),
-        "snapshot": attr.output(mandatory = True),
+        "magic_snapshot": attr.output(mandatory = True),
+        "pokemon_snapshot": attr.output(mandatory = True),
     },
 )
 
@@ -119,7 +98,8 @@ def collectorvision_image(name, base, handler, repo_tag, application_files):
     collectorvision_cache(
         name = cache_metadata,
         feed = name + "-feed.json",
-        snapshot = name + "-snapshot.json",
+        magic_snapshot = name + "-snapshot.json",
+        pokemon_snapshot = name + "-pokemon-snapshot.json",
     )
 
     python_package_layers = []
@@ -177,14 +157,20 @@ def collectorvision_image(name, base, handler, repo_tag, application_files):
         package_dir = "/var/task",
     )
 
+    cache_files = {":" + name + "-feed.json": "catalog-v2/feed.json"}
+    snapshot_labels = {
+        "scryfall/mtg": ":" + name + "-snapshot.json",
+        "tcgplayer/pokemon": ":" + name + "-pokemon-snapshot.json",
+    }
+    for key, catalog in CATALOGS.items():
+        path = "catalog-v2/snapshots/milo1--{}/metadata/version-{}".format(key.replace("/", "--"), catalog.version)
+        cache_files[snapshot_labels[key]] = path + "/snapshot.json"
+        for asset in catalog.assets.values():
+            cache_files["@{}//file".format(asset.repository)] = path + "/" + asset.filename
+
     pkg_tar(
         name = cache_layer,
-        files = {
-            ":" + name + "-feed.json": "catalog-v2/feed.json",
-            ":" + name + "-snapshot.json": "catalog-v2/snapshots/milo1--scryfall--mtg/metadata/version-{}/snapshot.json".format(CATALOG_VERSION),
-            "@collectorvision_catalog_records//file": "catalog-v2/snapshots/milo1--scryfall--mtg/metadata/version-{}/records.jsonl.gz".format(CATALOG_VERSION),
-            "@collectorvision_catalog_embeddings//file": "catalog-v2/snapshots/milo1--scryfall--mtg/metadata/version-{}/embeddings.f16.gz".format(CATALOG_VERSION),
-        },
+        files = cache_files,
         package_dir = "/opt/collectorvision",
     )
 
@@ -215,7 +201,7 @@ def collectorvision_image(name, base, handler, repo_tag, application_files):
             "org.opencontainers.image.revision": COLLECTORVISION_COMMIT,
             "org.opencontainers.image.source": COLLECTORVISION_SOURCE_URL,
             "org.opencontainers.image.version": COLLECTORVISION_COMMIT,
-            "org.jordansimsmith.collectorvision.catalog-version": str(CATALOG_VERSION),
+            "org.jordansimsmith.collectorvision.catalog-version": str(CATALOGS["scryfall/mtg"].version),
             "org.jordansimsmith.collectorvision.model-size": str(MILO_SIZE),
             "org.jordansimsmith.collectorvision.model-sha256": MILO_SHA256,
         },

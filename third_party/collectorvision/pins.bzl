@@ -5,15 +5,68 @@ COLLECTORVISION_SOURCE_URL = "https://github.com/HanClinto/CollectorVision"
 COLLECTORVISION_LICENSE_URL = "https://raw.githubusercontent.com/HanClinto/CollectorVision/{}/LICENSE".format(COLLECTORVISION_COMMIT)
 COLLECTORVISION_LICENSE_SHA256 = "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0"
 
-CATALOG_VERSION = 40
-CATALOG_ROWS = 113031
-CATALOG_SOURCE_UPDATED_AT = "2026-09-21T09:05:30.034Z"
-CATALOG_RECORDS_URL = "https://hanclinto.github.io/CollectorVisionCatalog/catalog-v2/scryfall-mtg/version/40/base/records.jsonl.gz"
-CATALOG_RECORDS_SIZE = 9043401
-CATALOG_RECORDS_SHA256 = "cd566e2d103c532c9e79644e152496a53494a9b04b3cd1a43c5baf3e8589bff9"
-CATALOG_EMBEDDINGS_URL = "https://hanclinto.github.io/CollectorVisionCatalog/catalog-v2/scryfall-mtg/version/40/base/embeddings.f16.gz"
-CATALOG_EMBEDDINGS_SIZE = 26451329
-CATALOG_EMBEDDINGS_SHA256 = "bbe2eab30e2db5d1c2811c2429cecb9435a6d537319bd82c521733407becdd40"
+CATALOGS = {
+    "scryfall/mtg": struct(
+        public_name = "scryfall-mtg",
+        version = 40,
+        rows = 113031,
+        source_updated_at = "2026-09-21T09:05:30.034Z",
+        descriptor = {
+            "game": "magic-the-gathering",
+            "source": "scryfall",
+            "profile": "default",
+            "description": "English-first paper printings from Scryfall default cards.",
+            "result_identifier": "scryfall_card",
+            "recommended": True,
+        },
+        assets = {
+            "records": struct(
+                filename = "records.jsonl.gz",
+                repository = "collectorvision_magic_the_gathering_records",
+                url = "https://hanclinto.github.io/CollectorVisionCatalog/catalog-v2/scryfall-mtg/version/40/base/records.jsonl.gz",
+                size = 9043401,
+                sha256 = "cd566e2d103c532c9e79644e152496a53494a9b04b3cd1a43c5baf3e8589bff9",
+            ),
+            "embeddings": struct(
+                filename = "embeddings.f16.gz",
+                repository = "collectorvision_magic_the_gathering_embeddings",
+                url = "https://hanclinto.github.io/CollectorVisionCatalog/catalog-v2/scryfall-mtg/version/40/base/embeddings.f16.gz",
+                size = 26451329,
+                sha256 = "bbe2eab30e2db5d1c2811c2429cecb9435a6d537319bd82c521733407becdd40",
+            ),
+        },
+    ),
+    "tcgplayer/pokemon": struct(
+        public_name = "tcgplayer-pokemon",
+        version = 60,
+        rows = 27289,
+        source_updated_at = "2026-11-03T20:06:12Z",
+        descriptor = {
+            "game": "pokemon",
+            "source": "tcgplayer",
+            "profile": "printings",
+            "description": "TCGplayer marketplace printing catalog.",
+            "result_identifier": "tcgplayer_product",
+            "recommended": True,
+        },
+        assets = {
+            "records": struct(
+                filename = "records.jsonl.gz",
+                repository = "collectorvision_pokemon_records",
+                url = "https://hanclinto.github.io/CollectorVisionCatalog/catalog-v2/tcgplayer-pokemon/version/60/base/records.jsonl.gz",
+                size = 434053,
+                sha256 = "aba6b240d61ad48bdb458f9c5128fd22cf6aa1764575902430cb8eb85d9c5676",
+            ),
+            "embeddings": struct(
+                filename = "embeddings.f16.gz",
+                repository = "collectorvision_pokemon_embeddings",
+                url = "https://hanclinto.github.io/CollectorVisionCatalog/catalog-v2/tcgplayer-pokemon/version/60/base/embeddings.f16.gz",
+                size = 6406132,
+                sha256 = "cac33b11bac50b57759ec0cdc5963167fe54ddced55b3011b4c23f152ac08736",
+            ),
+        },
+    ),
+}
 
 MILO_URL = "https://raw.githubusercontent.com/HanClinto/CollectorVision/{}/collector_vision/weights/milo.onnx".format(COLLECTORVISION_COMMIT)
 MILO_SHA256 = "bd13d8d60383c69da04dce261f32e93fdaeaa8fd618fbc991e7385f71b3d45df"

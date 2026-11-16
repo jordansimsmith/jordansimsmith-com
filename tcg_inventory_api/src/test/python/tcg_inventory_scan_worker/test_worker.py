@@ -8,14 +8,16 @@ import json
 import pytest
 from PIL import Image
 
+from tcg_inventory_scan_worker import worker as scan_worker
 from tcg_inventory_scan_worker.worker import (
     LambdaRuntime,
-    RecognitionProfile,
+    MagicTheGatheringResolver,
+    PokemonResolver,
     RecognitionWorker,
     Scan,
     ScanRow,
+    ScanSuggestion,
     SqsContinuationQueue,
-    _magic_eligible_suggestions,
 )
 
 
@@ -58,8 +60,8 @@ class FakeStore:
         self.scan = Scan("jordan", "scan-1", status, game, finish)
         self.rows = rows
         self.results: list[tuple[int, str]] = []
-        self.suggestions: dict[int, list[dict]] = {}
-        self.transitions: list[tuple[str, str | None]] = []
+        self.suggestions: dict[int, list[ScanSuggestion]] = {}
+        self.transitions: list[tuple[str, int, str | None]] = []
 
     def get_scan(self, user: str, scan_id: str) -> Scan | None:
         if self.scan is None:
@@ -80,7 +82,7 @@ class FakeStore:
         *,
         status: str,
         needs_review: bool,
-        suggestions: list[dict] | None,
+        suggestions: list[ScanSuggestion] | None,
     ) -> bool:
         if self.scan is None or self.scan.status != "identifying":
             return False
@@ -102,11 +104,11 @@ class FakeStore:
         return True
 
     def transition_reviewing(
-        self, user: str, scan_id: str, error: str | None = None
+        self, user: str, scan_id: str, catalog_version: int, error: str | None = None
     ) -> bool:
         if self.scan is None or self.scan.status != "identifying":
             return False
-        self.transitions.append(("reviewing", error))
+        self.transitions.append(("reviewing", catalog_version, error))
         self.scan = Scan(
             self.scan.user,
             self.scan.scan_id,
@@ -137,11 +139,12 @@ class FakeEmbedder:
 
 
 class FakeCatalog:
-    def __init__(self, records=None, failure_on_call: int | None = None):
+    def __init__(self, records=None, failure_on_call: int | None = None, version=40):
         self.embedder = FakeEmbedder()
         self.records = records if records is not None else [_record()]
         self.failure_on_call = failure_on_call
         self.search_calls = 0
+        self.version = version
 
     def search_records(self, embedding, top_k: int):
         self.search_calls += 1
@@ -200,9 +203,7 @@ def _worker(store, images=None, catalog=None, detector=None, queue=None, loader=
         if game != "mtg":
             raise ValueError(f"no recognition integration configured for game: {game}")
         loaded_catalog = loader(game) if loader else catalog or FakeCatalog()
-        return RecognitionProfile(
-            loaded_catalog, detector or FakeDetector(), _magic_eligible_suggestions
-        )
+        return MagicTheGatheringResolver(loaded_catalog, detector or FakeDetector())
 
     return RecognitionWorker(
         store=store,
@@ -378,11 +379,7 @@ def test_filters_language_and_finish_and_deduplicates_faces():
 
     assert store.rows[0].status == "suggested"
     assert store.suggestions[1] == [
-        {
-            "external_id": "a9738cda-adb1-47fb-9f4c-ecd930228c4d",
-            "name": "Forest",
-            "score": 0.83,
-        }
+        ScanSuggestion("a9738cda-adb1-47fb-9f4c-ecd930228c4d", "Forest", 0.83)
     ]
     assert catalog.search_calls == 2
 
@@ -404,7 +401,7 @@ def test_uses_higher_scoring_card_orientation():
     )
 
     assert detector.calls == 1
-    assert store.suggestions[1][0]["name"] == "Correct card"
+    assert store.suggestions[1][0].name == "Correct card"
 
 
 def test_missing_card_becomes_manual_review_without_search():
@@ -420,9 +417,96 @@ def test_missing_card_becomes_manual_review_without_search():
 
 
 def test_treats_external_ids_as_opaque():
-    suggestions = _magic_eligible_suggestions([_record("not-a-uuid")], "normal")
+    store = FakeStore(_scan_rows(1))
+    _worker(store, catalog=FakeCatalog([_record("not-a-uuid")])).handle_message(
+        {"user": "jordan", "scan_id": "scan-1"}
+    )
 
-    assert suggestions[0]["external_id"] == "not-a-uuid"
+    assert store.suggestions[1][0].external_id == "not-a-uuid"
+
+
+def test_pokemon_suggestions_keep_rank_and_cap_unique_products():
+    charizard = {
+        "id": "226395",
+        "name": "Charizard",
+        "identifiers": {"tcgplayer_group": "2701"},
+        "metadata": {"collector_number": "025/185", "set": "SWSH04: Vivid Voltage"},
+        "score": 0.98,
+    }
+    records = [
+        charizard,
+        {**charizard, "face_index": 1, "score": 0.97},
+        {"id": "124026", "name": "Charizard", "score": 0.96},
+        {"id": "84485", "name": "Crobat (147)", "score": 0.94},
+        {"id": "724537", "name": "Pichu (2002 E3 Promo)", "score": 0.93},
+        {"id": "724538", "name": "Hoppip (2002 E3 Promo)", "score": 0.92},
+        {"id": "264925", "name": "VSTAR Token", "score": 0.91},
+    ]
+
+    store = FakeStore(_scan_rows(1), game="pokemon", finish="reverse_holofoil")
+    resolver = PokemonResolver(FakeCatalog(records, version=60), FakeDetector())
+    worker = RecognitionWorker(store, FakeImages(), FakeQueue(), lambda game: resolver)
+    worker.handle_message({"user": "jordan", "scan_id": "scan-1"})
+
+    assert store.suggestions[1] == [
+        ScanSuggestion("226395", "Charizard", 0.98),
+        ScanSuggestion("124026", "Charizard", 0.96),
+        ScanSuggestion("84485", "Crobat (147)", 0.94),
+        ScanSuggestion("724537", "Pichu (2002 E3 Promo)", 0.93),
+        ScanSuggestion("724538", "Hoppip (2002 E3 Promo)", 0.92),
+    ]
+
+
+def test_runtime_lazily_reuses_both_resolvers_and_records_their_versions(monkeypatch):
+    catalogs = {
+        "mtg": FakeCatalog(version=40),
+        "pokemon": FakeCatalog([], version=60),
+    }
+    load_calls = []
+    detector_calls = []
+    detector = FakeDetector()
+
+    def load(game, **options):
+        load_calls.append((game, options))
+        return catalogs[game]
+
+    def create_detector(*, provider):
+        detector_calls.append(provider)
+        return detector
+
+    monkeypatch.setenv(scan_worker.CACHE_ENV, "/offline-cache")
+    monkeypatch.setattr(scan_worker.Catalog, "load", load)
+    monkeypatch.setattr(scan_worker, "NeuralCornerDetector", create_detector)
+    runtime = LambdaRuntime()
+    assert load_calls == []
+    assert detector_calls == []
+
+    magic = FakeStore(_scan_rows(1))
+    RecognitionWorker(
+        magic, FakeImages(), FakeQueue(), runtime._load_recognition
+    ).handle_message({"user": "jordan", "scan_id": "scan-1"})
+    assert [game for game, _ in load_calls] == ["mtg"]
+
+    pokemon = FakeStore(_scan_rows(1), game="pokemon")
+    RecognitionWorker(
+        pokemon, FakeImages(), FakeQueue(), runtime._load_recognition
+    ).handle_message({"user": "jordan", "scan_id": "scan-1"})
+
+    magic_resolver = runtime._load_recognition("mtg")
+    pokemon_resolver = runtime._load_recognition("pokemon")
+    assert magic_resolver is runtime._load_recognition("mtg")
+    assert pokemon_resolver is runtime._load_recognition("pokemon")
+    assert detector_calls == ["cpu"]
+    assert detector.calls == 2
+    common = {"family": "milo1", "cache_dir": "/offline-cache", "offline": True}
+    assert load_calls == [
+        ("mtg", {**common, "source": "scryfall", "version": 40}),
+        ("pokemon", {**common, "source": "tcgplayer", "version": 60}),
+    ]
+    assert magic.transitions == [("reviewing", 40, None)]
+    assert pokemon.transitions == [("reviewing", 60, None)]
+    assert pokemon.results == [(1, "needs_review")]
+    assert pokemon.suggestions[1] == []
 
 
 def test_game_without_recognition_integration_fails_before_image_processing():
@@ -453,7 +537,7 @@ def test_runtime_fails_before_catalog_loading_when_game_has_no_catalog():
     ):
         runtime._load_recognition("unknown_game")
 
-    assert runtime._catalog is None
+    assert runtime._resolvers == {}
 
 
 def test_corrupt_image_failure_propagates_without_marking_row_finished():

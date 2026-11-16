@@ -6,13 +6,15 @@ import json
 import logging
 import os
 import time
+from abc import ABC, abstractmethod
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
-from typing import Callable
+from typing import Self
 
 import boto3
 import cv2
 import numpy as np
-from collector_vision import Catalog, NeuralCornerDetector, rotate_card_180
+from collector_vision import Catalog, CatalogV2, NeuralCornerDetector, rotate_card_180
 
 LOGGER = logging.getLogger(__name__)
 
@@ -20,17 +22,9 @@ TABLE_ENV = "SCAN_TABLE_NAME"
 BUCKET_ENV = "SCAN_BUCKET_NAME"
 CACHE_ENV = "COLLECTORVISION_CACHE"
 SCAN_IDENTIFICATION_QUEUE_NAME = "tcg_inventory_scan_identification.fifo"
-CATALOG_VERSION = 40
 BATCH_SIZE = 100
 SEARCH_TOP_K = 25
 MAX_SUGGESTIONS = 5
-MAGIC_GAME_ID = "mtg"
-MAGIC_EXTERNAL_SOURCE = "scryfall"
-MAGIC_FINISH_TO_CATALOG_FINISH = {
-    "normal": "nonfoil",
-    "foil": "foil",
-    "etched": "etched",
-}
 
 
 @dataclass(frozen=True)
@@ -52,45 +46,110 @@ class ScanRow:
 
 
 @dataclass(frozen=True)
-class RecognitionProfile:
-    catalog: object
-    detector: object
-    convert_suggestions: Callable[[list[dict], str], list[dict]]
+class ScanSuggestion:
+    external_id: str
+    name: str
+    score: float
 
 
-def _magic_eligible_suggestions(records: list[dict], finish: str) -> list[dict]:
-    required_finish = MAGIC_FINISH_TO_CATALOG_FINISH[finish]
-    suggestions: list[dict] = []
-    seen: set[str] = set()
-    for record in records:
-        identifiers = record.get("identifiers") or {}
-        external_id = identifiers.get("scryfall_card") or record.get("id")
-        metadata = record.get("metadata") or {}
-        if metadata.get("lang") != "en":
-            continue
-        if required_finish not in set(record.get("finishes") or ()):
-            continue
-        name = record.get("name")
-        score = record.get("score")
-        if not isinstance(external_id, str) or not external_id.strip():
-            continue
-        if not isinstance(name, str) or not name:
-            continue
-        if not isinstance(score, (float, int)) or isinstance(score, bool):
-            continue
-        if external_id in seen:
-            continue
-        seen.add(external_id)
-        suggestions.append(
-            {
-                "external_id": external_id,
-                "name": name,
-                "score": float(score),
-            }
+class RecognitionResolver(ABC):
+    game: str
+    _source: str
+    _pinned_version: int
+
+    def __init__(self, catalog: CatalogV2, detector: NeuralCornerDetector):
+        self._catalog = catalog
+        self._detector = detector
+
+    @classmethod
+    def load(cls, detector: NeuralCornerDetector) -> Self:
+        catalog = Catalog.load(
+            cls.game,
+            source=cls._source,
+            family="milo1",
+            cache_dir=os.environ[CACHE_ENV],
+            offline=True,
+            version=cls._pinned_version,
         )
-        if len(suggestions) >= MAX_SUGGESTIONS:
-            break
-    return suggestions
+        _ = catalog.embedder
+        return cls(catalog, detector)
+
+    @property
+    def catalog_version(self) -> int:
+        return self._catalog.version
+
+    def find_suggestions(
+        self, image_bgr: np.ndarray, finish: str
+    ) -> list[ScanSuggestion]:
+        detection = self._detector.detect(image_bgr)
+        if not detection.card_present:
+            return []
+
+        card = detection.dewarp(image_bgr)
+        searches = [
+            self._catalog.search_records(
+                self._catalog.embedder.embed(orientation), top_k=SEARCH_TOP_K
+            )
+            for orientation in (card, rotate_card_180(card))
+        ]
+        records = max(
+            searches,
+            key=lambda results: results[0]["score"] if results else float("-inf"),
+        )
+
+        suggestions: dict[str, ScanSuggestion] = {}
+        for suggestion in self._filter_suggestions(records, finish):
+            suggestions.setdefault(suggestion.external_id, suggestion)
+            if len(suggestions) == MAX_SUGGESTIONS:
+                break
+        return list(suggestions.values())
+
+    @abstractmethod
+    def _filter_suggestions(
+        self, records: list[dict], finish: str
+    ) -> Iterator[ScanSuggestion]:
+        raise NotImplementedError
+
+
+class MagicTheGatheringResolver(RecognitionResolver):
+    game = "mtg"
+    _source = "scryfall"
+    _pinned_version = 40
+    _FINISHES = {"normal": "nonfoil", "foil": "foil", "etched": "etched"}
+
+    def _filter_suggestions(
+        self, records: list[dict], finish: str
+    ) -> Iterator[ScanSuggestion]:
+        required_finish = self._FINISHES[finish]
+        for record in records:
+            identifiers = record.get("identifiers") or {}
+            external_id = identifiers.get("scryfall_card") or record.get("id")
+            metadata = record.get("metadata") or {}
+            if metadata.get("lang") != "en":
+                continue
+            if required_finish not in set(record.get("finishes") or ()):
+                continue
+            name = record.get("name")
+            score = record.get("score")
+            if not isinstance(external_id, str) or not external_id.strip():
+                continue
+            if not isinstance(name, str) or not name:
+                continue
+            if not isinstance(score, (float, int)) or isinstance(score, bool):
+                continue
+            yield ScanSuggestion(external_id, name, float(score))
+
+
+class PokemonResolver(RecognitionResolver):
+    game = "pokemon"
+    _source = "tcgplayer"
+    _pinned_version = 60
+
+    def _filter_suggestions(
+        self, records: list[dict], finish: str
+    ) -> Iterator[ScanSuggestion]:
+        for record in records:
+            yield ScanSuggestion(record["id"], record["name"], float(record["score"]))
 
 
 class DynamoScanStore:
@@ -125,12 +184,12 @@ class DynamoScanStore:
         return int(item[field]["N"])
 
     @staticmethod
-    def _suggestion_attribute(suggestion: dict) -> dict:
+    def _suggestion_attribute(suggestion: ScanSuggestion) -> dict:
         return {
             "M": {
-                "external_id": {"S": suggestion["external_id"]},
-                "name": {"S": suggestion["name"]},
-                "score": {"N": str(suggestion["score"])},
+                "external_id": {"S": suggestion.external_id},
+                "name": {"S": suggestion.name},
+                "score": {"N": str(suggestion.score)},
             }
         }
 
@@ -191,7 +250,7 @@ class DynamoScanStore:
         *,
         status: str,
         needs_review: bool,
-        suggestions: list[dict] | None,
+        suggestions: list[ScanSuggestion] | None,
     ) -> bool:
         set_parts = ["#status = :status", "#needs_review = :needs_review"]
         values: dict = {
@@ -253,7 +312,7 @@ class DynamoScanStore:
             raise
 
     def transition_reviewing(
-        self, user: str, scan_id: str, error: str | None = None
+        self, user: str, scan_id: str, catalog_version: int, error: str | None = None
     ) -> bool:
         set_parts = [
             "#status = :reviewing",
@@ -263,7 +322,7 @@ class DynamoScanStore:
         values = {
             ":reviewing": {"S": "reviewing"},
             ":identifying": {"S": "identifying"},
-            ":catalog_version": {"N": str(CATALOG_VERSION)},
+            ":catalog_version": {"N": str(catalog_version)},
             ":updated_at": {"N": str(self._now())},
         }
         names = {
@@ -326,7 +385,7 @@ class RecognitionWorker:
         store,
         images,
         continuations,
-        recognition_loader,
+        recognition_loader: Callable[[str], RecognitionResolver],
         logger: logging.Logger | None = None,
     ):
         self._store = store
@@ -348,27 +407,27 @@ class RecognitionWorker:
         scan = self._store.get_scan(user, scan_id)
         if scan is None or scan.status != "identifying":
             return
-        profile = self._recognition_loader(scan.game)
+        resolver = self._recognition_loader(scan.game)
 
         rows = self._store.get_rows(user, scan_id)
         if not rows:
             raise RuntimeError("identifying scan has no rows")
         pending = [row for row in rows if row.status == "pending"]
         if not pending:
-            self._reconcile(scan)
+            self._reconcile(scan, resolver.catalog_version)
             return
 
         for row in pending[:BATCH_SIZE]:
-            if not self._recognize_row(scan, row, profile):
+            if not self._recognize_row(scan, row, resolver):
                 return
 
-        self._reconcile(scan)
+        self._reconcile(scan, resolver.catalog_version)
 
     def _recognize_row(
         self,
         scan: Scan,
         row: ScanRow,
-        profile: RecognitionProfile,
+        resolver: RecognitionResolver,
     ) -> bool:
         image_bytes = self._images.read(row.s3_key)
         try:
@@ -379,24 +438,7 @@ class RecognitionWorker:
             )
             if image_bgr is None:
                 raise ValueError("unable to decode image")
-            detection = profile.detector.detect(image_bgr)
-            if not detection.card_present:
-                candidates = []
-            else:
-                card = detection.dewarp(image_bgr)
-                searches = [
-                    profile.catalog.search_records(
-                        profile.catalog.embedder.embed(orientation), top_k=SEARCH_TOP_K
-                    )
-                    for orientation in (card, rotate_card_180(card))
-                ]
-                records = max(
-                    searches,
-                    key=lambda results: (
-                        results[0]["score"] if results else float("-inf")
-                    ),
-                )
-                candidates = profile.convert_suggestions(records, scan.finish)
+            candidates = resolver.find_suggestions(image_bgr, scan.finish)
         except Exception:
             self._logger.exception(
                 "scan row recognition failed",
@@ -418,7 +460,7 @@ class RecognitionWorker:
             suggestions=suggestions,
         )
 
-    def _reconcile(self, scan: Scan) -> None:
+    def _reconcile(self, scan: Scan, catalog_version: int) -> None:
         current_scan = self._store.get_scan(scan.user, scan.scan_id)
         if current_scan is None or current_scan.status != "identifying":
             return
@@ -432,7 +474,7 @@ class RecognitionWorker:
             self._continuations.send(scan.user, scan.scan_id, next_pending_position)
             return
         if statuses <= {"suggested", "needs_review"}:
-            self._store.transition_reviewing(scan.user, scan.scan_id)
+            self._store.transition_reviewing(scan.user, scan.scan_id, catalog_version)
             return
         raise RuntimeError("scan contains an unrecognized worker row status")
 
@@ -440,34 +482,29 @@ class RecognitionWorker:
 class LambdaRuntime:
     def __init__(self):
         self._worker: RecognitionWorker | None = None
-        self._catalog = None
+        self._resolvers: dict[str, RecognitionResolver] = {}
         self._detector = None
 
     def handle_event(self, event: dict) -> dict[str, int]:
         return self._get_worker().handle_event(event)
 
-    def _load_recognition(self, game: str) -> RecognitionProfile:
-        integration_loader = {MAGIC_GAME_ID: self._load_mtg_recognition}.get(game)
-        if integration_loader is None:
-            raise ValueError(f"no recognition integration configured for game: {game}")
-        return integration_loader()
+    def _load_recognition(self, game: str) -> RecognitionResolver:
+        if game in self._resolvers:
+            return self._resolvers[game]
 
-    def _load_mtg_recognition(self) -> RecognitionProfile:
-        if self._catalog is None:
-            self._catalog = Catalog.load(
-                MAGIC_GAME_ID,
-                source=MAGIC_EXTERNAL_SOURCE,
-                family="milo1",
-                cache_dir=os.environ[CACHE_ENV],
-                offline=True,
-                version=CATALOG_VERSION,
-            )
-            _ = self._catalog.embedder
+        resolver_type = {
+            MagicTheGatheringResolver.game: MagicTheGatheringResolver,
+            PokemonResolver.game: PokemonResolver,
+        }.get(game)
+        if resolver_type is None:
+            raise ValueError(f"no recognition integration configured for game: {game}")
+
         if self._detector is None:
             self._detector = NeuralCornerDetector(provider="cpu")
-        return RecognitionProfile(
-            self._catalog, self._detector, _magic_eligible_suggestions
-        )
+
+        resolver = resolver_type.load(self._detector)
+        self._resolvers[game] = resolver
+        return resolver
 
     def _get_worker(self) -> RecognitionWorker:
         if self._worker is None:
