@@ -165,7 +165,18 @@ pip.parse(
     python_version = "3.12",
     requirements_lock = "//:requirements.txt",
 )
-use_repo(pip, "pypi")
+pip.parse(
+    download_only = True,
+    extra_pip_args = [
+        "--platform=manylinux_2_28_x86_64",
+        "--platform=manylinux2014_x86_64",
+    ],
+    hub_name = "pypi_linux_x86_64",
+    python_version = "3.12",
+    requirements_lock = "//:requirements.txt",
+    target_platforms = ["linux_x86_64"],
+)
+use_repo(pip, "pypi", "pypi_linux_x86_64")
 
 bazel_dep(name = "aspect_rules_js", version = "3.0.3")
 bazel_dep(name = "aspect_rules_ts", version = "3.8.8")

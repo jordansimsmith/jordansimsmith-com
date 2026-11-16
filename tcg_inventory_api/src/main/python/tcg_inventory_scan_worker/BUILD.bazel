@@ -24,7 +24,7 @@ collectorvision_image(
         "__init__.py": "tcg_inventory_scan_worker/__init__.py",
         "worker.py": "tcg_inventory_scan_worker/worker.py",
     },
-    base = "@lambda_python312//:lambda_python312",
+    base = "@lambda_python312_linux_amd64//:lambda_python312_linux_amd64",
     handler = "tcg_inventory_scan_worker.worker.lambda_handler",
     repo_tag = "bazel/tcg-inventory-scan-worker:latest",
 )

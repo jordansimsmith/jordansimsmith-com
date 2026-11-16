@@ -145,9 +145,12 @@ def collectorvision_image(name, base, handler, repo_tag, application_files):
         "urllib3",
     ]:
         package_layer = name + "-" + package.replace("_", "-") + "-dependencies"
+
+        # collectorvision builds a pure python wheel from the pinned source archive.
+        wheel_repository = "pypi" if package == "collectorvision" else "pypi_linux_x86_64"
         whl_filegroup(
             name = package_layer + "-wheel",
-            whl = "@pypi//{}:whl".format(package),
+            whl = "@{}//{}:whl".format(wheel_repository, package),
         )
         pkg_files(
             name = package_layer + "-files",
