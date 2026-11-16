@@ -117,15 +117,15 @@ locals {
     }
   }
 
-  queue_lambda_arns = {
-    reports             = module.java_api.lambda_functions["reports_worker"].qualified_arn
-    pricing             = module.java_api.lambda_functions["pricing_worker"].qualified_arn
-    publish             = module.java_api.lambda_functions["publish_worker"].qualified_arn
-    orders              = module.java_api.lambda_functions["orders_worker"].qualified_arn
-    imports             = module.java_api.lambda_functions["imports_worker"].qualified_arn
-    scans               = module.java_api.lambda_functions["scans_worker"].qualified_arn
-    scan_identification = module.scan_worker.lambda_function.qualified_arn
-    catalog             = module.java_api.lambda_functions["catalog_worker"].qualified_arn
+  queue_workers = {
+    reports             = module.java_api.lambda_functions["reports_worker"]
+    pricing             = module.java_api.lambda_functions["pricing_worker"]
+    publish             = module.java_api.lambda_functions["publish_worker"]
+    orders              = module.java_api.lambda_functions["orders_worker"]
+    imports             = module.java_api.lambda_functions["imports_worker"]
+    scans               = module.java_api.lambda_functions["scans_worker"]
+    scan_identification = module.scan_worker.lambda_function
+    catalog             = module.java_api.lambda_functions["catalog_worker"]
   }
 }
 
@@ -405,6 +405,13 @@ module "java_api" {
   ]
 }
 
+resource "aws_lambda_function_recursion_config" "worker" {
+  for_each = local.queue_workers
+
+  function_name  = each.value.function_name
+  recursive_loop = "Allow"
+}
+
 module "sqs_queue" {
   for_each = local.queues
 
@@ -417,7 +424,7 @@ module "sqs_queue" {
   content_based_deduplication = each.value.content_based_deduplication
   max_receive_count           = each.value.max_receive_count
   lambda_trigger = {
-    function_arn                       = local.queue_lambda_arns[each.key]
+    function_arn                       = local.queue_workers[each.key].qualified_arn
     batch_size                         = 1
     maximum_batching_window_in_seconds = 0
   }
