@@ -13,7 +13,6 @@ import java.util.Map;
 
 public class FetchTcgCardMatcher {
   private static final int BATCH_SIZE = 100;
-  private static final String FETCHTCG_EXTERNAL_REFERENCE_FIELD = "scryfallId";
 
   private final FetchTcgService fetchTcgService;
 
@@ -27,6 +26,7 @@ public class FetchTcgCardMatcher {
       List<Integer> setIds,
       String searchName,
       String finish,
+      String externalReferenceField,
       String externalId)
       throws ServiceException {
     var candidates = new ArrayList<Map.Entry<String, Integer>>();
@@ -44,8 +44,9 @@ public class FetchTcgCardMatcher {
       var externalReferences =
           fetchTcgService.getCard(ctx, new GetCardRequest(cardId)).externalReferences();
       if (externalReferences != null
-          && externalId.equals(externalReferences.get(FETCHTCG_EXTERNAL_REFERENCE_FIELD))) {
-        matchingCards.put(cardId, candidate.getValue());
+          && externalId.equals(externalReferences.get(externalReferenceField))) {
+        var setId = candidate.getValue();
+        matchingCards.put(cardId, setId);
       }
     }
     if (matchingCards.isEmpty()) {
@@ -55,7 +56,9 @@ public class FetchTcgCardMatcher {
       return new FetchTcgCardMatch(null, null, "ambiguous match");
     }
     Map.Entry<String, Integer> match = matchingCards.entrySet().iterator().next();
-    return new FetchTcgCardMatch(match.getKey(), match.getValue(), null);
+    var cardId = match.getKey();
+    var setId = match.getValue();
+    return new FetchTcgCardMatch(cardId, setId, null);
   }
 
   private List<Map.Entry<String, Integer>> findCards(

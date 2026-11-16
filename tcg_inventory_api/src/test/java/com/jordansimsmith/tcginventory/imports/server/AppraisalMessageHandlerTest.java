@@ -58,7 +58,7 @@ class AppraisalMessageHandlerTest {
         new AppraisalMessageHandler(
             importReadRepository,
             importMutationRepository,
-            new AppraisalResolverFactory(resolver),
+            new AppraisalResolverFactory(resolver, resolver),
             pricingService,
             new AppraisalPolicy(),
             importsQueue,

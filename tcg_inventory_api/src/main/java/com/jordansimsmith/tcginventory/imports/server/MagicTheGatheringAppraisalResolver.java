@@ -39,6 +39,7 @@ public class MagicTheGatheringAppraisalResolver implements AppraisalResolver {
             sets.stream().map(set -> set.id()).toList(),
             searchName,
             fetchTcgFinish,
+            "scryfallId",
             row.getExternalId());
     if (match.reason() != null) {
       return review(match.reason());

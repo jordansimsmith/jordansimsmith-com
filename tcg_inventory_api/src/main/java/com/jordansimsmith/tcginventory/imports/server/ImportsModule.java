@@ -166,8 +166,9 @@ public class ImportsModule {
       QueueClient<ImportMessage> importsQueue,
       Clock clock) {
     var cardMatcher = new FetchTcgCardMatcher(fetchTcgService);
-    var resolver = new MagicTheGatheringAppraisalResolver(fetchTcgService, cardMatcher);
-    var resolverFactory = new AppraisalResolverFactory(resolver);
+    var magicResolver = new MagicTheGatheringAppraisalResolver(fetchTcgService, cardMatcher);
+    var pokemonResolver = new PokemonAppraisalResolver(fetchTcgService, cardMatcher);
+    var resolverFactory = new AppraisalResolverFactory(magicResolver, pokemonResolver);
     return new AppraisalMessageHandler(
         importReadRepository,
         importMutationRepository,
