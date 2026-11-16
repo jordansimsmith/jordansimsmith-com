@@ -3,10 +3,10 @@
 
 Probes every FetchTCG set by sampling unique card names from the newest and
 oldest ends, looking up each card's Scryfall ID, and collecting the distinct
-Scryfall set codes. Produces fetchtcg_set_mapping.json.
+Scryfall set codes. Produces fetchtcg_magic_the_gathering_set_mapping.json.
 
 Usage:
-    python generate_fetchtcg_set_mapping.py [--output PATH]
+    python generate_fetchtcg_magic_the_gathering_set_mapping.py [--output PATH]
 """
 
 import argparse
@@ -64,18 +64,19 @@ def main():
         / "src"
         / "main"
         / "resources"
-        / "fetchtcg_set_mapping.json"
+        / "com/jordansimsmith/tcginventory/fetchtcg/server"
+        / "fetchtcg_magic_the_gathering_set_mapping.json"
     )
     parser.add_argument("--output", type=Path, default=default_output)
     args = parser.parse_args()
 
     print("fetching Scryfall set catalog...")
-    scryfall_sets = _get_json(SCRYFALL_SETS_URL, SCRYFALL_HEADERS).get("data", [])
+    scryfall_sets = get_json(SCRYFALL_SETS_URL, SCRYFALL_HEADERS).get("data", [])
     scryfall_codes = {s["code"].casefold() for s in scryfall_sets}
     print(f"  {len(scryfall_codes)} Scryfall set codes")
 
     print("fetching FetchTCG set list...")
-    fetchtcg_sets = _get_json(FETCHTCG_FILTERS_URL, FETCHTCG_HEADERS).get("sets", [])
+    fetchtcg_sets = get_json(FETCHTCG_FILTERS_URL, FETCHTCG_HEADERS).get("sets", [])
     print(f"  {len(fetchtcg_sets)} FetchTCG sets")
 
     mapping = defaultdict(dict)
@@ -168,8 +169,8 @@ def _probe_set(fetchtcg_set_id, scryfall_codes):
                 "sets": fetchtcg_set_id,
             }
         )
-        _pace()
-        search = _get_json(f"{FETCHTCG_CARDS_URL}?{query}", FETCHTCG_HEADERS)
+        pace()
+        search = get_json(f"{FETCHTCG_CARDS_URL}?{query}", FETCHTCG_HEADERS)
         results = search.get("searchResults", {})
         candidates = results.get("content", [])
 
@@ -184,8 +185,8 @@ def _probe_set(fetchtcg_set_id, scryfall_codes):
             seen_names.add(name)
 
             card_id = urllib.parse.quote(str(candidate["id"]), safe="_-.")
-            _pace()
-            card = _get_json(f"{FETCHTCG_CARDS_URL}/{card_id}", FETCHTCG_HEADERS)
+            pace()
+            card = get_json(f"{FETCHTCG_CARDS_URL}/{card_id}", FETCHTCG_HEADERS)
             references = card.get("externalReferences", {})
             scryfall_id = references.get("scryfallId")
             if not scryfall_id:
@@ -193,7 +194,7 @@ def _probe_set(fetchtcg_set_id, scryfall_codes):
 
             scryfall_id = urllib.parse.quote(str(scryfall_id), safe="-")
             try:
-                scryfall_card = _get_json(
+                scryfall_card = get_json(
                     f"{SCRYFALL_CARDS_URL}/{scryfall_id}", SCRYFALL_HEADERS
                 )
             except RuntimeError:
@@ -210,7 +211,7 @@ def _probe_set(fetchtcg_set_id, scryfall_codes):
     return codes
 
 
-def _get_json(url, headers):
+def get_json(url, headers):
     """Fetch a URL and return the parsed JSON. Retries on transient failures."""
     for attempt in range(1, MAX_ATTEMPTS + 1):
         request = urllib.request.Request(url, headers=headers)
@@ -224,7 +225,7 @@ def _get_json(url, headers):
     raise RuntimeError(f"request failed for {url}")
 
 
-def _pace():
+def pace():
     """Sleep 1-2 seconds (rate limiting for FetchTCG)."""
     time.sleep(random.uniform(MIN_INTERVAL_SECONDS, MAX_INTERVAL_SECONDS))
 

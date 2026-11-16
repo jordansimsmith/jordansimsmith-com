@@ -1,0 +1,1390 @@
+{
+  "30c": [
+    {
+      "set_id": 4823,
+      "set_name": "ME: 30th Celebration"
+    },
+    {
+      "set_id": 5281,
+      "set_name": "ME: 30th Celebration Classic Collection"
+    }
+  ],
+  "aor": [
+    {
+      "set_id": 118,
+      "set_name": "Ancient Origins"
+    }
+  ],
+  "aq": [
+    {
+      "set_id": 172,
+      "set_name": "Aquapolis"
+    }
+  ],
+  "ar": [
+    {
+      "set_id": 144,
+      "set_name": "Arceus"
+    }
+  ],
+  "asc": [
+    {
+      "set_id": 4447,
+      "set_name": "Ascended Heroes"
+    }
+  ],
+  "ba22": [
+    {
+      "set_id": 217,
+      "set_name": "Battle Academy 2022 (Cinderace)"
+    },
+    {
+      "set_id": 218,
+      "set_name": "Battle Academy 2022 (Eevee)"
+    },
+    {
+      "set_id": 219,
+      "set_name": "Battle Academy 2022 (Pikachu)"
+    }
+  ],
+  "ba24": [
+    {
+      "set_id": 1867,
+      "set_name": "Battle Academy 2024"
+    }
+  ],
+  "bcr": [
+    {
+      "set_id": 131,
+      "set_name": "Boundaries Crossed"
+    }
+  ],
+  "bkp": [
+    {
+      "set_id": 116,
+      "set_name": "BREAKpoint"
+    },
+    {
+      "set_id": 150,
+      "set_name": "Majestic Dawn"
+    }
+  ],
+  "bkt": [
+    {
+      "set_id": 117,
+      "set_name": "BREAKthrough"
+    }
+  ],
+  "ble": [
+    {
+      "set_id": 111,
+      "set_name": "Sun & Moon"
+    },
+    {
+      "set_id": 131,
+      "set_name": "Boundaries Crossed"
+    },
+    {
+      "set_id": 132,
+      "set_name": "Dragon Vault"
+    },
+    {
+      "set_id": 137,
+      "set_name": "Emerging Powers"
+    },
+    {
+      "set_id": 138,
+      "set_name": "Black & White"
+    }
+  ],
+  "blk": [
+    {
+      "set_id": 4344,
+      "set_name": "Black Bolt"
+    }
+  ],
+  "blw": [
+    {
+      "set_id": 138,
+      "set_name": "Black & White"
+    },
+    {
+      "set_id": 235,
+      "set_name": "BW Trainer Kit Excadrill"
+    },
+    {
+      "set_id": 236,
+      "set_name": "BW Trainer Kit Zoroark"
+    }
+  ],
+  "bs": [
+    {
+      "set_id": 4241,
+      "set_name": "Base Set Unlimited"
+    }
+  ],
+  "bs2": [
+    {
+      "set_id": 182,
+      "set_name": "Base Set 2"
+    }
+  ],
+  "bst": [
+    {
+      "set_id": 169,
+      "set_name": "EX Sandstorm"
+    },
+    {
+      "set_id": 170,
+      "set_name": "EX Ruby & Sapphire"
+    }
+  ],
+  "bta": [
+    {
+      "set_id": 219,
+      "set_name": "Battle Academy 2022 (Pikachu)"
+    },
+    {
+      "set_id": 220,
+      "set_name": "Battle Academy 2020 (Charizard)"
+    },
+    {
+      "set_id": 221,
+      "set_name": "Battle Academy 2020 (Mewtwo)"
+    },
+    {
+      "set_id": 222,
+      "set_name": "Battle Academy 2020 (Pikachu)"
+    }
+  ],
+  "ccc": [
+    {
+      "set_id": 85,
+      "set_name": "Celebrations"
+    }
+  ],
+  "ces": [
+    {
+      "set_id": 103,
+      "set_name": "Celestial Storm"
+    }
+  ],
+  "cg": [
+    {
+      "set_id": 157,
+      "set_name": "EX Crystal Guardians"
+    }
+  ],
+  "chp": [
+    {
+      "set_id": 91,
+      "set_name": "Champion's Path"
+    }
+  ],
+  "cl": [
+    {
+      "set_id": 139,
+      "set_name": "Call of Legends"
+    },
+    {
+      "set_id": 1869,
+      "set_name": "Trading Card Game Classic"
+    }
+  ],
+  "clb": [
+    {
+      "set_id": 85,
+      "set_name": "Celebrations"
+    }
+  ],
+  "cri": [
+    {
+      "set_id": 4657,
+      "set_name": "Chaos Rising"
+    }
+  ],
+  "crz": [
+    {
+      "set_id": 359,
+      "set_name": "Crown Zenith"
+    }
+  ],
+  "crz:gg": [
+    {
+      "set_id": 359,
+      "set_name": "Crown Zenith"
+    }
+  ],
+  "dcr": [
+    {
+      "set_id": 120,
+      "set_name": "Double Crisis"
+    }
+  ],
+  "dep": [
+    {
+      "set_id": 99,
+      "set_name": "Detective Pikachu"
+    }
+  ],
+  "dex": [
+    {
+      "set_id": 134,
+      "set_name": "Dark Explorers"
+    }
+  ],
+  "df": [
+    {
+      "set_id": 156,
+      "set_name": "EX Dragon Frontiers"
+    }
+  ],
+  "dlr": [
+    {
+      "set_id": 5402,
+      "set_name": "Delta Reign"
+    }
+  ],
+  "dp": [
+    {
+      "set_id": 154,
+      "set_name": "Diamond & Pearl"
+    }
+  ],
+  "dr": [
+    {
+      "set_id": 168,
+      "set_name": "EX Dragon"
+    }
+  ],
+  "dri": [
+    {
+      "set_id": 4224,
+      "set_name": "Destined Rivals"
+    }
+  ],
+  "drm": [
+    {
+      "set_id": 102,
+      "set_name": "Dragon Majesty"
+    }
+  ],
+  "drv": [
+    {
+      "set_id": 132,
+      "set_name": "Dragon Vault"
+    }
+  ],
+  "drx": [
+    {
+      "set_id": 133,
+      "set_name": "Dragons Exalted"
+    }
+  ],
+  "ds": [
+    {
+      "set_id": 160,
+      "set_name": "EX Delta Species"
+    }
+  ],
+  "dx": [
+    {
+      "set_id": 163,
+      "set_name": "EX Deoxys"
+    }
+  ],
+  "em": [
+    {
+      "set_id": 162,
+      "set_name": "EX Emerald"
+    }
+  ],
+  "epo": [
+    {
+      "set_id": 137,
+      "set_name": "Emerging Powers"
+    }
+  ],
+  "evo": [
+    {
+      "set_id": 112,
+      "set_name": "Evolutions"
+    }
+  ],
+  "ex": [
+    {
+      "set_id": 173,
+      "set_name": "Expedition Base Set"
+    }
+  ],
+  "fco": [
+    {
+      "set_id": 114,
+      "set_name": "Fates Collide"
+    }
+  ],
+  "ffi": [
+    {
+      "set_id": 123,
+      "set_name": "Furious Fists"
+    }
+  ],
+  "flf": [
+    {
+      "set_id": 124,
+      "set_name": "Flashfire"
+    }
+  ],
+  "fpp": [
+    {
+      "set_id": 85,
+      "set_name": "Celebrations"
+    }
+  ],
+  "ge": [
+    {
+      "set_id": 151,
+      "set_name": "Great Encounters"
+    }
+  ],
+  "gen": [
+    {
+      "set_id": 115,
+      "set_name": "Generations"
+    }
+  ],
+  "hif": [
+    {
+      "set_id": 96,
+      "set_name": "Hidden Fates"
+    }
+  ],
+  "hif:sv": [
+    {
+      "set_id": 96,
+      "set_name": "Hidden Fates"
+    }
+  ],
+  "hl": [
+    {
+      "set_id": 166,
+      "set_name": "EX Hidden Legends"
+    }
+  ],
+  "hp": [
+    {
+      "set_id": 158,
+      "set_name": "EX Holon Phantoms"
+    }
+  ],
+  "hs": [
+    {
+      "set_id": 143,
+      "set_name": "HeartGold & SoulSilver"
+    }
+  ],
+  "jtg": [
+    {
+      "set_id": 3399,
+      "set_name": "Journey Together"
+    }
+  ],
+  "kss": [
+    {
+      "set_id": 126,
+      "set_name": "Kalos Starter Set"
+    }
+  ],
+  "la": [
+    {
+      "set_id": 149,
+      "set_name": "Legends Awakened"
+    }
+  ],
+  "lc": [
+    {
+      "set_id": 174,
+      "set_name": "Legendary Collection"
+    }
+  ],
+  "lm": [
+    {
+      "set_id": 159,
+      "set_name": "EX Legend Maker"
+    }
+  ],
+  "ltr": [
+    {
+      "set_id": 127,
+      "set_name": "Legendary Treasures"
+    }
+  ],
+  "m11": [
+    {
+      "set_id": 216,
+      "set_name": "McDonald's Collection 2011"
+    }
+  ],
+  "m12": [
+    {
+      "set_id": 215,
+      "set_name": "McDonald's Collection 2012"
+    }
+  ],
+  "m14": [
+    {
+      "set_id": 213,
+      "set_name": "McDonald's Collection 2014"
+    }
+  ],
+  "m15": [
+    {
+      "set_id": 212,
+      "set_name": "McDonald's Collection 2015"
+    }
+  ],
+  "m16": [
+    {
+      "set_id": 211,
+      "set_name": "McDonald's Collection 2016"
+    }
+  ],
+  "m17": [
+    {
+      "set_id": 210,
+      "set_name": "McDonald's Collection 2017"
+    }
+  ],
+  "m18": [
+    {
+      "set_id": 208,
+      "set_name": "McDonald's Collection 2018"
+    }
+  ],
+  "m19": [
+    {
+      "set_id": 207,
+      "set_name": "McDonald's Collection 2019"
+    }
+  ],
+  "m21": [
+    {
+      "set_id": 205,
+      "set_name": "McDonald's Collection 2021"
+    }
+  ],
+  "m22": [
+    {
+      "set_id": 204,
+      "set_name": "McDonald's Match Battle 2022"
+    }
+  ],
+  "m23": [
+    {
+      "set_id": 1875,
+      "set_name": "McDonald's Promos 2023"
+    }
+  ],
+  "m24": [
+    {
+      "set_id": 1876,
+      "set_name": "McDonald's Promos 2024"
+    }
+  ],
+  "ma": [
+    {
+      "set_id": 167,
+      "set_name": "EX Team Magma vs Team Aqua"
+    }
+  ],
+  "mcap": [
+    {
+      "set_id": 90,
+      "set_name": "Vivid Voltage"
+    },
+    {
+      "set_id": 93,
+      "set_name": "Rebel Clash"
+    },
+    {
+      "set_id": 98,
+      "set_name": "Unbroken Bonds"
+    },
+    {
+      "set_id": 113,
+      "set_name": "Steam Siege"
+    },
+    {
+      "set_id": 115,
+      "set_name": "Generations"
+    },
+    {
+      "set_id": 184,
+      "set_name": "Jungle"
+    },
+    {
+      "set_id": 187,
+      "set_name": "SM Black Star Promos"
+    },
+    {
+      "set_id": 194,
+      "set_name": "Unnumbered Promos"
+    },
+    {
+      "set_id": 256,
+      "set_name": "Pok\u00e9mon Futsal"
+    },
+    {
+      "set_id": 4224,
+      "set_name": "Destined Rivals"
+    },
+    {
+      "set_id": 4241,
+      "set_name": "Base Set Unlimited"
+    },
+    {
+      "set_id": 4381,
+      "set_name": "Mega Evolution"
+    },
+    {
+      "set_id": 4645,
+      "set_name": "Special Cards"
+    },
+    {
+      "set_id": 4822,
+      "set_name": "Miscellaneous Cards & Products"
+    }
+  ],
+  "md": [
+    {
+      "set_id": 150,
+      "set_name": "Majestic Dawn"
+    }
+  ],
+  "mee": [
+    {
+      "set_id": 5374,
+      "set_name": "MEE: Mega Evolution Energies"
+    }
+  ],
+  "meg": [
+    {
+      "set_id": 4381,
+      "set_name": "Mega Evolution"
+    }
+  ],
+  "mep": [
+    {
+      "set_id": 4380,
+      "set_name": "Mega Evolution Promo"
+    },
+    {
+      "set_id": 4637,
+      "set_name": "First Partner Collection 2026"
+    }
+  ],
+  "mew": [
+    {
+      "set_id": 379,
+      "set_name": "Scarlet & Violet: 151"
+    }
+  ],
+  "mt": [
+    {
+      "set_id": 153,
+      "set_name": "Mysterious Treasures"
+    }
+  ],
+  "nvi": [
+    {
+      "set_id": 136,
+      "set_name": "Noble Victories"
+    }
+  ],
+  "nxd": [
+    {
+      "set_id": 135,
+      "set_name": "Next Destinies"
+    }
+  ],
+  "obf": [
+    {
+      "set_id": 374,
+      "set_name": "Obsidian Flames"
+    }
+  ],
+  "paf": [
+    {
+      "set_id": 493,
+      "set_name": "Paldean Fates"
+    }
+  ],
+  "pal": [
+    {
+      "set_id": 369,
+      "set_name": "Paldea Evolved"
+    }
+  ],
+  "par": [
+    {
+      "set_id": 428,
+      "set_name": "Scarlet & Violet: Paradox Rift"
+    }
+  ],
+  "pbl": [
+    {
+      "set_id": 4687,
+      "set_name": "Pitch Black"
+    }
+  ],
+  "pfl": [
+    {
+      "set_id": 4408,
+      "set_name": "Phantasmal Flames"
+    }
+  ],
+  "pgo": [
+    {
+      "set_id": 81,
+      "set_name": "Pok\u00e9mon GO"
+    }
+  ],
+  "phf": [
+    {
+      "set_id": 122,
+      "set_name": "Phantom Forces"
+    }
+  ],
+  "pk": [
+    {
+      "set_id": 155,
+      "set_name": "EX Power Keepers"
+    }
+  ],
+  "pl": [
+    {
+      "set_id": 147,
+      "set_name": "Platinum"
+    }
+  ],
+  "plb": [
+    {
+      "set_id": 128,
+      "set_name": "Plasma Blast"
+    }
+  ],
+  "plf": [
+    {
+      "set_id": 129,
+      "set_name": "Plasma Freeze"
+    }
+  ],
+  "pls": [
+    {
+      "set_id": 130,
+      "set_name": "Plasma Storm"
+    }
+  ],
+  "pop": [
+    {
+      "set_id": 195,
+      "set_name": "POP Series 9"
+    },
+    {
+      "set_id": 196,
+      "set_name": "POP Series 8"
+    },
+    {
+      "set_id": 197,
+      "set_name": "POP Series 7"
+    },
+    {
+      "set_id": 198,
+      "set_name": "POP Series 6"
+    },
+    {
+      "set_id": 199,
+      "set_name": "POP Series 5"
+    },
+    {
+      "set_id": 200,
+      "set_name": "POP Series 4"
+    },
+    {
+      "set_id": 201,
+      "set_name": "POP Series 3"
+    },
+    {
+      "set_id": 202,
+      "set_name": "POP Series 2"
+    },
+    {
+      "set_id": 203,
+      "set_name": "POP Series 1"
+    }
+  ],
+  "por": [
+    {
+      "set_id": 4494,
+      "set_name": "Perfect Order"
+    }
+  ],
+  "ppp": [
+    {
+      "set_id": 5373,
+      "set_name": "Professor Program Promos"
+    }
+  ],
+  "pr": [
+    {
+      "set_id": 82,
+      "set_name": "Astral Radiance"
+    },
+    {
+      "set_id": 83,
+      "set_name": "Brilliant Stars"
+    },
+    {
+      "set_id": 84,
+      "set_name": "Fusion Strike"
+    },
+    {
+      "set_id": 85,
+      "set_name": "Celebrations"
+    },
+    {
+      "set_id": 92,
+      "set_name": "Darkness Ablaze"
+    },
+    {
+      "set_id": 93,
+      "set_name": "Rebel Clash"
+    },
+    {
+      "set_id": 94,
+      "set_name": "Sword & Shield"
+    },
+    {
+      "set_id": 101,
+      "set_name": "Lost Thunder"
+    },
+    {
+      "set_id": 103,
+      "set_name": "Celestial Storm"
+    },
+    {
+      "set_id": 106,
+      "set_name": "EX Trainer Kit Latios"
+    },
+    {
+      "set_id": 107,
+      "set_name": "Crimson Invasion"
+    },
+    {
+      "set_id": 109,
+      "set_name": "Burning Shadows"
+    },
+    {
+      "set_id": 110,
+      "set_name": "Guardians Rising"
+    },
+    {
+      "set_id": 112,
+      "set_name": "Evolutions"
+    },
+    {
+      "set_id": 116,
+      "set_name": "BREAKpoint"
+    },
+    {
+      "set_id": 123,
+      "set_name": "Furious Fists"
+    },
+    {
+      "set_id": 126,
+      "set_name": "Kalos Starter Set"
+    },
+    {
+      "set_id": 129,
+      "set_name": "Plasma Freeze"
+    },
+    {
+      "set_id": 131,
+      "set_name": "Boundaries Crossed"
+    },
+    {
+      "set_id": 134,
+      "set_name": "Dark Explorers"
+    },
+    {
+      "set_id": 135,
+      "set_name": "Next Destinies"
+    },
+    {
+      "set_id": 136,
+      "set_name": "Noble Victories"
+    },
+    {
+      "set_id": 138,
+      "set_name": "Black & White"
+    },
+    {
+      "set_id": 141,
+      "set_name": "Undaunted"
+    },
+    {
+      "set_id": 142,
+      "set_name": "Unleashed"
+    },
+    {
+      "set_id": 143,
+      "set_name": "HeartGold & SoulSilver"
+    },
+    {
+      "set_id": 145,
+      "set_name": "Supreme Victors"
+    },
+    {
+      "set_id": 150,
+      "set_name": "Majestic Dawn"
+    },
+    {
+      "set_id": 157,
+      "set_name": "EX Crystal Guardians"
+    },
+    {
+      "set_id": 184,
+      "set_name": "Jungle"
+    },
+    {
+      "set_id": 187,
+      "set_name": "SM Black Star Promos"
+    },
+    {
+      "set_id": 188,
+      "set_name": "XY Black Star Promos"
+    },
+    {
+      "set_id": 189,
+      "set_name": "BW Black Star Promos"
+    },
+    {
+      "set_id": 190,
+      "set_name": "HGSS Black Star Promos"
+    },
+    {
+      "set_id": 191,
+      "set_name": "DP Black Star Promos"
+    },
+    {
+      "set_id": 192,
+      "set_name": "Nintendo Black Star Promos"
+    },
+    {
+      "set_id": 193,
+      "set_name": "Wizards Black Star Promos"
+    },
+    {
+      "set_id": 227,
+      "set_name": "XY Trainer Kit Pikachu Libre"
+    },
+    {
+      "set_id": 228,
+      "set_name": "XY Trainer Kit Suicune"
+    },
+    {
+      "set_id": 229,
+      "set_name": "XY Trainer Kit Latias"
+    },
+    {
+      "set_id": 230,
+      "set_name": "XY Trainer Kit Latios"
+    },
+    {
+      "set_id": 231,
+      "set_name": "XY Trainer Kit Bisharp"
+    },
+    {
+      "set_id": 232,
+      "set_name": "XY Trainer Kit Wigglytuff"
+    },
+    {
+      "set_id": 233,
+      "set_name": "XY Trainer Kit Noivern"
+    },
+    {
+      "set_id": 234,
+      "set_name": "XY Trainer Kit Sylveon"
+    },
+    {
+      "set_id": 237,
+      "set_name": "HGSS Trainer Kit Gyarados"
+    },
+    {
+      "set_id": 238,
+      "set_name": "HGSS Trainer Kit Raichu"
+    },
+    {
+      "set_id": 239,
+      "set_name": "DP Trainer Kit Lucario"
+    },
+    {
+      "set_id": 240,
+      "set_name": "DP Trainer Kit Manaphy"
+    },
+    {
+      "set_id": 241,
+      "set_name": "EX Trainer Kit 2 Minun"
+    },
+    {
+      "set_id": 242,
+      "set_name": "EX Trainer Kit 2 Plusle"
+    },
+    {
+      "set_id": 243,
+      "set_name": "EX Trainer Kit Latias"
+    },
+    {
+      "set_id": 259,
+      "set_name": "Best of Game"
+    },
+    {
+      "set_id": 260,
+      "set_name": "Box Toppers E-Card Series"
+    },
+    {
+      "set_id": 261,
+      "set_name": "Box Toppers Legendary Collection"
+    },
+    {
+      "set_id": 4650,
+      "set_name": "Tournament Promotion Cards"
+    },
+    {
+      "set_id": 4804,
+      "set_name": "Deck Exclusives"
+    },
+    {
+      "set_id": 5278,
+      "set_name": "Alternate Art Promos"
+    },
+    {
+      "set_id": 5383,
+      "set_name": "Jumbo Cards"
+    },
+    {
+      "set_id": 5398,
+      "set_name": "Nintendo Promos"
+    }
+  ],
+  "prc": [
+    {
+      "set_id": 121,
+      "set_name": "Primal Clash"
+    }
+  ],
+  "pre": [
+    {
+      "set_id": 1872,
+      "set_name": "Prismatic Evolutions"
+    }
+  ],
+  "pwcp": [
+    {
+      "set_id": 193,
+      "set_name": "Wizards Black Star Promos"
+    },
+    {
+      "set_id": 5397,
+      "set_name": "Pikachu World Collection Promos"
+    }
+  ],
+  "rg": [
+    {
+      "set_id": 165,
+      "set_name": "EX FireRed & LeafGreen"
+    }
+  ],
+  "ros": [
+    {
+      "set_id": 119,
+      "set_name": "Roaring Skies"
+    }
+  ],
+  "rr": [
+    {
+      "set_id": 146,
+      "set_name": "Rising Rivals"
+    },
+    {
+      "set_id": 164,
+      "set_name": "EX Team Rocket Returns"
+    }
+  ],
+  "rs": [
+    {
+      "set_id": 170,
+      "set_name": "EX Ruby & Sapphire"
+    }
+  ],
+  "rum": [
+    {
+      "set_id": 257,
+      "set_name": "Pok\u00e9mon Rumble"
+    }
+  ],
+  "scr": [
+    {
+      "set_id": 1123,
+      "set_name": "Stellar Crown"
+    }
+  ],
+  "sf": [
+    {
+      "set_id": 148,
+      "set_name": "Stormfront"
+    }
+  ],
+  "sfa": [
+    {
+      "set_id": 1119,
+      "set_name": "Shrouded Fable"
+    }
+  ],
+  "shf": [
+    {
+      "set_id": 89,
+      "set_name": "Shining Fates"
+    }
+  ],
+  "shfsv": [
+    {
+      "set_id": 89,
+      "set_name": "Shining Fates"
+    }
+  ],
+  "shl": [
+    {
+      "set_id": 108,
+      "set_name": "Shining Legends"
+    }
+  ],
+  "si": [
+    {
+      "set_id": 262,
+      "set_name": "Southern Islands"
+    }
+  ],
+  "sk": [
+    {
+      "set_id": 171,
+      "set_name": "Skyridge"
+    }
+  ],
+  "sm01": [
+    {
+      "set_id": 111,
+      "set_name": "Sun & Moon"
+    }
+  ],
+  "sm02": [
+    {
+      "set_id": 110,
+      "set_name": "Guardians Rising"
+    }
+  ],
+  "sm03": [
+    {
+      "set_id": 109,
+      "set_name": "Burning Shadows"
+    }
+  ],
+  "sm04": [
+    {
+      "set_id": 107,
+      "set_name": "Crimson Invasion"
+    }
+  ],
+  "sm05": [
+    {
+      "set_id": 105,
+      "set_name": "Ultra Prism"
+    }
+  ],
+  "sm06": [
+    {
+      "set_id": 104,
+      "set_name": "Forbidden Light"
+    }
+  ],
+  "sm10": [
+    {
+      "set_id": 98,
+      "set_name": "Unbroken Bonds"
+    }
+  ],
+  "sm11": [
+    {
+      "set_id": 97,
+      "set_name": "Unified Minds"
+    }
+  ],
+  "sm12": [
+    {
+      "set_id": 95,
+      "set_name": "Cosmic Eclipse"
+    }
+  ],
+  "sm8": [
+    {
+      "set_id": 101,
+      "set_name": "Lost Thunder"
+    }
+  ],
+  "sm9": [
+    {
+      "set_id": 100,
+      "set_name": "Team Up"
+    }
+  ],
+  "smk1": [
+    {
+      "set_id": 225,
+      "set_name": "SM Trainer Kit Alolan Raichu"
+    },
+    {
+      "set_id": 226,
+      "set_name": "SM Trainer Kit Lycanroc"
+    }
+  ],
+  "smk2": [
+    {
+      "set_id": 223,
+      "set_name": "SM Trainer Kit Alolan Ninetales"
+    },
+    {
+      "set_id": 224,
+      "set_name": "SM Trainer Kit Alolan Sandslash"
+    }
+  ],
+  "smp": [
+    {
+      "set_id": 187,
+      "set_name": "SM Black Star Promos"
+    },
+    {
+      "set_id": 223,
+      "set_name": "SM Trainer Kit Alolan Ninetales"
+    }
+  ],
+  "ss": [
+    {
+      "set_id": 169,
+      "set_name": "EX Sandstorm"
+    }
+  ],
+  "ssp": [
+    {
+      "set_id": 1145,
+      "set_name": "Surging Sparks"
+    }
+  ],
+  "sts": [
+    {
+      "set_id": 113,
+      "set_name": "Steam Siege"
+    }
+  ],
+  "sv": [
+    {
+      "set_id": 145,
+      "set_name": "Supreme Victors"
+    }
+  ],
+  "sve": [
+    {
+      "set_id": 5376,
+      "set_name": "SVE: Scarlet & Violet Energies"
+    }
+  ],
+  "svi": [
+    {
+      "set_id": 365,
+      "set_name": "Scarlet and Violet"
+    }
+  ],
+  "svp": [
+    {
+      "set_id": 367,
+      "set_name": "SV Black Star Promos"
+    }
+  ],
+  "sw": [
+    {
+      "set_id": 152,
+      "set_name": "Secret Wonders"
+    }
+  ],
+  "swsd": [
+    {
+      "set_id": 85,
+      "set_name": "Celebrations"
+    },
+    {
+      "set_id": 186,
+      "set_name": "SWSH Black Star Promos"
+    },
+    {
+      "set_id": 218,
+      "set_name": "Battle Academy 2022 (Eevee)"
+    }
+  ],
+  "swsh01": [
+    {
+      "set_id": 94,
+      "set_name": "Sword & Shield"
+    }
+  ],
+  "swsh02": [
+    {
+      "set_id": 93,
+      "set_name": "Rebel Clash"
+    }
+  ],
+  "swsh03": [
+    {
+      "set_id": 92,
+      "set_name": "Darkness Ablaze"
+    }
+  ],
+  "swsh04": [
+    {
+      "set_id": 90,
+      "set_name": "Vivid Voltage"
+    }
+  ],
+  "swsh05": [
+    {
+      "set_id": 88,
+      "set_name": "Battle Styles"
+    }
+  ],
+  "swsh06": [
+    {
+      "set_id": 87,
+      "set_name": "Chilling Reign"
+    }
+  ],
+  "swsh07": [
+    {
+      "set_id": 86,
+      "set_name": "Evolving Skies"
+    }
+  ],
+  "swsh08": [
+    {
+      "set_id": 84,
+      "set_name": "Fusion Strike"
+    }
+  ],
+  "swsh09": [
+    {
+      "set_id": 83,
+      "set_name": "Brilliant Stars"
+    }
+  ],
+  "swsh10": [
+    {
+      "set_id": 82,
+      "set_name": "Astral Radiance"
+    }
+  ],
+  "swsh11": [
+    {
+      "set_id": 80,
+      "set_name": "Lost Origin"
+    }
+  ],
+  "swsh12": [
+    {
+      "set_id": 348,
+      "set_name": "Silver Tempest"
+    }
+  ],
+  "tef": [
+    {
+      "set_id": 502,
+      "set_name": "Temporal Forces"
+    }
+  ],
+  "tm": [
+    {
+      "set_id": 140,
+      "set_name": "Triumphant"
+    }
+  ],
+  "ttbb": [
+    {
+      "set_id": 92,
+      "set_name": "Darkness Ablaze"
+    },
+    {
+      "set_id": 4672,
+      "set_name": "Trick or Trade BOOster Bundle"
+    }
+  ],
+  "ttbb23": [
+    {
+      "set_id": 4671,
+      "set_name": "Trick or Trade BOOster Bundle 2023"
+    }
+  ],
+  "ttbb24": [
+    {
+      "set_id": 1866,
+      "set_name": "Trick or Trade BOOster Bundle 2024"
+    }
+  ],
+  "twm": [
+    {
+      "set_id": 1081,
+      "set_name": "Twilight Masquerade"
+    }
+  ],
+  "ud": [
+    {
+      "set_id": 141,
+      "set_name": "Undaunted"
+    }
+  ],
+  "uf": [
+    {
+      "set_id": 161,
+      "set_name": "EX Unseen Forces"
+    }
+  ],
+  "ul": [
+    {
+      "set_id": 142,
+      "set_name": "Unleashed"
+    }
+  ],
+  "wcd": [
+    {
+      "set_id": 5382,
+      "set_name": "World Championship Decks"
+    }
+  ],
+  "wht": [
+    {
+      "set_id": 4343,
+      "set_name": "White Flare"
+    }
+  ],
+  "xy": [
+    {
+      "set_id": 125,
+      "set_name": "XY"
+    }
+  ]
+}

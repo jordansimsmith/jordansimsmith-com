@@ -15,11 +15,11 @@ public class FindSetsService {
     if (request.externalSetId() == null || request.externalSetId().isBlank()) {
       throw new BadRequestException("external_set_id is required");
     }
-    if (!"mtg".equals(request.gameId())) {
+    if (!"mtg".equals(request.gameId()) && !"poke".equals(request.gameId())) {
       throw new BadRequestException("game_id is not supported for set mapping");
     }
     var sets =
-        FetchTcgSetMapping.get(request.externalSetId()).stream()
+        FetchTcgSetMapping.get(request.gameId(), request.externalSetId()).stream()
             .map(set -> new CardSet(set.setId(), set.setName()))
             .toList();
     return new FindSetsResponse(sets);

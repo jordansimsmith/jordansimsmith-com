@@ -28,9 +28,14 @@ filegroup(
     ],
 )
 
+FETCHTCG_SET_MAPPING_RESOURCES = [
+    "src/main/resources/com/jordansimsmith/tcginventory/fetchtcg/server/fetchtcg_magic_the_gathering_set_mapping.json",
+    "src/main/resources/com/jordansimsmith/tcginventory/fetchtcg/server/fetchtcg_pokemon_set_mapping.json",
+]
+
 filegroup(
     name = "fetchtcg-set-mapping-resource",
-    srcs = ["src/main/resources/com/jordansimsmith/tcginventory/fetchtcg/server/fetchtcg_set_mapping.json"],
+    srcs = FETCHTCG_SET_MAPPING_RESOURCES,
     visibility = [
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/server:__pkg__",
     ],
@@ -45,7 +50,7 @@ java_library(
     ),
     resources = glob(
         ["src/main/resources/**"],
-        exclude = ["src/main/resources/com/jordansimsmith/tcginventory/fetchtcg/server/fetchtcg_set_mapping.json"],
+        exclude = FETCHTCG_SET_MAPPING_RESOURCES,
     ),
     visibility = [
         "//tcg_inventory_api:__pkg__",
