@@ -10,6 +10,8 @@ py_test(
     main = "test_runner.py",
     deps = [
         "//tcg_inventory_api/src/main/python/tcg_inventory_scan_worker:scan-worker-lib",
+        "@pypi//boto3",
+        "@pypi//botocore",
         "@pypi//pillow",
         "@pypi//pytest",
     ],

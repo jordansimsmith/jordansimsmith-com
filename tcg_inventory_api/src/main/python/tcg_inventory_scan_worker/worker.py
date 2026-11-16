@@ -5,16 +5,16 @@ from __future__ import annotations
 import json
 import logging
 import os
-import time
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterator
-from dataclasses import dataclass
 from typing import Self
 
 import boto3
 import cv2
 import numpy as np
 from collector_vision import Catalog, CatalogV2, NeuralCornerDetector, rotate_card_180
+
+from .scan_repository import Scan, ScanRepository, ScanRow, ScanSuggestion
 
 LOGGER = logging.getLogger(__name__)
 
@@ -25,31 +25,6 @@ SCAN_IDENTIFICATION_QUEUE_NAME = "tcg_inventory_scan_identification.fifo"
 BATCH_SIZE = 100
 SEARCH_TOP_K = 25
 MAX_SUGGESTIONS = 5
-
-
-@dataclass(frozen=True)
-class Scan:
-    user: str
-    scan_id: str
-    status: str
-    game: str
-    finish: str
-
-
-@dataclass(frozen=True)
-class ScanRow:
-    user: str
-    scan_id: str
-    scan_position: int
-    status: str
-    s3_key: str
-
-
-@dataclass(frozen=True)
-class ScanSuggestion:
-    external_id: str
-    name: str
-    score: float
 
 
 class RecognitionResolver(ABC):
@@ -152,202 +127,6 @@ class PokemonResolver(RecognitionResolver):
             yield ScanSuggestion(record["id"], record["name"], float(record["score"]))
 
 
-class DynamoScanStore:
-    """DynamoDB persistence for scan recognition checkpoints."""
-
-    def __init__(self, client, table_name: str, now=None):
-        self._client = client
-        self._table_name = table_name
-        self._now = now or (lambda: int(time.time()))
-
-    @staticmethod
-    def _scan_key(user: str, scan_id: str) -> dict[str, dict[str, str]]:
-        return {"pk": {"S": f"USER#{user}"}, "sk": {"S": f"SCAN#{scan_id}"}}
-
-    @staticmethod
-    def _row_partition_key(user: str, scan_id: str) -> str:
-        return f"USER#{user}#SCAN#{scan_id}"
-
-    @classmethod
-    def _row_key(cls, row: ScanRow) -> dict[str, dict[str, str]]:
-        return {
-            "pk": {"S": cls._row_partition_key(row.user, row.scan_id)},
-            "sk": {"S": f"ROW#{row.scan_position:06d}"},
-        }
-
-    @staticmethod
-    def _string(item: dict, field: str) -> str:
-        return item[field]["S"]
-
-    @staticmethod
-    def _number(item: dict, field: str) -> int:
-        return int(item[field]["N"])
-
-    @staticmethod
-    def _suggestion_attribute(suggestion: ScanSuggestion) -> dict:
-        return {
-            "M": {
-                "external_id": {"S": suggestion.external_id},
-                "name": {"S": suggestion.name},
-                "score": {"N": str(suggestion.score)},
-            }
-        }
-
-    @staticmethod
-    def _only_conditional_failures(error: Exception) -> bool:
-        reasons = getattr(error, "response", {}).get("CancellationReasons", [])
-        codes = [reason.get("Code") for reason in reasons]
-        return (
-            bool(codes)
-            and "ConditionalCheckFailed" in codes
-            and all(code in {"None", "ConditionalCheckFailed"} for code in codes)
-        )
-
-    def get_scan(self, user: str, scan_id: str) -> Scan | None:
-        response = self._client.get_item(
-            TableName=self._table_name,
-            Key=self._scan_key(user, scan_id),
-            ConsistentRead=True,
-        )
-        item = response.get("Item")
-        if item is None:
-            return None
-        return Scan(
-            user=user,
-            scan_id=scan_id,
-            status=self._string(item, "status"),
-            game=self._string(item, "game"),
-            finish=self._string(item, "finish"),
-        )
-
-    def get_rows(self, user: str, scan_id: str) -> list[ScanRow]:
-        response = self._client.query(
-            TableName=self._table_name,
-            KeyConditionExpression="#pk = :pk AND begins_with(#sk, :row_prefix)",
-            ExpressionAttributeNames={"#pk": "pk", "#sk": "sk"},
-            ExpressionAttributeValues={
-                ":pk": {"S": self._row_partition_key(user, scan_id)},
-                ":row_prefix": {"S": "ROW#"},
-            },
-            ScanIndexForward=True,
-            ConsistentRead=True,
-        )
-        rows = [
-            ScanRow(
-                user=user,
-                scan_id=scan_id,
-                scan_position=self._number(item, "scan_position"),
-                status=self._string(item, "status"),
-                s3_key=self._string(item, "s3_key"),
-            )
-            for item in response.get("Items", [])
-        ]
-        return sorted(rows, key=lambda row: row.scan_position)
-
-    def write_result(
-        self,
-        row: ScanRow,
-        *,
-        status: str,
-        needs_review: bool,
-        suggestions: list[ScanSuggestion] | None,
-    ) -> bool:
-        set_parts = ["#status = :status", "#needs_review = :needs_review"]
-        values: dict = {
-            ":status": {"S": status},
-            ":needs_review": {"BOOL": needs_review},
-        }
-        names = {
-            "#pk": "pk",
-            "#status": "status",
-            "#needs_review": "needs_review",
-        }
-        if suggestions is not None:
-            set_parts.append("#suggestions = :suggestions")
-            names["#suggestions"] = "suggestions"
-            values[":suggestions"] = {
-                "L": [
-                    self._suggestion_attribute(suggestion) for suggestion in suggestions
-                ]
-            }
-        expression = "SET " + ", ".join(set_parts)
-
-        try:
-            self._client.transact_write_items(
-                TransactItems=[
-                    {
-                        "ConditionCheck": {
-                            "TableName": self._table_name,
-                            "Key": self._scan_key(row.user, row.scan_id),
-                            "ConditionExpression": (
-                                "attribute_exists(#pk) AND #status = :identifying"
-                            ),
-                            "ExpressionAttributeNames": {
-                                "#pk": "pk",
-                                "#status": "status",
-                            },
-                            "ExpressionAttributeValues": {
-                                ":identifying": {"S": "identifying"},
-                            },
-                        }
-                    },
-                    {
-                        "Update": {
-                            "TableName": self._table_name,
-                            "Key": self._row_key(row),
-                            "UpdateExpression": expression,
-                            "ConditionExpression": "attribute_exists(#pk)",
-                            "ExpressionAttributeNames": names,
-                            "ExpressionAttributeValues": {
-                                **values,
-                            },
-                        }
-                    },
-                ],
-            )
-            return True
-        except self._client.exceptions.TransactionCanceledException as error:
-            if self._only_conditional_failures(error):
-                return False
-            raise
-
-    def transition_reviewing(
-        self, user: str, scan_id: str, catalog_version: int, error: str | None = None
-    ) -> bool:
-        set_parts = [
-            "#status = :reviewing",
-            "#catalog_version = :catalog_version",
-            "#updated_at = :updated_at",
-        ]
-        values = {
-            ":reviewing": {"S": "reviewing"},
-            ":identifying": {"S": "identifying"},
-            ":catalog_version": {"N": str(catalog_version)},
-            ":updated_at": {"N": str(self._now())},
-        }
-        names = {
-            "#status": "status",
-            "#catalog_version": "catalog_version",
-            "#updated_at": "updated_at",
-        }
-        if error is not None:
-            set_parts.append("#error = :error")
-            names["#error"] = "error"
-            values[":error"] = {"S": error}
-        try:
-            self._client.update_item(
-                TableName=self._table_name,
-                Key=self._scan_key(user, scan_id),
-                UpdateExpression="SET " + ", ".join(set_parts),
-                ConditionExpression="attribute_exists(#pk) AND #status = :identifying",
-                ExpressionAttributeNames={"#pk": "pk", **names},
-                ExpressionAttributeValues=values,
-            )
-            return True
-        except self._client.exceptions.ConditionalCheckFailedException:
-            return False
-
-
 class S3ImageStore:
     def __init__(self, client, bucket: str):
         self._client = client
@@ -382,13 +161,13 @@ class SqsContinuationQueue:
 class RecognitionWorker:
     def __init__(
         self,
-        store,
+        repository: ScanRepository,
         images,
         continuations,
         recognition_loader: Callable[[str], RecognitionResolver],
         logger: logging.Logger | None = None,
     ):
-        self._store = store
+        self._repository = repository
         self._images = images
         self._continuations = continuations
         self._recognition_loader = recognition_loader
@@ -404,12 +183,12 @@ class RecognitionWorker:
         message = json.loads(body) if isinstance(body, str) else body
         user = message["user"]
         scan_id = message["scan_id"]
-        scan = self._store.get_scan(user, scan_id)
+        scan = self._repository.get_scan(user, scan_id)
         if scan is None or scan.status != "identifying":
             return
         resolver = self._recognition_loader(scan.game)
 
-        rows = self._store.get_rows(user, scan_id)
+        rows = self._repository.find_scan_rows(user, scan_id)
         if not rows:
             raise RuntimeError("identifying scan has no rows")
         pending = [row for row in rows if row.status == "pending"]
@@ -418,8 +197,7 @@ class RecognitionWorker:
             return
 
         for row in pending[:BATCH_SIZE]:
-            if not self._recognize_row(scan, row, resolver):
-                return
+            self._recognize_row(scan, row, resolver)
 
         self._reconcile(scan, resolver.catalog_version)
 
@@ -428,7 +206,7 @@ class RecognitionWorker:
         scan: Scan,
         row: ScanRow,
         resolver: RecognitionResolver,
-    ) -> bool:
+    ) -> None:
         image_bytes = self._images.read(row.s3_key)
         try:
             if not image_bytes.startswith(b"\xff\xd8\xff"):
@@ -453,7 +231,7 @@ class RecognitionWorker:
             status = "suggested"
             needs_review = False
             suggestions = candidates
-        return self._store.write_result(
+        self._repository.update_scan_row_result(
             row,
             status=status,
             needs_review=needs_review,
@@ -461,11 +239,11 @@ class RecognitionWorker:
         )
 
     def _reconcile(self, scan: Scan, catalog_version: int) -> None:
-        current_scan = self._store.get_scan(scan.user, scan.scan_id)
+        current_scan = self._repository.get_scan(scan.user, scan.scan_id)
         if current_scan is None or current_scan.status != "identifying":
             return
 
-        rows = self._store.get_rows(scan.user, scan.scan_id)
+        rows = self._repository.find_scan_rows(scan.user, scan.scan_id)
         statuses = {row.status for row in rows}
         if "pending" in statuses:
             next_pending_position = min(
@@ -474,7 +252,9 @@ class RecognitionWorker:
             self._continuations.send(scan.user, scan.scan_id, next_pending_position)
             return
         if statuses <= {"suggested", "needs_review"}:
-            self._store.transition_reviewing(scan.user, scan.scan_id, catalog_version)
+            self._repository.update_scan_for_review(
+                scan.user, scan.scan_id, catalog_version
+            )
             return
         raise RuntimeError("scan contains an unrecognized worker row status")
 
@@ -511,7 +291,7 @@ class LambdaRuntime:
             table_name = os.environ[TABLE_ENV]
             bucket_name = os.environ[BUCKET_ENV]
             self._worker = RecognitionWorker(
-                store=DynamoScanStore(boto3.client("dynamodb"), table_name),
+                repository=ScanRepository(boto3.client("dynamodb"), table_name),
                 images=S3ImageStore(boto3.client("s3"), bucket_name),
                 continuations=SqsContinuationQueue(boto3.client("sqs")),
                 recognition_loader=self._load_recognition,

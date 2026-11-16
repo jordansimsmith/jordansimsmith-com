@@ -6,6 +6,7 @@ py_library(
     name = "scan-worker-lib",
     srcs = [
         "__init__.py",
+        "scan_repository.py",
         "worker.py",
     ],
     imports = [".."],
@@ -22,6 +23,7 @@ collectorvision_image(
     name = "scan-worker-image",
     application_files = {
         "__init__.py": "tcg_inventory_scan_worker/__init__.py",
+        "scan_repository.py": "tcg_inventory_scan_worker/scan_repository.py",
         "worker.py": "tcg_inventory_scan_worker/worker.py",
     },
     base = "@lambda_python312_linux_amd64//:lambda_python312_linux_amd64",
