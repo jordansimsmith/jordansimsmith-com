@@ -11,7 +11,12 @@ from botocore.exceptions import ClientError
 from botocore.stub import Stubber
 from PIL import Image
 
+from tcg_inventory_scan_worker import scan_identifier
 from tcg_inventory_scan_worker import worker as scan_worker
+from tcg_inventory_scan_worker.magic_the_gathering_scan_identifier import (
+    MagicTheGatheringScanIdentifier,
+)
+from tcg_inventory_scan_worker.pokemon_scan_identifier import PokemonScanIdentifier
 from tcg_inventory_scan_worker.scan_queue import ScanQueue
 from tcg_inventory_scan_worker.scan_repository import (
     Scan,
@@ -21,8 +26,6 @@ from tcg_inventory_scan_worker.scan_repository import (
 )
 from tcg_inventory_scan_worker.worker import (
     LambdaRuntime,
-    MagicTheGatheringResolver,
-    PokemonResolver,
     RecognitionWorker,
 )
 
@@ -196,17 +199,19 @@ class FakeSqsClient:
 
 
 def _worker(store, images=None, catalog=None, detector=None, queue=None, loader=None):
-    def load_recognition(game):
+    def load_identifier(game):
         if game != "mtg":
             raise ValueError(f"no recognition integration configured for game: {game}")
         loaded_catalog = loader(game) if loader else catalog or FakeCatalog()
-        return MagicTheGatheringResolver(loaded_catalog, detector or FakeDetector())
+        return MagicTheGatheringScanIdentifier(
+            loaded_catalog, detector or FakeDetector()
+        )
 
     return RecognitionWorker(
         repository=store,
         image_store=images or FakeImages(),
         scan_queue=queue or FakeQueue(),
-        recognition_loader=load_recognition,
+        identifier_loader=load_identifier,
     )
 
 
@@ -493,8 +498,10 @@ def test_pokemon_suggestions_keep_rank_and_cap_unique_products():
     ]
 
     store = FakeScanRepository(_scan_rows(1), game="pokemon", finish="reverse_holofoil")
-    resolver = PokemonResolver(FakeCatalog(records, version=60), FakeDetector())
-    worker = RecognitionWorker(store, FakeImages(), FakeQueue(), lambda game: resolver)
+    identifier = PokemonScanIdentifier(FakeCatalog(records, version=60), FakeDetector())
+    worker = RecognitionWorker(
+        store, FakeImages(), FakeQueue(), lambda game: identifier
+    )
     worker.handle_message({"user": "jordan", "scan_id": "scan-1"})
 
     assert store.suggestions[1] == [
@@ -506,7 +513,7 @@ def test_pokemon_suggestions_keep_rank_and_cap_unique_products():
     ]
 
 
-def test_runtime_lazily_reuses_both_resolvers_and_records_their_versions(monkeypatch):
+def test_runtime_lazily_reuses_both_identifiers_and_records_their_versions(monkeypatch):
     catalogs = {
         "mtg": FakeCatalog(version=40),
         "pokemon": FakeCatalog([], version=60),
@@ -523,8 +530,8 @@ def test_runtime_lazily_reuses_both_resolvers_and_records_their_versions(monkeyp
         detector_calls.append(provider)
         return detector
 
-    monkeypatch.setenv(scan_worker.CACHE_ENV, "/offline-cache")
-    monkeypatch.setattr(scan_worker.Catalog, "load", load)
+    monkeypatch.setenv(scan_identifier.CACHE_ENV, "/offline-cache")
+    monkeypatch.setattr(scan_identifier.Catalog, "load", load)
     monkeypatch.setattr(scan_worker, "NeuralCornerDetector", create_detector)
     runtime = LambdaRuntime()
     assert load_calls == []
@@ -532,19 +539,19 @@ def test_runtime_lazily_reuses_both_resolvers_and_records_their_versions(monkeyp
 
     magic = FakeScanRepository(_scan_rows(1))
     RecognitionWorker(
-        magic, FakeImages(), FakeQueue(), runtime._load_recognition
+        magic, FakeImages(), FakeQueue(), runtime._load_identifier
     ).handle_message({"user": "jordan", "scan_id": "scan-1"})
     assert [game for game, _ in load_calls] == ["mtg"]
 
     pokemon = FakeScanRepository(_scan_rows(1), game="pokemon")
     RecognitionWorker(
-        pokemon, FakeImages(), FakeQueue(), runtime._load_recognition
+        pokemon, FakeImages(), FakeQueue(), runtime._load_identifier
     ).handle_message({"user": "jordan", "scan_id": "scan-1"})
 
-    magic_resolver = runtime._load_recognition("mtg")
-    pokemon_resolver = runtime._load_recognition("pokemon")
-    assert magic_resolver is runtime._load_recognition("mtg")
-    assert pokemon_resolver is runtime._load_recognition("pokemon")
+    magic_identifier = runtime._load_identifier("mtg")
+    pokemon_identifier = runtime._load_identifier("pokemon")
+    assert magic_identifier is runtime._load_identifier("mtg")
+    assert pokemon_identifier is runtime._load_identifier("pokemon")
     assert detector_calls == ["cpu"]
     assert detector.calls == 2
     common = {"family": "milo1", "cache_dir": "/offline-cache", "offline": True}
@@ -584,9 +591,9 @@ def test_runtime_fails_before_catalog_loading_when_game_has_no_catalog():
     with pytest.raises(
         ValueError, match="no recognition integration configured for game: unknown_game"
     ):
-        runtime._load_recognition("unknown_game")
+        runtime._load_identifier("unknown_game")
 
-    assert runtime._resolvers == {}
+    assert runtime._identifiers == {}
 
 
 def test_corrupt_image_failure_propagates_without_marking_row_finished():
