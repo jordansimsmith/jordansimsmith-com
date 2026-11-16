@@ -17,6 +17,11 @@ from tcg_inventory_scan_worker.magic_the_gathering_scan_identifier import (
     MagicTheGatheringScanIdentifier,
 )
 from tcg_inventory_scan_worker.pokemon_scan_identifier import PokemonScanIdentifier
+from tcg_inventory_scan_worker.scan_identification_message_handler import (
+    RequestContext,
+    ScanIdentificationMessage,
+    ScanIdentificationMessageHandler,
+)
 from tcg_inventory_scan_worker.scan_queue import ScanQueue
 from tcg_inventory_scan_worker.scan_repository import (
     Scan,
@@ -24,10 +29,10 @@ from tcg_inventory_scan_worker.scan_repository import (
     ScanRow,
     ScanSuggestion,
 )
-from tcg_inventory_scan_worker.worker import (
-    LambdaRuntime,
-    RecognitionWorker,
-)
+from tcg_inventory_scan_worker.worker import LambdaRuntime
+
+REQUEST_CONTEXT = RequestContext("jordan")
+SCAN_IDENTIFICATION_MESSAGE = ScanIdentificationMessage("jordan", "scan-1")
 
 
 def _jpeg() -> bytes:
@@ -198,7 +203,7 @@ class FakeSqsClient:
         self.messages.append(kwargs)
 
 
-def _worker(store, images=None, catalog=None, detector=None, queue=None, loader=None):
+def _handler(store, images=None, catalog=None, detector=None, queue=None, loader=None):
     def load_identifier(game):
         if game != "mtg":
             raise ValueError(f"no recognition integration configured for game: {game}")
@@ -207,7 +212,7 @@ def _worker(store, images=None, catalog=None, detector=None, queue=None, loader=
             loaded_catalog, detector or FakeDetector()
         )
 
-    return RecognitionWorker(
+    return ScanIdentificationMessageHandler(
         repository=store,
         image_store=images or FakeImages(),
         scan_queue=queue or FakeQueue(),
@@ -215,12 +220,25 @@ def _worker(store, images=None, catalog=None, detector=None, queue=None, loader=
     )
 
 
+@pytest.mark.parametrize("record_count", [0, 2])
+def test_runtime_rejects_events_without_exactly_one_sqs_record(record_count):
+    runtime = LambdaRuntime()
+    record = {"body": '{"user":"jordan","scan_id":"scan-1"}'}
+
+    with pytest.raises(
+        ValueError, match=f"expected one SQS record, got {record_count}"
+    ):
+        runtime.handle_event({"Records": [record] * record_count})
+
+    assert runtime._message_handler is None
+
+
 def test_processes_at_most_one_hundred_rows_and_enqueues_continuation():
     store = FakeScanRepository(_scan_rows(200))
     queue = FakeQueue()
-    worker = _worker(store, queue=queue)
+    handler = _handler(store, queue=queue)
 
-    worker.handle_message({"user": "jordan", "scan_id": "scan-1"})
+    handler.handle_message(REQUEST_CONTEXT, SCAN_IDENTIFICATION_MESSAGE)
 
     assert sum(status == "suggested" for _, status in store.results) == 100
     assert [row.status for row in store.rows[100:]] == ["pending"] * 100
@@ -229,7 +247,10 @@ def test_processes_at_most_one_hundred_rows_and_enqueues_continuation():
     ]
     assert store.scan.status == "identifying"
 
-    worker.handle_message(json.dumps(queue.messages[0]))
+    runtime = LambdaRuntime()
+    runtime._message_handler = handler
+    event = {"Records": [{"body": json.dumps(queue.messages[0])}]}
+    assert runtime.handle_event(event) == {"processed_messages": 1}
 
     assert all(row.status == "suggested" for row in store.rows)
     assert store.scan.status == "reviewing"
@@ -241,7 +262,9 @@ def test_finishes_without_continuation_when_batch_is_complete(count):
     store = FakeScanRepository(_scan_rows(count))
     queue = FakeQueue()
 
-    _worker(store, queue=queue).handle_message({"user": "jordan", "scan_id": "scan-1"})
+    _handler(store, queue=queue).handle_message(
+        REQUEST_CONTEXT, SCAN_IDENTIFICATION_MESSAGE
+    )
 
     assert store.scan.status == "reviewing"
     assert queue.messages == []
@@ -253,8 +276,8 @@ def test_terminal_rows_are_not_reprocessed():
     store = FakeScanRepository(rows)
     catalog = FakeCatalog()
 
-    _worker(store, catalog=catalog).handle_message(
-        {"user": "jordan", "scan_id": "scan-1"}
+    _handler(store, catalog=catalog).handle_message(
+        REQUEST_CONTEXT, SCAN_IDENTIFICATION_MESSAGE
     )
 
     assert catalog.embedder.calls == 4
@@ -275,10 +298,10 @@ def test_overlapping_workers_repeat_results_and_enqueue_same_continuation():
         return original_find_scan_rows(user, scan_id)
 
     store.find_scan_rows = find_scan_rows_with_stale_overlap
-    worker = _worker(store, queue=queue)
+    handler = _handler(store, queue=queue)
 
-    worker.handle_message({"user": "jordan", "scan_id": "scan-1"})
-    worker.handle_message({"user": "jordan", "scan_id": "scan-1"})
+    handler.handle_message(REQUEST_CONTEXT, SCAN_IDENTIFICATION_MESSAGE)
+    handler.handle_message(REQUEST_CONTEXT, SCAN_IDENTIFICATION_MESSAGE)
 
     assert len(store.results) == 200
     assert queue.messages == [
@@ -305,14 +328,14 @@ def test_partial_batch_retry_leaves_written_rows_terminal():
     store = FakeScanRepository(_scan_rows(101))
 
     with pytest.raises(RuntimeError, match="s3 unavailable"):
-        _worker(store, images=FailingImages()).handle_message(
-            {"user": "jordan", "scan_id": "scan-1"}
+        _handler(store, images=FailingImages()).handle_message(
+            REQUEST_CONTEXT, SCAN_IDENTIFICATION_MESSAGE
         )
 
     assert [row.status for row in store.rows[:50]] == ["suggested"] * 50
     assert [row.status for row in store.rows[50:]] == ["pending"] * 51
 
-    _worker(store).handle_message({"user": "jordan", "scan_id": "scan-1"})
+    _handler(store).handle_message(REQUEST_CONTEXT, SCAN_IDENTIFICATION_MESSAGE)
 
     assert all(row.status == "suggested" for row in store.rows)
     assert store.scan.status == "reviewing"
@@ -353,7 +376,8 @@ def test_dynamodb_write_conflict_fails_the_event_and_retry_reads_current_state(
         aws_secret_access_key="test",
     )
     queue = FakeQueue()
-    worker = _worker(ScanRepository(client, "scans"), queue=queue)
+    runtime = LambdaRuntime()
+    runtime._message_handler = _handler(ScanRepository(client, "scans"), queue=queue)
     event = {"Records": [{"body": '{"user":"jordan","scan_id":"scan-1"}'}]}
     scan = {
         "Item": {
@@ -380,9 +404,9 @@ def test_dynamodb_write_conflict_fails_the_event_and_retry_reads_current_state(
         stubber.add_response("get_item", retry_scan)
 
         with pytest.raises(ClientError) as error:
-            worker.handle_event(event)
+            runtime.handle_event(event)
         assert error.value.response["Error"]["Code"] == error_code
-        assert worker.handle_event(event) == {"processed_messages": 1}
+        assert runtime.handle_event(event) == {"processed_messages": 1}
         stubber.assert_no_pending_responses()
 
     assert queue.messages == []
@@ -390,11 +414,11 @@ def test_dynamodb_write_conflict_fails_the_event_and_retry_reads_current_state(
 
 def test_duplicate_delivery_after_completion_is_a_no_op():
     store = FakeScanRepository(_scan_rows(1))
-    worker = _worker(store)
+    handler = _handler(store)
 
-    worker.handle_message({"user": "jordan", "scan_id": "scan-1"})
+    handler.handle_message(REQUEST_CONTEXT, SCAN_IDENTIFICATION_MESSAGE)
     result_count = len(store.results)
-    worker.handle_message({"user": "jordan", "scan_id": "scan-1"})
+    handler.handle_message(REQUEST_CONTEXT, SCAN_IDENTIFICATION_MESSAGE)
 
     assert len(store.results) == result_count
     assert store.scan.status == "reviewing"
@@ -407,7 +431,9 @@ def test_continuation_message_uses_next_pending_position():
     store = FakeScanRepository(rows)
     queue = FakeQueue()
 
-    _worker(store, queue=queue).handle_message({"user": "jordan", "scan_id": "scan-1"})
+    _handler(store, queue=queue).handle_message(
+        REQUEST_CONTEXT, SCAN_IDENTIFICATION_MESSAGE
+    )
 
     assert queue.messages == [
         {"user": "jordan", "scan_id": "scan-1", "next_pending_position": 103}
@@ -427,8 +453,8 @@ def test_filters_language_and_finish_and_deduplicates_faces():
     ]
     store = FakeScanRepository(_scan_rows(1))
     catalog = FakeCatalog(records)
-    _worker(store, catalog=catalog).handle_message(
-        {"user": "jordan", "scan_id": "scan-1"}
+    _handler(store, catalog=catalog).handle_message(
+        REQUEST_CONTEXT, SCAN_IDENTIFICATION_MESSAGE
     )
 
     assert store.rows[0].status == "suggested"
@@ -450,8 +476,8 @@ def test_uses_higher_scoring_card_orientation():
     detector = FakeDetector()
     catalog = OrientationCatalog()
 
-    _worker(store, catalog=catalog, detector=detector).handle_message(
-        {"user": "jordan", "scan_id": "scan-1"}
+    _handler(store, catalog=catalog, detector=detector).handle_message(
+        REQUEST_CONTEXT, SCAN_IDENTIFICATION_MESSAGE
     )
 
     assert detector.calls == 1
@@ -462,8 +488,8 @@ def test_missing_card_becomes_manual_review_without_search():
     store = FakeScanRepository(_scan_rows(1))
     catalog = FakeCatalog()
 
-    _worker(store, catalog=catalog, detector=FakeDetector(False)).handle_message(
-        {"user": "jordan", "scan_id": "scan-1"}
+    _handler(store, catalog=catalog, detector=FakeDetector(False)).handle_message(
+        REQUEST_CONTEXT, SCAN_IDENTIFICATION_MESSAGE
     )
 
     assert store.rows[0].status == "needs_review"
@@ -472,8 +498,8 @@ def test_missing_card_becomes_manual_review_without_search():
 
 def test_treats_external_ids_as_opaque():
     store = FakeScanRepository(_scan_rows(1))
-    _worker(store, catalog=FakeCatalog([_record("not-a-uuid")])).handle_message(
-        {"user": "jordan", "scan_id": "scan-1"}
+    _handler(store, catalog=FakeCatalog([_record("not-a-uuid")])).handle_message(
+        REQUEST_CONTEXT, SCAN_IDENTIFICATION_MESSAGE
     )
 
     assert store.suggestions[1][0].external_id == "not-a-uuid"
@@ -499,10 +525,10 @@ def test_pokemon_suggestions_keep_rank_and_cap_unique_products():
 
     store = FakeScanRepository(_scan_rows(1), game="pokemon", finish="reverse_holofoil")
     identifier = PokemonScanIdentifier(FakeCatalog(records, version=60), FakeDetector())
-    worker = RecognitionWorker(
+    handler = ScanIdentificationMessageHandler(
         store, FakeImages(), FakeQueue(), lambda game: identifier
     )
-    worker.handle_message({"user": "jordan", "scan_id": "scan-1"})
+    handler.handle_message(REQUEST_CONTEXT, SCAN_IDENTIFICATION_MESSAGE)
 
     assert store.suggestions[1] == [
         ScanSuggestion("226395", "Charizard", 0.98),
@@ -538,15 +564,15 @@ def test_runtime_lazily_reuses_both_identifiers_and_records_their_versions(monke
     assert detector_calls == []
 
     magic = FakeScanRepository(_scan_rows(1))
-    RecognitionWorker(
+    ScanIdentificationMessageHandler(
         magic, FakeImages(), FakeQueue(), runtime._load_identifier
-    ).handle_message({"user": "jordan", "scan_id": "scan-1"})
+    ).handle_message(REQUEST_CONTEXT, SCAN_IDENTIFICATION_MESSAGE)
     assert [game for game, _ in load_calls] == ["mtg"]
 
     pokemon = FakeScanRepository(_scan_rows(1), game="pokemon")
-    RecognitionWorker(
+    ScanIdentificationMessageHandler(
         pokemon, FakeImages(), FakeQueue(), runtime._load_identifier
-    ).handle_message({"user": "jordan", "scan_id": "scan-1"})
+    ).handle_message(REQUEST_CONTEXT, SCAN_IDENTIFICATION_MESSAGE)
 
     magic_identifier = runtime._load_identifier("mtg")
     pokemon_identifier = runtime._load_identifier("pokemon")
@@ -577,8 +603,8 @@ def test_game_without_recognition_integration_fails_before_image_processing():
     with pytest.raises(
         ValueError, match="no recognition integration configured for game: unknown_game"
     ):
-        worker = _worker(store, images=images, loader=load_catalog)
-        worker.handle_message({"user": "jordan", "scan_id": "scan-1"})
+        handler = _handler(store, images=images, loader=load_catalog)
+        handler.handle_message(REQUEST_CONTEXT, SCAN_IDENTIFICATION_MESSAGE)
 
     assert catalog_loader_calls == []
     assert images.read_keys == []
@@ -599,8 +625,8 @@ def test_runtime_fails_before_catalog_loading_when_game_has_no_catalog():
 def test_corrupt_image_failure_propagates_without_marking_row_finished():
     store = FakeScanRepository(_scan_rows(1))
     with pytest.raises(ValueError, match="unsupported image format"):
-        _worker(store, images=FakeImages(b"not a jpeg")).handle_message(
-            {"user": "jordan", "scan_id": "scan-1"}
+        _handler(store, images=FakeImages(b"not a jpeg")).handle_message(
+            REQUEST_CONTEXT, SCAN_IDENTIFICATION_MESSAGE
         )
 
     assert store.rows[0].status == "pending"
@@ -610,8 +636,8 @@ def test_corrupt_image_failure_propagates_without_marking_row_finished():
 def test_truncated_jpeg_failure_propagates_without_marking_row_finished():
     store = FakeScanRepository(_scan_rows(1))
     with pytest.raises(ValueError, match="unable to decode image"):
-        _worker(store, images=FakeImages(b"\xff\xd8\xff\xe0broken")).handle_message(
-            {"user": "jordan", "scan_id": "scan-1"}
+        _handler(store, images=FakeImages(b"\xff\xd8\xff\xe0broken")).handle_message(
+            REQUEST_CONTEXT, SCAN_IDENTIFICATION_MESSAGE
         )
 
     assert store.rows[0].status == "pending"
@@ -624,8 +650,8 @@ def test_unsupported_image_failure_propagates_without_marking_row_finished():
     store = FakeScanRepository(_scan_rows(1))
 
     with pytest.raises(ValueError, match="unsupported image format"):
-        _worker(store, images=FakeImages(output.getvalue())).handle_message(
-            {"user": "jordan", "scan_id": "scan-1"}
+        _handler(store, images=FakeImages(output.getvalue())).handle_message(
+            REQUEST_CONTEXT, SCAN_IDENTIFICATION_MESSAGE
         )
 
     assert store.rows[0].status == "pending"
@@ -640,8 +666,8 @@ def test_image_store_failure_propagates_without_marking_row_finished():
     store = FakeScanRepository(_scan_rows(1))
 
     with pytest.raises(RuntimeError, match="s3 unavailable"):
-        _worker(store, images=BrokenImages()).handle_message(
-            {"user": "jordan", "scan_id": "scan-1"}
+        _handler(store, images=BrokenImages()).handle_message(
+            REQUEST_CONTEXT, SCAN_IDENTIFICATION_MESSAGE
         )
 
     assert store.rows[0].status == "pending"
@@ -650,8 +676,8 @@ def test_image_store_failure_propagates_without_marking_row_finished():
 
 def test_empty_candidates_become_manual_review():
     store = FakeScanRepository(_scan_rows(1))
-    _worker(store, catalog=FakeCatalog([])).handle_message(
-        {"user": "jordan", "scan_id": "scan-1"}
+    _handler(store, catalog=FakeCatalog([])).handle_message(
+        REQUEST_CONTEXT, SCAN_IDENTIFICATION_MESSAGE
     )
 
     assert store.rows[0].status == "needs_review"
@@ -661,12 +687,12 @@ def test_catalog_initialization_failure_propagates_without_marking_rows():
     store = FakeScanRepository(_scan_rows(2))
 
     with pytest.raises(RuntimeError, match="offline catalog failed"):
-        _worker(
+        _handler(
             store,
             loader=lambda game: (_ for _ in ()).throw(
                 RuntimeError("offline catalog failed")
             ),
-        ).handle_message({"user": "jordan", "scan_id": "scan-1"})
+        ).handle_message(REQUEST_CONTEXT, SCAN_IDENTIFICATION_MESSAGE)
 
     assert [row.status for row in store.rows] == ["pending", "pending"]
     assert store.scan.status == "identifying"
@@ -676,9 +702,9 @@ def test_catalog_initialization_failure_propagates_without_marking_rows():
 def test_deleted_scan_is_ignored():
     store = FakeScanRepository(_scan_rows(1))
     store.scan = None
-    worker = _worker(store)
+    handler = _handler(store)
 
-    worker.handle_message({"user": "jordan", "scan_id": "scan-1"})
+    handler.handle_message(REQUEST_CONTEXT, SCAN_IDENTIFICATION_MESSAGE)
 
     assert store.results == []
 
@@ -688,8 +714,8 @@ def test_continuation_failure_leaves_pending_rows_for_recovery():
     queue = FakeQueue(RuntimeError("queue unavailable"))
 
     with pytest.raises(RuntimeError, match="queue unavailable"):
-        _worker(store, queue=queue).handle_message(
-            {"user": "jordan", "scan_id": "scan-1"}
+        _handler(store, queue=queue).handle_message(
+            REQUEST_CONTEXT, SCAN_IDENTIFICATION_MESSAGE
         )
 
     assert store.scan.status == "identifying"
