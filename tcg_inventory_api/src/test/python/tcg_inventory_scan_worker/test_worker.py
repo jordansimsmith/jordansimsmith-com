@@ -12,7 +12,6 @@ from botocore.stub import Stubber
 from PIL import Image
 
 from tcg_inventory_scan_worker import scan_identifier
-from tcg_inventory_scan_worker import worker as scan_worker
 from tcg_inventory_scan_worker.magic_the_gathering_scan_identifier import (
     MagicTheGatheringScanIdentifier,
 )
@@ -539,7 +538,9 @@ def test_pokemon_suggestions_keep_rank_and_cap_unique_products():
     ]
 
 
-def test_runtime_lazily_reuses_both_identifiers_and_records_their_versions(monkeypatch):
+def test_runtime_lazily_reuses_both_identifiers_and_records_their_versions(
+    monkeypatch, request
+):
     catalogs = {
         "mtg": FakeCatalog(version=40),
         "pokemon": FakeCatalog([], version=60),
@@ -558,7 +559,9 @@ def test_runtime_lazily_reuses_both_identifiers_and_records_their_versions(monke
 
     monkeypatch.setenv(scan_identifier.CACHE_ENV, "/offline-cache")
     monkeypatch.setattr(scan_identifier.Catalog, "load", load)
-    monkeypatch.setattr(scan_worker, "NeuralCornerDetector", create_detector)
+    monkeypatch.setattr(scan_identifier, "NeuralCornerDetector", create_detector)
+    scan_identifier.ScanIdentifier._load_detector.cache_clear()
+    request.addfinalizer(scan_identifier.ScanIdentifier._load_detector.cache_clear)
     runtime = LambdaRuntime()
     assert load_calls == []
     assert detector_calls == []

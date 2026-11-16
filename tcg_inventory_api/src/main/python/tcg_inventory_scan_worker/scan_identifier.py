@@ -3,6 +3,7 @@
 import os
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
+from functools import cache
 from typing import Self
 
 import numpy as np
@@ -25,7 +26,8 @@ class ScanIdentifier(ABC):
         self._detector = detector
 
     @classmethod
-    def load(cls, detector: NeuralCornerDetector) -> Self:
+    def load(cls) -> Self:
+        detector = cls._load_detector()
         catalog = Catalog.load(
             cls.game,
             source=cls._source,
@@ -36,6 +38,11 @@ class ScanIdentifier(ABC):
         )
         _ = catalog.embedder
         return cls(catalog, detector)
+
+    @staticmethod
+    @cache
+    def _load_detector() -> NeuralCornerDetector:
+        return NeuralCornerDetector(provider="cpu")
 
     @property
     def catalog_version(self) -> int:

@@ -6,7 +6,6 @@ import json
 import os
 
 import boto3
-from collector_vision import NeuralCornerDetector
 
 from .magic_the_gathering_scan_identifier import MagicTheGatheringScanIdentifier
 from .pokemon_scan_identifier import PokemonScanIdentifier
@@ -28,7 +27,6 @@ class LambdaRuntime:
     def __init__(self):
         self._message_handler: ScanIdentificationMessageHandler | None = None
         self._identifiers: dict[str, ScanIdentifier] = {}
-        self._detector = None
 
     def handle_event(self, event: dict) -> dict[str, int]:
         records = event.get("Records", [])
@@ -56,10 +54,7 @@ class LambdaRuntime:
         if identifier_type is None:
             raise ValueError(f"no recognition integration configured for game: {game}")
 
-        if self._detector is None:
-            self._detector = NeuralCornerDetector(provider="cpu")
-
-        identifier = identifier_type.load(self._detector)
+        identifier = identifier_type.load()
         self._identifiers[game] = identifier
         return identifier
 
