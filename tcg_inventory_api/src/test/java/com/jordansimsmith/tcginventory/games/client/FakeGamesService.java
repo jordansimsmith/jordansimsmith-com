@@ -43,12 +43,35 @@ public class FakeGamesService implements GamesService {
                   "artwork_stamps_left", "Left artwork stamps", 0, 0.32, 0.45, 0.22),
               new ScanReviewImageRegion(
                   "artwork_stamps_right", "Right artwork stamps", 0.55, 0.32, 0.45, 0.22)));
+  public static final Game POKEMON_JAPANESE =
+      new Game(
+          "pokemon_jp",
+          "Pokémon (JP)",
+          "tcgplayer",
+          Language.JAPANESE,
+          true,
+          false,
+          List.of(new Finish("normal", "Normal"), new Finish("holofoil", "Holofoil")),
+          List.of(
+              new ScanReviewImageRegion("set_and_number", "Set and number", 0, 0.85, 0.5, 0.15),
+              new ScanReviewImageRegion(
+                  "artwork_stamps_left", "Left artwork stamps", 0, 0.3, 0.48, 0.28),
+              new ScanReviewImageRegion(
+                  "artwork_stamps_right", "Right artwork stamps", 0.52, 0.3, 0.48, 0.28),
+              new ScanReviewImageRegion(
+                  "lower_right_stamp_and_foil",
+                  "Lower-right stamp and foil",
+                  0.42,
+                  0.54,
+                  0.58,
+                  0.35)));
 
   private final Map<String, Game> gamesById = new LinkedHashMap<>();
 
   public FakeGamesService() {
     seed(MAGIC_THE_GATHERING);
     seed(POKEMON_ENGLISH);
+    seed(POKEMON_JAPANESE);
   }
 
   public void seed(Game game) {

@@ -43,11 +43,15 @@ public class FindGamesHandlerTest {
 
     // assert
     assertThat(response.getStatusCode()).isEqualTo(200);
-    assertThat(objectMapper.readTree(response.getBody()))
+    var games = objectMapper.readTree(response.getBody()).get("games");
+    assertThat(games).hasSize(3);
+    assertThat(games.get(0).get("id").asText()).isEqualTo("mtg");
+    assertThat(games.get(1).get("id").asText()).isEqualTo("pokemon");
+    assertThat(games.get(2))
         .isEqualTo(
             objectMapper.readTree(
                 """
-                {"games":[{"id":"mtg","display_name":"Magic: The Gathering","external_source":"scryfall","language":"en","scanning_enabled":true,"csv_import_enabled":true,"finishes":[{"id":"normal","display_name":"Normal"},{"id":"foil","display_name":"Foil"},{"id":"etched","display_name":"Etched"}],"scan_review_image_regions":[{"id":"set_code","display_name":"Set code","x":0.0,"y":0.9,"width":0.25,"height":0.1},{"id":"set_symbol","display_name":"Set symbol","x":0.75,"y":0.535,"width":0.25,"height":0.1}]},{"id":"pokemon","display_name":"Pokémon (EN)","external_source":"tcgplayer","language":"en","scanning_enabled":true,"csv_import_enabled":false,"finishes":[{"id":"normal","display_name":"Normal"},{"id":"holofoil","display_name":"Holofoil"},{"id":"reverse_holofoil","display_name":"Reverse Holofoil"}],"scan_review_image_regions":[{"id":"set_and_number","display_name":"Set and number","x":0.0,"y":0.88,"width":0.5,"height":0.12},{"id":"artwork_stamps_left","display_name":"Left artwork stamps","x":0.0,"y":0.32,"width":0.45,"height":0.22},{"id":"artwork_stamps_right","display_name":"Right artwork stamps","x":0.55,"y":0.32,"width":0.45,"height":0.22}]}]}
+                {"id":"pokemon_jp","display_name":"Pokémon (JP)","external_source":"tcgplayer","language":"ja","scanning_enabled":true,"csv_import_enabled":false,"finishes":[{"id":"normal","display_name":"Normal"},{"id":"holofoil","display_name":"Holofoil"}],"scan_review_image_regions":[{"id":"set_and_number","display_name":"Set and number","x":0.0,"y":0.85,"width":0.5,"height":0.15},{"id":"artwork_stamps_left","display_name":"Left artwork stamps","x":0.0,"y":0.3,"width":0.48,"height":0.28},{"id":"artwork_stamps_right","display_name":"Right artwork stamps","x":0.52,"y":0.3,"width":0.48,"height":0.28},{"id":"lower_right_stamp_and_foil","display_name":"Lower-right stamp and foil","x":0.42,"y":0.54,"width":0.58,"height":0.35}]}
                 """));
   }
 

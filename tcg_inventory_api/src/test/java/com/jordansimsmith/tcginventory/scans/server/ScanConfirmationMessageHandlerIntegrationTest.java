@@ -171,6 +171,32 @@ class ScanConfirmationMessageHandlerIntegrationTest {
   }
 
   @Test
+  void handleMessageShouldRejectJapanesePrintingThatDoesNotSupportSelectedFinish()
+      throws Exception {
+    // arrange
+    saveScan("pokemon_jp", "holofoil", List.of(scanRow(1, "566488")), "confirming");
+    when(catalog.findCards(any(), any()))
+        .thenReturn(
+            new FindCardsResponse(
+                List.of(
+                    new CatalogPrinting(
+                        "pokemon_jp",
+                        "566488",
+                        "Snorlax",
+                        "SV2a",
+                        "Pokémon Card 151",
+                        "143/165",
+                        List.of("normal")))));
+
+    // act / assert
+    assertThatThrownBy(() -> handler.handleMessage(CTX, MESSAGE))
+        .hasMessage("scan position 1: selected printing does not support finish holofoil");
+    assertThat(getScan().getStatus()).isEqualTo("confirming");
+    verify(catalog).findCards(CTX, new FindCardsRequest("pokemon_jp", List.of("566488")));
+    verifyNoInteractions(imports);
+  }
+
+  @Test
   void handleMessageShouldFailWhenScanIsMissingOrHasUnexpectedStatus() {
     // act / assert
     assertThatThrownBy(() -> handler.handleMessage(CTX, MESSAGE))
@@ -207,8 +233,12 @@ class ScanConfirmationMessageHandlerIntegrationTest {
   }
 
   private void saveScan(List<ScanRowItem> rows, String status) {
+    saveScan("mtg", "normal", rows, status);
+  }
+
+  private void saveScan(String game, String finish, List<ScanRowItem> rows, String status) {
     var scan =
-        ScanItem.create(CTX.user(), "mtg", MESSAGE.scanId(), "NM", "normal", 200, Instant.EPOCH);
+        ScanItem.create(CTX.user(), game, MESSAGE.scanId(), "NM", finish, 200, Instant.EPOCH);
     scan.setStatus(status);
     scanTable.putItem(scan);
     for (var row : rows) {

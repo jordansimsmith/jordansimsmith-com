@@ -6,6 +6,7 @@ java_test_suite(
         "AppraisalMessageHandlerTest.java",
         "AppraisalResolverTest.java",
         "ConfirmImportServiceTest.java",
+        "CreateImportServiceTest.java",
         "ImportConfirmationMessageHandlerTest.java",
         "ManaBoxCsvParserTest.java",
     ],

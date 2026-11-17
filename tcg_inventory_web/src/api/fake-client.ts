@@ -77,6 +77,7 @@ const VALID_CONDITIONS: Condition[] = ['NM', 'LP', 'MP', 'HP', 'DMG'];
 const SKU_PAGE_SIZE = 20;
 const MAGIC_THE_GATHERING = { id: 'mtg' };
 const POKEMON_ENGLISH = { id: 'pokemon' };
+const POKEMON_JAPANESE = { id: 'pokemon_jp' };
 const FAKE_GAMES: Game[] = [
   {
     id: 'mtg',
@@ -143,6 +144,51 @@ const FAKE_GAMES: Game[] = [
         y: 0.32,
         width: 0.45,
         height: 0.22,
+      },
+    ],
+  },
+  {
+    id: 'pokemon_jp',
+    display_name: 'Pokémon (JP)',
+    language: 'ja',
+    scanning_enabled: true,
+    csv_import_enabled: false,
+    finishes: [
+      { id: 'normal', display_name: 'Normal' },
+      { id: 'holofoil', display_name: 'Holofoil' },
+    ],
+    scan_review_image_regions: [
+      {
+        id: 'set_and_number',
+        display_name: 'Set and number',
+        x: 0,
+        y: 0.85,
+        width: 0.5,
+        height: 0.15,
+      },
+      {
+        id: 'artwork_stamps_left',
+        display_name: 'Left artwork stamps',
+        x: 0,
+        y: 0.3,
+        width: 0.48,
+        height: 0.28,
+      },
+      {
+        id: 'artwork_stamps_right',
+        display_name: 'Right artwork stamps',
+        x: 0.52,
+        y: 0.3,
+        width: 0.48,
+        height: 0.28,
+      },
+      {
+        id: 'lower_right_stamp_and_foil',
+        display_name: 'Lower-right stamp and foil',
+        x: 0.42,
+        y: 0.54,
+        width: 0.58,
+        height: 0.35,
       },
     ],
   },
@@ -238,6 +284,40 @@ const FAKE_CATALOG_CARDS = [
     set_name: 'Evolutions',
     collector_number: '11/108',
     image_urls: fakeImageUrls('124026', 'Charizard', 'EVO'),
+    available_finishes: ['holofoil'],
+  },
+  {
+    game: 'pokemon_jp',
+    external_id: '566488',
+    name: 'Snorlax',
+    set_code: 'SV2a',
+    set_name: 'Pokémon Card 151',
+    collector_number: '143/165',
+    image_urls: fakeImageUrls('566488', 'Snorlax', 'SV2a'),
+    available_finishes: ['normal'],
+  },
+  {
+    game: 'pokemon_jp',
+    external_id: '566685',
+    name: 'Snorlax (Poké Ball Pattern)',
+    set_code: 'SV2a',
+    set_name: 'Pokémon Card 151',
+    collector_number: '143/165',
+    image_urls: fakeImageUrls('566685', 'Snorlax (Poké Ball Pattern)', 'SV2a'),
+    available_finishes: ['holofoil'],
+  },
+  {
+    game: 'pokemon_jp',
+    external_id: '566838',
+    name: 'Snorlax (Master Ball Pattern)',
+    set_code: 'SV2a',
+    set_name: 'Pokémon Card 151',
+    collector_number: '143/165',
+    image_urls: fakeImageUrls(
+      '566838',
+      'Snorlax (Master Ball Pattern)',
+      'SV2a',
+    ),
     available_finishes: ['holofoil'],
   },
 ] satisfies CatalogCard[];
@@ -368,6 +448,42 @@ const seedPokemonSkus: SeedSku[] = [
   ],
 ];
 
+const seedJapanesePokemonSkus: SeedSku[] = [
+  [
+    '566488',
+    'Snorlax',
+    'SV2a',
+    'Pokémon Card 151',
+    '143/165',
+    'normal',
+    'NM',
+    1,
+    0,
+  ],
+  [
+    '566685',
+    'Snorlax (Poké Ball Pattern)',
+    'SV2a',
+    'Pokémon Card 151',
+    '143/165',
+    'holofoil',
+    'NM',
+    1,
+    1,
+  ],
+  [
+    '566838',
+    'Snorlax (Master Ball Pattern)',
+    'SV2a',
+    'Pokémon Card 151',
+    '143/165',
+    'holofoil',
+    'NM',
+    1,
+    0,
+  ],
+];
+
 interface FakeUnit {
   sequence_number: number;
   status: UnitStatus;
@@ -453,54 +569,68 @@ function createSeedState(): FakeSku[] {
     throw new Error('expected a seeded in-stock Doubling Season unit');
   }
   photographed.photos = ['fake-unit-photo-1'];
-  let pokemonUnitIndex = 0;
-  const pokemonSkus = seedPokemonSkus.map(
-    ([
-      tcgplayerId,
-      name,
-      setCode,
-      setName,
-      collectorNumber,
-      finish,
-      condition,
-      inStockCount,
-      reservedCount,
-      soldCount = 0,
-    ]) => {
-      const units: FakeUnit[] = [];
-      for (let i = 0; i < inStockCount + reservedCount + soldCount; i += 1) {
-        units.push({
-          sequence_number: pokemonUnitIndex,
-          status: 'in_stock',
-          photos: [],
-          created_at: createdAt,
-          updated_at: null,
-        });
-        pokemonUnitIndex += 1;
-      }
-      for (let i = 0; i < soldCount; i += 1) {
-        units[i].status = 'sold';
-      }
-      for (let i = soldCount; i < soldCount + reservedCount; i += 1) {
-        units[i].status = 'reserved';
-      }
-      const suggestedPrice = formatPrice(3.5 + pokemonUnitIndex);
-      return {
-        sku_id: crypto.randomUUID(),
-        game: POKEMON_ENGLISH.id,
-        external_id: tcgplayerId,
+  const createPokemonSkus = (game: GameId, seed: SeedSku[]): FakeSku[] => {
+    let pokemonUnitIndex = 0;
+    return seed.map(
+      ([
+        tcgplayerId,
         name,
-        set_code: setCode,
-        set_name: setName,
-        collector_number: collectorNumber,
+        setCode,
+        setName,
+        collectorNumber,
         finish,
         condition,
-        suggested_price: suggestedPrice,
-        units,
-      };
-    },
+        inStockCount,
+        reservedCount,
+        soldCount = 0,
+      ]) => {
+        const units: FakeUnit[] = [];
+        for (let i = 0; i < inStockCount + reservedCount + soldCount; i += 1) {
+          units.push({
+            sequence_number: pokemonUnitIndex,
+            status: 'in_stock',
+            photos: [],
+            created_at: createdAt,
+            updated_at: null,
+          });
+          pokemonUnitIndex += 1;
+        }
+        for (let i = 0; i < soldCount; i += 1) {
+          units[i].status = 'sold';
+        }
+        for (let i = soldCount; i < soldCount + reservedCount; i += 1) {
+          units[i].status = 'reserved';
+        }
+        const suggestedPrice = formatPrice(3.5 + pokemonUnitIndex);
+        return {
+          sku_id: crypto.randomUUID(),
+          game,
+          external_id: tcgplayerId,
+          name,
+          set_code: setCode,
+          set_name: setName,
+          collector_number: collectorNumber,
+          finish,
+          condition,
+          suggested_price: suggestedPrice,
+          units,
+        };
+      },
+    );
+  };
+  const pokemonSkus = createPokemonSkus(POKEMON_ENGLISH.id, seedPokemonSkus);
+  const japanesePokemonSkus = createPokemonSkus(
+    POKEMON_JAPANESE.id,
+    seedJapanesePokemonSkus,
   );
-  return [...skus, ...pokemonSkus];
+  const masterBallSnorlax = japanesePokemonSkus.find(
+    (sku) => sku.external_id === '566838',
+  );
+  if (!masterBallSnorlax) {
+    throw new Error('expected a seeded Master Ball Snorlax');
+  }
+  masterBallSnorlax.suggested_price = '25.00';
+  return [...skus, ...pokemonSkus, ...japanesePokemonSkus];
 }
 
 function deriveBlock(sequenceNumber: number): string {
@@ -1213,6 +1343,11 @@ function progressFakeScan(scan: FakeScan): void {
     if (scan.game === POKEMON_ENGLISH.id) {
       const externalId = scan.finish === 'holofoil' ? '124026' : '226395';
       row.suggestions = [scanSuggestion(externalId, 'Charizard', 0.9)];
+    } else if (scan.game === POKEMON_JAPANESE.id) {
+      const externalId = scan.finish === 'holofoil' ? '566685' : '566488';
+      const name =
+        scan.finish === 'holofoil' ? 'Snorlax (Poké Ball Pattern)' : 'Snorlax';
+      row.suggestions = [scanSuggestion(externalId, name, 0.9)];
     } else {
       row.suggestions = [
         scanSuggestion(
@@ -1350,6 +1485,12 @@ function createSeedOrders(skus: FakeSku[]): FakeOrder[] {
     solRing: unitsOf('Sol Ring', 'normal', 'NM', 'reserved'),
     aberration: unitsOf('Elvish Aberration', 'normal', 'NM', 'reserved'),
     abomasnow: unitsOf('Abomasnow', 'normal', 'NM', 'reserved'),
+    japaneseSnorlax: unitsOf(
+      'Snorlax (Poké Ball Pattern)',
+      'holofoil',
+      'NM',
+      'reserved',
+    ),
   };
   const atListUnits = unitsOf('Hellkite Tyrant', 'normal', 'NM', 'sold');
   const legacyUnits = unitsOf('Counterspell', 'normal', 'NM', 'in_stock').slice(
@@ -1399,16 +1540,18 @@ function createSeedOrders(skus: FakeSku[]): FakeOrder[] {
       buyer_name: 'Rook Nimbus (copper-fox)',
       buyer_address: null,
       postage_option: null,
-      total_price: '18.90',
+      total_price: '30.90',
       units: [
         ...discountedUnits.solRing,
         ...discountedUnits.aberration,
         ...discountedUnits.abomasnow,
+        ...discountedUnits.japaneseSnorlax,
       ],
       lines: [
         lineOf(discountedUnits.solRing, '8.00', '5.00'),
         lineOf(discountedUnits.aberration, '2.90', '3.00'),
         lineOf(discountedUnits.abomasnow, '8.00', '7.00'),
+        lineOf(discountedUnits.japaneseSnorlax, '12.00', '11.00'),
       ],
     },
     {
@@ -1733,6 +1876,10 @@ export function createFakeClient(): ApiClient {
           `catalog printing does not support finish ${scan.finish}: ${row.external_id}`,
         );
       }
+      const prices =
+        scan.game === POKEMON_JAPANESE.id && row.external_id === '566838'
+          ? { market_price: '30.00', suggested_price: '25.00' }
+          : appraisePrices('keep', index + 1);
       return {
         position: index + 1,
         name: card.name,
@@ -1744,7 +1891,7 @@ export function createFakeClient(): ApiClient {
         external_id: row.external_id,
         decision: 'keep',
         decision_reason: null,
-        ...appraisePrices('keep', index + 1),
+        ...prices,
         photos: [],
       };
     });
@@ -2637,10 +2784,10 @@ export function createFakeClient(): ApiClient {
       ).size;
       const report: Report = {
         totals: {
-          inventory_value: '2923.35',
-          in_stock_units: 98,
-          sku_count: 44,
-          reserved_units: 9,
+          inventory_value: '2959.35',
+          in_stock_units: 101,
+          sku_count: 47,
+          reserved_units: 10,
           // consistent with the chart series below: 40 units sold across the
           // visible 12 weeks plus earlier months, revenue equal to the monthly sum
           sold_units: 76,
@@ -2860,6 +3007,52 @@ export function createFakeClient(): ApiClient {
               { label: '31-90 days', in_stock_units: 1 },
               { label: '91-180 days', in_stock_units: 1 },
               { label: '180+ days', in_stock_units: 1 },
+            ],
+          },
+          {
+            game: 'pokemon_jp',
+            unique_card_names: 1,
+            totals: {
+              inventory_value: '36.00',
+              in_stock_units: 3,
+              sku_count: 3,
+              reserved_units: 1,
+              sold_units: 0,
+              revenue_to_date: '0.00',
+              unpriced_units: 0,
+            },
+            top_sets: [
+              {
+                set_code: 'SV2a',
+                set_name: 'Pokémon Card 151',
+                in_stock_units: 3,
+              },
+            ],
+            price_buckets: [
+              { label: '$0.25-$0.50', in_stock_units: 0 },
+              { label: '$0.50-$1', in_stock_units: 0 },
+              { label: '$1-$2', in_stock_units: 0 },
+              { label: '$2-$5', in_stock_units: 0 },
+              { label: '$5-$10', in_stock_units: 1 },
+              { label: '$10+', in_stock_units: 2 },
+            ],
+            top_hits: [
+              {
+                sku_id: reportSkuId('566838', 'holofoil', 'NM'),
+                name: 'Snorlax (Master Ball Pattern)',
+                set_code: 'SV2a',
+                collector_number: '143/165',
+                finish: 'holofoil',
+                condition: 'NM',
+                price: '25.00',
+                in_stock_units: 1,
+              },
+            ],
+            aging_bands: [
+              { label: '0-30 days', in_stock_units: 3 },
+              { label: '31-90 days', in_stock_units: 0 },
+              { label: '91-180 days', in_stock_units: 0 },
+              { label: '180+ days', in_stock_units: 0 },
             ],
           },
         ],

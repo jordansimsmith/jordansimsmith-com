@@ -22,9 +22,9 @@ sheets. The main consumer is [TCG inventory web](../tcg_inventory_web/README.md)
 - **Reporting.** Regenerate a stored dashboard of stock, valuation, and sales
   across supported games.
 
-Magic: The Gathering and English Pokémon share the inventory, publishing,
-order, and reporting workflows. Magic supports CSV and scanner intake.
-English Pokémon supports scanner intake with one finish per scan and uses
+Magic: The Gathering and both English and Japanese Pokémon share the inventory,
+publishing, order, and reporting workflows. Magic supports CSV and scanner
+intake. Pokémon supports scanner intake with one finish per scan and uses
 TCGplayer printings from the published TCGCSV snapshot. Pokémon CSV intake
 remains disabled. The review catalog uses Scryfall for Magic.
 
@@ -35,8 +35,8 @@ shared [Auth API](../auth_api/README.md) authorizer. Java workers consume
 vertical-owned SQS FIFO queues. Scan recognition runs in a separate Python
 Lambda container with an offline CollectorVision catalog. DynamoDB holds
 service records, and S3 stores scans, listing photos, and catalog snapshots.
-The Pokémon catalog refresh worker builds as a standalone JAR. Production has
-no refresh Lambda or schedule.
+Terraform schedules daily TCGCSV refreshes for English Pokémon at 22:00 UTC and
+Japanese Pokémon at 22:30 UTC through the shared catalog worker.
 
 Run these commands from the repository root. The full build and deployment
 include the Linux AMD64 scan image. Integration and end-to-end tests use Docker.

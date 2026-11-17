@@ -95,8 +95,77 @@ describe('createFakeClient', () => {
             { id: 'reverse_holofoil', display_name: 'Reverse Holofoil' },
           ],
         },
+        {
+          id: 'pokemon_jp',
+          display_name: 'Pokémon (JP)',
+          language: 'ja',
+          scanning_enabled: true,
+          csv_import_enabled: false,
+          scan_review_image_regions: [
+            {
+              id: 'set_and_number',
+              display_name: 'Set and number',
+              x: 0,
+              y: 0.85,
+              width: 0.5,
+              height: 0.15,
+            },
+            {
+              id: 'artwork_stamps_left',
+              display_name: 'Left artwork stamps',
+              x: 0,
+              y: 0.3,
+              width: 0.48,
+              height: 0.28,
+            },
+            {
+              id: 'artwork_stamps_right',
+              display_name: 'Right artwork stamps',
+              x: 0.52,
+              y: 0.3,
+              width: 0.48,
+              height: 0.28,
+            },
+            {
+              id: 'lower_right_stamp_and_foil',
+              display_name: 'Lower-right stamp and foil',
+              x: 0.42,
+              y: 0.54,
+              width: 0.58,
+              height: 0.35,
+            },
+          ],
+          finishes: [
+            { id: 'normal', display_name: 'Normal' },
+            { id: 'holofoil', display_name: 'Holofoil' },
+          ],
+        },
       ],
     });
+  });
+
+  it('searches Japanese Pokémon printings by the selected finish', async () => {
+    const client = createFakeClient();
+
+    const normals = await client.searchCards({
+      game: 'pokemon_jp',
+      query: 'Snorlax',
+      finish: 'normal',
+    });
+    const holofoils = await client.searchCards({
+      game: 'pokemon_jp',
+      query: 'Snorlax',
+      finish: 'holofoil',
+    });
+
+    expect(normals.cards.map((card) => card.external_id)).toEqual(['566488']);
+    expect(holofoils.cards.map((card) => card.external_id)).toEqual([
+      '566685',
+      '566838',
+    ]);
+    expect(
+      holofoils.cards.find((card) => card.external_id === '566838')?.name,
+    ).toBe('Snorlax (Master Ball Pattern)');
   });
 
   it('returns exact catalog cards, paged alternatives, and search results', async () => {
@@ -483,6 +552,16 @@ describe('createFakeClient pokemon inventory', () => {
     const magicUnits = await findAllUnits(client, magicDetail.sku_id);
     expect(magicUnits[0].sequence_number).toBe(0);
     expect(detailUnits[0].sequence_number).toBe(0);
+
+    const japanese = await client.findSkus({ game: 'pokemon_jp' });
+    expect(japanese.skus.map((sku) => sku.external_id).sort()).toEqual([
+      '566488',
+      '566685',
+      '566838',
+    ]);
+    expect(
+      japanese.skus.find((sku) => sku.external_id === '566838')?.price,
+    ).toBe(25);
   });
 
   it('includes Pokémon stock and top hits in its report', async () => {
@@ -493,7 +572,14 @@ describe('createFakeClient pokemon inventory', () => {
     expect(response.report.games.map((game) => game.game)).toEqual([
       'mtg',
       'pokemon',
+      'pokemon_jp',
     ]);
+    expect(response.report.totals).toMatchObject({
+      inventory_value: '2959.35',
+      in_stock_units: 101,
+      sku_count: 47,
+      reserved_units: 10,
+    });
     const pokemon = response.report.games[1];
     expect(pokemon.totals).toMatchObject({
       inventory_value: '29.00',
@@ -503,6 +589,17 @@ describe('createFakeClient pokemon inventory', () => {
     expect(pokemon.top_hits[0]).toMatchObject({
       name: 'Charmander',
       finish: 'holofoil',
+    });
+    expect(response.report.games[2].totals).toMatchObject({
+      inventory_value: '36.00',
+      in_stock_units: 3,
+      sku_count: 3,
+      reserved_units: 1,
+    });
+    expect(response.report.games[2].top_hits[0]).toMatchObject({
+      name: 'Snorlax (Master Ball Pattern)',
+      finish: 'holofoil',
+      price: '25.00',
     });
   });
 });
@@ -934,6 +1031,92 @@ describe('createFakeClient scans', () => {
     },
   );
 
+  it.each([
+    ['normal', '566488', 'SV2a', '143/165'],
+    ['holofoil', '566685', 'SV2a', '143/165'],
+  ] as const)(
+    'identifies and confirms a Japanese Pokémon %s scan',
+    async (finish, externalId, setCode, collectorNumber) => {
+      vi.useFakeTimers();
+      const client = createFakeClient();
+      const created = await client.createScan({
+        game: 'pokemon_jp',
+        condition: 'NM',
+        finish,
+        files: [{ filename: '001.jpg', size_bytes: 100 }],
+      });
+
+      await client.identifyScan(created.scan_id);
+      vi.advanceTimersByTime(1_000);
+      const identified = await client.getScan(created.scan_id);
+      expect(identified.rows[0].suggestions[0]).toMatchObject({
+        external_id: externalId,
+      });
+
+      await client.confirmScan(created.scan_id, {
+        rows: [{ scan_position: 1, external_id: externalId }],
+      });
+      const confirmed = await client.getScan(created.scan_id);
+      const imported = await client.getImport(confirmed.import_id!);
+
+      expect(imported.game).toBe('pokemon_jp');
+      expect(imported.rows).toMatchObject([
+        {
+          external_id: externalId,
+          set_code: setCode,
+          collector_number: collectorNumber,
+          finish,
+        },
+      ]);
+    },
+  );
+
+  it('lets a Japanese scan manually select the photo-gated Master Ball printing', async () => {
+    vi.useFakeTimers();
+    const client = createFakeClient();
+    const created = await client.createScan({
+      game: 'pokemon_jp',
+      condition: 'NM',
+      finish: 'holofoil',
+      files: [{ filename: '001.jpg', size_bytes: 100 }],
+    });
+
+    await client.identifyScan(created.scan_id);
+    vi.advanceTimersByTime(1_000);
+    await client.getScan(created.scan_id);
+    await client.confirmScan(created.scan_id, {
+      rows: [{ scan_position: 1, external_id: '566838' }],
+    });
+    const confirmed = await client.getScan(created.scan_id);
+    vi.advanceTimersByTime(1_000);
+    const imported = await client.getImport(confirmed.import_id!);
+
+    expect(imported.rows[0]).toMatchObject({
+      external_id: '566838',
+      name: 'Snorlax (Master Ball Pattern)',
+      finish: 'holofoil',
+      market_price: '30.00',
+      suggested_price: '25.00',
+      needs_photos: true,
+    });
+    await expect(client.confirmImport(imported.import_id)).rejects.toThrow(
+      '1 rows need photos before confirm',
+    );
+    await client.addRowPhoto(
+      imported.import_id,
+      imported.rows[0].position,
+      new Blob([new Uint8Array([0xff, 0xd8, 0xff])], { type: 'image/jpeg' }),
+    );
+    expect(
+      (await client.getImport(imported.import_id)).rows[0].needs_photos,
+    ).toBe(false);
+    await client.confirmImport(imported.import_id);
+    await client.getImport(imported.import_id);
+    expect((await client.getImport(imported.import_id)).status).toBe(
+      'confirmed',
+    );
+  });
+
   it('confirms a reviewing scan once and creates rows in scan order', async () => {
     const client = createFakeClient();
     await client.deleteScanRow('fake-scan-reviewing', 2);
@@ -1169,10 +1352,10 @@ describe('createFakeClient orders', () => {
     expect(acceptedAts).toEqual([...acceptedAts].sort((a, b) => b - a));
     const toPick = response.orders[1];
     expect(toPick.order_id).toBe('83647');
-    expect(toPick.unit_count).toBe(4);
-    expect(toPick.total_price).toBe('18.90');
-    expect(toPick.items_total_price).toBe('18.90');
-    expect(toPick.listed_total_price).toBe('20.00');
+    expect(toPick.unit_count).toBe(5);
+    expect(toPick.total_price).toBe('30.90');
+    expect(toPick.items_total_price).toBe('30.90');
+    expect(toPick.listed_total_price).toBe('31.00');
     expect(toPick.delivery_mode).toBe('PICKUP');
     expect(response.orders[0].items_total_price).toBe('479.90');
     expect(response.orders[0].listed_total_price).toBe('431.50');
@@ -1188,12 +1371,13 @@ describe('createFakeClient orders', () => {
     const detail = await client.getOrder('83647');
 
     expect(detail.state).toBe('to_pick');
-    expect(detail.units).toHaveLength(4);
+    expect(detail.units).toHaveLength(5);
     expect(detail.units.map((unit) => unit.game)).toEqual([
       'mtg',
       'mtg',
       'mtg',
       'pokemon',
+      'pokemon_jp',
     ]);
     for (const unit of detail.units) {
       const block = Math.floor(unit.sequence_number / 100);
@@ -1203,8 +1387,10 @@ describe('createFakeClient orders', () => {
       expect(unit.external_id).toBeTruthy();
       if (unit.game === 'mtg') {
         expect(unit.external_id).toMatch(/^[0-9a-f-]{36}$/);
-      } else {
+      } else if (unit.game === 'pokemon') {
         expect(unit.external_id).toBe('283917');
+      } else {
+        expect(unit.external_id).toBe('566685');
       }
     }
     for (const unit of detail.units) {
@@ -1275,6 +1461,17 @@ describe('createFakeClient orders', () => {
         price: '8.00',
         listed_price: '7.00',
       },
+      {
+        game: 'pokemon_jp',
+        name: 'Snorlax (Poké Ball Pattern)',
+        set_code: 'SV2a',
+        collector_number: '143/165',
+        finish: 'holofoil',
+        condition: 'NM',
+        quantity: 1,
+        price: '12.00',
+        listed_price: '11.00',
+      },
     ]);
   });
 
@@ -1292,7 +1489,7 @@ describe('createFakeClient orders', () => {
 
     const fulfilling = await client.getOrder('83647');
     expect(fulfilling.state).toBe('fulfilling');
-    expect(fulfilling.units).toHaveLength(4);
+    expect(fulfilling.units).toHaveLength(5);
 
     await vi.advanceTimersByTimeAsync(500);
     const detail = await client.getOrder('83647');
