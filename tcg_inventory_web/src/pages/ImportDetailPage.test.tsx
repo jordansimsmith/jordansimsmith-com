@@ -16,7 +16,6 @@ import { GamesProvider } from '../GamesProvider';
 import * as clientModule from '../api/client';
 import type { Game, ImportDetail, ImportRow } from '../api/client';
 import { encodeListingPhoto } from '../domain/encode-listing-photo';
-import finishClasses from '../components/CardFinishName.module.css';
 
 const REGISTERED_GAMES: Game[] = [
   {
@@ -25,6 +24,7 @@ const REGISTERED_GAMES: Game[] = [
     language: 'en',
     scanning_enabled: true,
     csv_import_enabled: true,
+    default_finish_id: 'normal',
     scan_review_image_regions: [],
     finishes: [
       { id: 'normal', display_name: 'Normal' },
@@ -281,7 +281,7 @@ describe('ImportDetailPage', () => {
     });
   });
 
-  it('places set then finish after name and rainbows keep foil and etched names', async () => {
+  it('highlights card names for non-default finishes on kept rows', async () => {
     vi.spyOn(clientModule.apiClient, 'getImport').mockResolvedValue(
       reviewImport({
         rows: [
@@ -329,28 +329,23 @@ describe('ImportDetailPage', () => {
     const foilCells = cellsAfterName('Foil Card');
     expect(foilCells[2].textContent).toBe('DOM#2');
     expect(foilCells[3].textContent).toBe('Foil');
+    expect(foilCells[3].style.color).toBe('');
     expect(foilCells[3].style.fontWeight).toBe('');
-    expect(foilCells[3].style.textTransform).toBe('');
-    expect(
-      screen.getByText('Foil Card').classList.contains(finishClasses.foil),
-    ).toBe(true);
-    expect(foilCells[1].classList.contains(finishClasses.foil)).toBe(false);
-    expect(screen.getByText('Foil Card').style.fontWeight).toBe('700');
-    expect(screen.getByText('Normal Card').style.fontWeight).toBe('500');
+    const foilName = screen.getByText('Foil Card');
+    expect(foilName.style.fontWeight).toBe('700');
+    expect(foilName.style.color).not.toBe('');
 
     const etchedCells = cellsAfterName('Etched Card');
     expect(etchedCells[2].textContent).toBe('DOM#3');
     expect(etchedCells[3].textContent).toBe('Etched');
-    expect(etchedCells[3].style.fontWeight).toBe('');
-    expect(etchedCells[3].style.textTransform).toBe('');
-    expect(
-      screen.getByText('Etched Card').classList.contains(finishClasses.etched),
-    ).toBe(true);
-    expect(screen.getByText('Etched Card').style.fontWeight).toBe('700');
-    expect(
-      screen.getByText('Discarded Foil').classList.contains(finishClasses.foil),
-    ).toBe(false);
-    expect(screen.getByText('Discarded Foil').style.fontWeight).toBe('700');
+    const etchedName = screen.getByText('Etched Card');
+    expect(etchedName.style.fontWeight).toBe('700');
+    expect(etchedName.style.color).not.toBe('');
+    expect(etchedName.style.color).not.toBe(foilName.style.color);
+
+    const discardedName = screen.getByText('Discarded Foil');
+    expect(discardedName.style.fontWeight).toBe('500');
+    expect(discardedName.style.color).toBe('');
   });
 
   it('greys out non-keep review row text', async () => {

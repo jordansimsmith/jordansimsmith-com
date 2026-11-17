@@ -3,9 +3,9 @@ import { IconTrash } from '@tabler/icons-react';
 import type { Condition, GameId, ImportRow, RowDecision } from '../api/client';
 import { CONDITIONS } from '../api/client';
 import { useGames } from '../GamesProvider';
-import { finishNameWeight, formatSetNumber } from '../domain/card-label';
+import { formatSetNumber } from '../domain/card-label';
 import { ImportRowPhotoStrip } from './ImportRowPhotoStrip';
-import finishClasses from './CardFinishName.module.css';
+import { CardName } from './CardName';
 import classes from './ImportReviewTable.module.css';
 
 const DECISION_COLORS: Record<RowDecision, string> = {
@@ -69,14 +69,12 @@ export function ImportReviewTable({
                 {row.position}
               </Table.Td>
               <Table.Td data-field="name">
-                <Text
-                  component="span"
-                  className={keep ? finishClasses[row.finish] : undefined}
-                  fw={finishNameWeight(row.finish)}
-                  fz="sm"
-                >
-                  {row.name}
-                </Text>
+                <CardName
+                  name={row.name}
+                  gameId={game}
+                  finishId={row.finish}
+                  highlight={keep}
+                />
               </Table.Td>
               <Table.Td data-field="set" data-label="Set" title={row.set_name}>
                 {row.set_code

@@ -24,6 +24,7 @@ const REGISTERED_GAMES: Game[] = [
     language: 'en',
     scanning_enabled: true,
     csv_import_enabled: true,
+    default_finish_id: 'normal',
     scan_review_image_regions: [],
     finishes: [
       { id: 'normal', display_name: 'Normal' },
@@ -37,6 +38,7 @@ const REGISTERED_GAMES: Game[] = [
     language: 'en',
     scanning_enabled: false,
     csv_import_enabled: false,
+    default_finish_id: 'normal',
     scan_review_image_regions: [],
     finishes: [
       { id: 'normal', display_name: 'Normal' },

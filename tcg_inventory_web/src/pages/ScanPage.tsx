@@ -133,7 +133,7 @@ export function ScanPage() {
   const [game, setGame] = useState<GameId | null>(initialGame?.id ?? null);
   const [condition, setCondition] = useState<Condition>('NM');
   const [finish, setFinish] = useState<Finish | null>(
-    initialGame?.finishes[0]?.id ?? null,
+    initialGame?.default_finish_id ?? null,
   );
   const [files, setFiles] = useState<File[]>([]);
   const [creating, setCreating] = useState(false);
@@ -301,7 +301,7 @@ export function ScanPage() {
                       currentFinish &&
                       nextGame.finishes.some(({ id }) => id === currentFinish)
                         ? currentFinish
-                        : (nextGame.finishes[0]?.id ?? null),
+                        : nextGame.default_finish_id,
                     );
                   }}
                   data={games.map(({ id, display_name }) => ({

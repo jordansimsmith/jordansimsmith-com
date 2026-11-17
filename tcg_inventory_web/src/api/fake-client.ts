@@ -85,6 +85,7 @@ const FAKE_GAMES: Game[] = [
     language: 'en',
     scanning_enabled: true,
     csv_import_enabled: true,
+    default_finish_id: 'normal',
     finishes: [
       { id: 'normal', display_name: 'Normal' },
       { id: 'foil', display_name: 'Foil' },
@@ -115,6 +116,7 @@ const FAKE_GAMES: Game[] = [
     language: 'en',
     scanning_enabled: true,
     csv_import_enabled: false,
+    default_finish_id: 'normal',
     finishes: [
       { id: 'normal', display_name: 'Normal' },
       { id: 'holofoil', display_name: 'Holofoil' },
@@ -153,6 +155,7 @@ const FAKE_GAMES: Game[] = [
     language: 'ja',
     scanning_enabled: true,
     csv_import_enabled: false,
+    default_finish_id: 'normal',
     finishes: [
       { id: 'normal', display_name: 'Normal' },
       { id: 'holofoil', display_name: 'Holofoil' },

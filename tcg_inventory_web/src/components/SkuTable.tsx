@@ -1,6 +1,7 @@
 import { Table } from '@mantine/core';
 import type { Sku } from '../api/client';
 import { useGames } from '../GamesProvider';
+import { CardName } from './CardName';
 import classes from './CollectionTable.module.css';
 
 interface SkuTableProps {
@@ -35,8 +36,12 @@ export function SkuTable({ skus, onOpen }: SkuTableProps) {
             onClick={() => onOpen(sku)}
             style={{ cursor: 'pointer' }}
           >
-            <Table.Td fw={500} data-field="name">
-              {sku.name}
+            <Table.Td data-field="name">
+              <CardName
+                name={sku.name}
+                gameId={sku.game}
+                finishId={sku.finish}
+              />
             </Table.Td>
             <Table.Td title={sku.set_name} data-field="set" data-label="Set">
               {sku.set_code.toUpperCase()}

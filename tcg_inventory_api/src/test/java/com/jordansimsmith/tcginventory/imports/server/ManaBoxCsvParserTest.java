@@ -46,6 +46,7 @@ class ManaBoxCsvParserTest {
             Language.JAPANESE,
             false,
             true,
+            "normal",
             FakeGamesService.POKEMON_ENGLISH.finishes(),
             List.of());
 
@@ -96,6 +97,7 @@ class ManaBoxCsvParserTest {
             Language.JAPANESE,
             false,
             true,
+            "normal",
             FakeGamesService.POKEMON_ENGLISH.finishes(),
             List.of());
     assertThatThrownBy(

@@ -33,6 +33,7 @@ describe('createFakeClient', () => {
           language: 'en',
           scanning_enabled: true,
           csv_import_enabled: true,
+          default_finish_id: 'normal',
           scan_review_image_regions: [
             {
               id: 'set_code',
@@ -63,6 +64,7 @@ describe('createFakeClient', () => {
           language: 'en',
           scanning_enabled: true,
           csv_import_enabled: false,
+          default_finish_id: 'normal',
           scan_review_image_regions: [
             {
               id: 'set_and_number',
@@ -101,6 +103,7 @@ describe('createFakeClient', () => {
           language: 'ja',
           scanning_enabled: true,
           csv_import_enabled: false,
+          default_finish_id: 'normal',
           scan_review_image_regions: [
             {
               id: 'set_and_number',
@@ -496,6 +499,7 @@ describe('createFakeClient pokemon inventory', () => {
       language: 'en',
       scanning_enabled: true,
       csv_import_enabled: false,
+      default_finish_id: 'normal',
       finishes: [
         { id: 'normal', display_name: 'Normal' },
         { id: 'holofoil', display_name: 'Holofoil' },

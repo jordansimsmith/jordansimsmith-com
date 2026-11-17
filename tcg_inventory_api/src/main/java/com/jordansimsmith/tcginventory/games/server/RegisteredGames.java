@@ -18,6 +18,7 @@ public class RegisteredGames {
           Language.ENGLISH,
           true,
           true,
+          "normal",
           List.of(
               new Finish("normal", "Normal"),
               new Finish("foil", "Foil"),
@@ -34,6 +35,7 @@ public class RegisteredGames {
           Language.ENGLISH,
           true,
           false,
+          "normal",
           List.of(
               new Finish("normal", "Normal"),
               new Finish("holofoil", "Holofoil"),
@@ -53,6 +55,7 @@ public class RegisteredGames {
           Language.JAPANESE,
           true,
           false,
+          "normal",
           List.of(new Finish("normal", "Normal"), new Finish("holofoil", "Holofoil")),
           List.of(
               new ScanReviewImageRegion("set_and_number", "Set and number", 0, 0.85, 0.5, 0.15),

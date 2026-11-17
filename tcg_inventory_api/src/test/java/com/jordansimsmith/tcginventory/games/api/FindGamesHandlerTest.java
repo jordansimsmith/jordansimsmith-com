@@ -51,7 +51,7 @@ public class FindGamesHandlerTest {
         .isEqualTo(
             objectMapper.readTree(
                 """
-                {"id":"pokemon_jp","display_name":"Pokémon (JP)","external_source":"tcgplayer","language":"ja","scanning_enabled":true,"csv_import_enabled":false,"finishes":[{"id":"normal","display_name":"Normal"},{"id":"holofoil","display_name":"Holofoil"}],"scan_review_image_regions":[{"id":"set_and_number","display_name":"Set and number","x":0.0,"y":0.85,"width":0.5,"height":0.15},{"id":"artwork_stamps_left","display_name":"Left artwork stamps","x":0.0,"y":0.3,"width":0.48,"height":0.28},{"id":"artwork_stamps_right","display_name":"Right artwork stamps","x":0.52,"y":0.3,"width":0.48,"height":0.28},{"id":"lower_right_stamp_and_foil","display_name":"Lower-right stamp and foil","x":0.42,"y":0.54,"width":0.58,"height":0.35}]}
+                {"id":"pokemon_jp","display_name":"Pokémon (JP)","external_source":"tcgplayer","language":"ja","scanning_enabled":true,"csv_import_enabled":false,"default_finish_id":"normal","finishes":[{"id":"normal","display_name":"Normal"},{"id":"holofoil","display_name":"Holofoil"}],"scan_review_image_regions":[{"id":"set_and_number","display_name":"Set and number","x":0.0,"y":0.85,"width":0.5,"height":0.15},{"id":"artwork_stamps_left","display_name":"Left artwork stamps","x":0.0,"y":0.3,"width":0.48,"height":0.28},{"id":"artwork_stamps_right","display_name":"Right artwork stamps","x":0.52,"y":0.3,"width":0.48,"height":0.28},{"id":"lower_right_stamp_and_foil","display_name":"Lower-right stamp and foil","x":0.42,"y":0.54,"width":0.58,"height":0.35}]}
                 """));
   }
 

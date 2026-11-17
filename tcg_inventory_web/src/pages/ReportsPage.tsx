@@ -18,9 +18,9 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 import { AppShellLayout } from '../layouts/AppShellLayout';
 import { JobFailureAlert } from '../components/JobFailureAlert';
 import { PageHeader } from '../components/PageHeader';
-import finishClasses from '../components/CardFinishName.module.css';
+import { CardName } from '../components/CardName';
 import { apiClient } from '../api/client';
-import { finishNameWeight, formatSetNumber } from '../domain/card-label';
+import { formatSetNumber } from '../domain/card-label';
 import type {
   ReportAgingBand,
   GameId,
@@ -259,7 +259,6 @@ function TopHitsTable({
   topHits: ReportTopHit[];
 }) {
   const { getFinish } = useGames();
-
   return (
     <Paper p="md" radius="md" withBorder>
       <FigureTitle
@@ -294,12 +293,12 @@ function TopHitsTable({
                 <Table.Td data-field="rank" c="dimmed">
                   {index + 1}
                 </Table.Td>
-                <Table.Td
-                  data-field="name"
-                  className={finishClasses[hit.finish]}
-                  fw={finishNameWeight(hit.finish)}
-                >
-                  {hit.name}
+                <Table.Td data-field="name">
+                  <CardName
+                    name={hit.name}
+                    gameId={game}
+                    finishId={hit.finish}
+                  />
                 </Table.Td>
                 <Table.Td data-field="set" data-label="Set / no.">
                   {formatSetNumber(hit.set_code, hit.collector_number)}

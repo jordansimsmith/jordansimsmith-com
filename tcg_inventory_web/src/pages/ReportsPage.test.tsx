@@ -12,7 +12,6 @@ import type {
   ReportResponse,
   ReportTotals,
 } from '../api/client';
-import finishClasses from '../components/CardFinishName.module.css';
 
 const REGISTERED_GAMES: Game[] = [
   {
@@ -21,6 +20,7 @@ const REGISTERED_GAMES: Game[] = [
     language: 'en',
     scanning_enabled: true,
     csv_import_enabled: true,
+    default_finish_id: 'normal',
     scan_review_image_regions: [],
     finishes: [
       { id: 'normal', display_name: 'Normal' },
@@ -405,35 +405,23 @@ describe('ReportsPage', () => {
     expect(screen.getByText('Foil')).toBeDefined();
     expect(screen.getByText('Etched')).toBeDefined();
     expect(screen.getByText('Normal').style.fontWeight).toBe('');
+    expect(screen.getByText('Normal').style.color).toBe('');
     expect(screen.getByText('Foil').style.fontWeight).toBe('');
-    expect(screen.getByText('Etched').style.fontWeight).toBe('');
+    expect(screen.getByText('Foil').style.color).toBe('');
+    const foilName = screen.getByText('Doubling Season');
+    expect(foilName.style.fontWeight).toBe('700');
+    expect(foilName.style.color).not.toBe('');
+    const etchedName = screen.getByText('Jeska, Thrice Reborn');
+    expect(etchedName.style.fontWeight).toBe('700');
+    expect(etchedName.style.color).not.toBe('');
+    expect(screen.getByText('Ragavan, Nimble Pilferer').style.fontWeight).toBe(
+      '500',
+    );
     const headers = screen
       .getAllByRole('columnheader')
       .map((header) => header.textContent);
     expect(headers.indexOf('Finish')).toBe(headers.indexOf('Set / no.') + 1);
     expect(headers.indexOf('Condition')).toBe(headers.indexOf('Finish') + 1);
-    expect(
-      screen
-        .getByText('Doubling Season')
-        .classList.contains(finishClasses.foil),
-    ).toBe(true);
-    expect(screen.getByText('Doubling Season').style.fontWeight).toBe('700');
-    expect(
-      screen
-        .getByText('Jeska, Thrice Reborn')
-        .classList.contains(finishClasses.etched),
-    ).toBe(true);
-    expect(screen.getByText('Jeska, Thrice Reborn').style.fontWeight).toBe(
-      '700',
-    );
-    expect(
-      screen
-        .getByText('Ragavan, Nimble Pilferer')
-        .classList.contains(finishClasses.foil),
-    ).toBe(false);
-    expect(screen.getByText('Ragavan, Nimble Pilferer').style.fontWeight).toBe(
-      '500',
-    );
   });
 
   it('uses the registry finish labels in game reports', async () => {
@@ -460,6 +448,7 @@ describe('ReportsPage', () => {
         language: 'en',
         scanning_enabled: false,
         csv_import_enabled: false,
+        default_finish_id: 'foil',
         scan_review_image_regions: [],
         finishes: [
           { id: 'foil', display_name: 'Reflective' },
@@ -475,7 +464,10 @@ describe('ReportsPage', () => {
     expect(
       screen.getByRole('tab', { name: 'Renamed Card Game' }),
     ).toBeDefined();
-    expect(screen.getByText('Reflective')).toBeDefined();
+    expect(screen.getByText('Reflective').style.fontWeight).toBe('');
+    expect(screen.getByText('Reflective').style.color).toBe('');
+    expect(screen.getByText('Doubling Season').style.fontWeight).toBe('500');
+    expect(screen.getByText('Doubling Season').style.color).toBe('');
   });
 
   it('shouldShowTopHitsEmptyMessageWhenEmpty', async () => {

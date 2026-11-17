@@ -158,6 +158,7 @@ class ScanServicesIntegrationTest {
                     Language.ENGLISH,
                     true,
                     true,
+                    "normal",
                     List.of(new Finish("normal", "Normal")),
                     List.of())));
     createScanService =

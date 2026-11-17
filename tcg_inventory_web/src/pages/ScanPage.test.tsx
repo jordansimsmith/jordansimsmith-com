@@ -29,6 +29,7 @@ const REGISTERED_GAMES: Game[] = [
     language: 'en',
     scanning_enabled: true,
     csv_import_enabled: true,
+    default_finish_id: 'normal',
     scan_review_image_regions: [],
     finishes: [
       { id: 'normal', display_name: 'Normal' },
@@ -173,7 +174,7 @@ describe('ScanPage', () => {
     expect(screen.queryByRole('button', { name: 'Identify scan' })).toBeNull();
   });
 
-  it('uses registry labels, finish ordering, and scan capabilities', async () => {
+  it('uses registry labels, explicit defaults, and scan capabilities', async () => {
     const games: Game[] = [
       {
         id: 'mtg',
@@ -181,6 +182,7 @@ describe('ScanPage', () => {
         language: 'en',
         scanning_enabled: false,
         csv_import_enabled: false,
+        default_finish_id: 'normal',
         scan_review_image_regions: [],
         finishes: [
           { id: 'foil', display_name: 'Gloss A' },
@@ -193,10 +195,11 @@ describe('ScanPage', () => {
         language: 'en',
         scanning_enabled: true,
         csv_import_enabled: false,
+        default_finish_id: 'etched',
         scan_review_image_regions: [],
         finishes: [
-          { id: 'etched', display_name: 'Etched B' },
           { id: 'foil', display_name: 'Gloss B' },
+          { id: 'etched', display_name: 'Etched B' },
         ],
       },
     ];
@@ -216,7 +219,7 @@ describe('ScanPage', () => {
     fireEvent.click(
       screen.getByRole('option', { name: 'Card Game A', hidden: true }),
     );
-    expect(finishInput).toHaveProperty('value', 'Gloss A');
+    expect(finishInput).toHaveProperty('value', 'Base A');
     expect(
       (
         within(jobs).getByRole('button', {
@@ -232,7 +235,7 @@ describe('ScanPage', () => {
     fireEvent.click(
       screen.getByRole('option', { name: 'Card Game B', hidden: true }),
     );
-    expect(finishInput).toHaveProperty('value', 'Gloss B');
+    expect(finishInput).toHaveProperty('value', 'Etched B');
   });
 
   it('offers Pokémon scanning with each registered finish', async () => {
@@ -242,6 +245,7 @@ describe('ScanPage', () => {
       language: 'en',
       scanning_enabled: true,
       csv_import_enabled: false,
+      default_finish_id: 'normal',
       finishes: [
         { id: 'normal', display_name: 'Normal' },
         { id: 'holofoil', display_name: 'Holofoil' },

@@ -530,6 +530,7 @@ public class SearchCardsServiceIntegrationTest {
         Language.JAPANESE,
         true,
         false,
+        "normal",
         List.of(new Finish("normal", "Normal"), new Finish("holofoil", "Holofoil")),
         List.of(new ScanReviewImageRegion("set_and_number", "Set and number", 0, 0.88, 0.5, 0.12)));
   }

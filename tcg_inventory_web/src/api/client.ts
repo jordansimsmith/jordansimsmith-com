@@ -25,6 +25,7 @@ export interface Game {
   language: GameLanguage;
   scanning_enabled: boolean;
   csv_import_enabled: boolean;
+  default_finish_id: Finish;
   finishes: GameFinish[];
   scan_review_image_regions: ScanReviewImageRegion[];
 }

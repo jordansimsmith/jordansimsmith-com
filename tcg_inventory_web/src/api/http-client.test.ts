@@ -444,6 +444,7 @@ describe('http client imports', () => {
           language: 'en',
           scanning_enabled: true,
           csv_import_enabled: true,
+          default_finish_id: 'normal',
           scan_review_image_regions: [
             {
               id: 'set_code',
