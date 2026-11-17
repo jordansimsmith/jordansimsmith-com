@@ -8,6 +8,7 @@ from .scan_repository import ScanSuggestion
 
 class PokemonScanIdentifier(ScanIdentifier):
     game = "pokemon"
+    _catalog_game = "pokemon"
     _source = "tcgplayer"
     _pinned_version = 60
 

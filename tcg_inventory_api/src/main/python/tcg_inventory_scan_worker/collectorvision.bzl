@@ -72,10 +72,12 @@ def _cache_impl(ctx):
     feed = ctx.outputs.feed
     magic_snapshot = ctx.outputs.magic_snapshot
     pokemon_snapshot = ctx.outputs.pokemon_snapshot
+    pokemon_japan_snapshot = ctx.outputs.pokemon_japan_snapshot
     ctx.actions.write(output = feed, content = json.encode(_feed()))
     ctx.actions.write(output = magic_snapshot, content = json.encode(_snapshot("scryfall/mtg", CATALOGS["scryfall/mtg"])))
     ctx.actions.write(output = pokemon_snapshot, content = json.encode(_snapshot("tcgplayer/pokemon", CATALOGS["tcgplayer/pokemon"])))
-    return [DefaultInfo(files = depset([feed, magic_snapshot, pokemon_snapshot]))]
+    ctx.actions.write(output = pokemon_japan_snapshot, content = json.encode(_snapshot("tcgplayer/pokemon-japan", CATALOGS["tcgplayer/pokemon-japan"])))
+    return [DefaultInfo(files = depset([feed, magic_snapshot, pokemon_snapshot, pokemon_japan_snapshot]))]
 
 collectorvision_cache = rule(
     implementation = _cache_impl,
@@ -83,6 +85,7 @@ collectorvision_cache = rule(
         "feed": attr.output(mandatory = True),
         "magic_snapshot": attr.output(mandatory = True),
         "pokemon_snapshot": attr.output(mandatory = True),
+        "pokemon_japan_snapshot": attr.output(mandatory = True),
     },
 )
 
@@ -100,6 +103,7 @@ def collectorvision_image(name, base, handler, repo_tag, application_files):
         feed = name + "-feed.json",
         magic_snapshot = name + "-snapshot.json",
         pokemon_snapshot = name + "-pokemon-snapshot.json",
+        pokemon_japan_snapshot = name + "-pokemon-japan-snapshot.json",
     )
 
     python_package_layers = []
@@ -161,6 +165,7 @@ def collectorvision_image(name, base, handler, repo_tag, application_files):
     snapshot_labels = {
         "scryfall/mtg": ":" + name + "-snapshot.json",
         "tcgplayer/pokemon": ":" + name + "-pokemon-snapshot.json",
+        "tcgplayer/pokemon-japan": ":" + name + "-pokemon-japan-snapshot.json",
     }
     for key, catalog in CATALOGS.items():
         path = "catalog-v2/snapshots/milo1--{}/metadata/version-{}".format(key.replace("/", "--"), catalog.version)

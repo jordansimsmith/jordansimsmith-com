@@ -15,6 +15,9 @@ from tcg_inventory_scan_worker import scan_identifier
 from tcg_inventory_scan_worker.magic_the_gathering_scan_identifier import (
     MagicTheGatheringScanIdentifier,
 )
+from tcg_inventory_scan_worker.pokemon_japanese_scan_identifier import (
+    PokemonJapaneseScanIdentifier,
+)
 from tcg_inventory_scan_worker.pokemon_scan_identifier import PokemonScanIdentifier
 from tcg_inventory_scan_worker.scan_identification_message_handler import (
     RequestContext,
@@ -538,12 +541,48 @@ def test_pokemon_suggestions_keep_rank_and_cap_unique_products():
     ]
 
 
-def test_runtime_lazily_reuses_both_identifiers_and_records_their_versions(
+@pytest.mark.parametrize("finish", ["normal", "holofoil"])
+def test_japanese_pokemon_suggestions_keep_rank_and_cap_unique_products(finish):
+    snorlax = {"id": "566488", "name": "Snorlax - 143/165", "score": 0.98}
+    records = [
+        snorlax,
+        {**snorlax, "face_index": 1, "score": 0.97},
+        {"id": "566685", "name": "Snorlax (Poke Ball Pattern)", "score": 0.96},
+        {"id": "566838", "name": "Snorlax (Master Ball Pattern)", "score": 0.95},
+        {
+            "id": "578358",
+            "name": "Abomasnow - 008/184 (Mirror Holofoil)",
+            "score": 0.94,
+        },
+        {"id": "602320", "name": "Budew (Mirror Foil)", "score": 0.93},
+        {"id": "602321", "name": "Budew", "score": 0.92},
+    ]
+    store = FakeScanRepository(_scan_rows(1), game="pokemon_jp", finish=finish)
+    identifier = PokemonJapaneseScanIdentifier(
+        FakeCatalog(records, version=20), FakeDetector()
+    )
+    handler = ScanIdentificationMessageHandler(
+        store, FakeImages(), FakeQueue(), lambda game: identifier
+    )
+
+    handler.handle_message(REQUEST_CONTEXT, SCAN_IDENTIFICATION_MESSAGE)
+
+    assert store.suggestions[1] == [
+        ScanSuggestion("566488", "Snorlax - 143/165", 0.98),
+        ScanSuggestion("566685", "Snorlax (Poke Ball Pattern)", 0.96),
+        ScanSuggestion("566838", "Snorlax (Master Ball Pattern)", 0.95),
+        ScanSuggestion("578358", "Abomasnow - 008/184 (Mirror Holofoil)", 0.94),
+        ScanSuggestion("602320", "Budew (Mirror Foil)", 0.93),
+    ]
+
+
+def test_runtime_lazily_reuses_all_identifiers_and_records_their_versions(
     monkeypatch, request
 ):
     catalogs = {
         "mtg": FakeCatalog(version=40),
         "pokemon": FakeCatalog([], version=60),
+        "pokemon-japan": FakeCatalog([], version=20),
     }
     load_calls = []
     detector_calls = []
@@ -577,21 +616,36 @@ def test_runtime_lazily_reuses_both_identifiers_and_records_their_versions(
         pokemon, FakeImages(), FakeQueue(), runtime._load_identifier
     ).handle_message(REQUEST_CONTEXT, SCAN_IDENTIFICATION_MESSAGE)
 
+    pokemon_jp = FakeScanRepository(_scan_rows(1), game="pokemon_jp")
+    ScanIdentificationMessageHandler(
+        pokemon_jp, FakeImages(), FakeQueue(), runtime._load_identifier
+    ).handle_message(REQUEST_CONTEXT, SCAN_IDENTIFICATION_MESSAGE)
+
     magic_identifier = runtime._load_identifier("mtg")
     pokemon_identifier = runtime._load_identifier("pokemon")
+    pokemon_jp_identifier = runtime._load_identifier("pokemon_jp")
     assert magic_identifier is runtime._load_identifier("mtg")
     assert pokemon_identifier is runtime._load_identifier("pokemon")
+    assert pokemon_jp_identifier is runtime._load_identifier("pokemon_jp")
+    assert isinstance(pokemon_jp_identifier, PokemonJapaneseScanIdentifier)
     assert detector_calls == ["cpu"]
-    assert detector.calls == 2
+    assert detector.calls == 3
     common = {"family": "milo1", "cache_dir": "/offline-cache", "offline": True}
     assert load_calls == [
         ("mtg", {**common, "source": "scryfall", "version": 40}),
         ("pokemon", {**common, "source": "tcgplayer", "version": 60}),
+        (
+            "pokemon-japan",
+            {**common, "source": "tcgplayer", "version": 20},
+        ),
     ]
     assert magic.transitions == [("reviewing", 40, None)]
     assert pokemon.transitions == [("reviewing", 60, None)]
+    assert pokemon_jp.transitions == [("reviewing", 20, None)]
     assert pokemon.results == [(1, "needs_review")]
     assert pokemon.suggestions[1] == []
+    assert pokemon_jp.results == [(1, "needs_review")]
+    assert pokemon_jp.suggestions[1] == []
 
 
 def test_game_without_recognition_integration_fails_before_image_processing():

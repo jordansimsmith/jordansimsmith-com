@@ -18,6 +18,7 @@ MAX_SUGGESTIONS = 5
 
 class ScanIdentifier(ABC):
     game: str
+    _catalog_game: str
     _source: str
     _pinned_version: int
 
@@ -29,7 +30,7 @@ class ScanIdentifier(ABC):
     def load(cls) -> Self:
         detector = cls._load_detector()
         catalog = Catalog.load(
-            cls.game,
+            cls._catalog_game,
             source=cls._source,
             family="milo1",
             cache_dir=os.environ[CACHE_ENV],

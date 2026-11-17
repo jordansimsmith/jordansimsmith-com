@@ -153,6 +153,8 @@ use_repo(
     "collectorvision_magic_the_gathering_records",
     "collectorvision_milo",
     "collectorvision_pokemon_embeddings",
+    "collectorvision_pokemon_japan_embeddings",
+    "collectorvision_pokemon_japan_records",
     "collectorvision_pokemon_records",
 )
 

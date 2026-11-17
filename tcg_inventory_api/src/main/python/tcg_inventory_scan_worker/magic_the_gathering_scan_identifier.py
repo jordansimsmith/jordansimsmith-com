@@ -8,6 +8,7 @@ from .scan_repository import ScanSuggestion
 
 class MagicTheGatheringScanIdentifier(ScanIdentifier):
     game = "mtg"
+    _catalog_game = "mtg"
     _source = "scryfall"
     _pinned_version = 40
     _FINISHES = {"normal": "nonfoil", "foil": "foil", "etched": "etched"}

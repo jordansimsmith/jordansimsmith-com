@@ -8,6 +8,7 @@ import os
 import boto3
 
 from .magic_the_gathering_scan_identifier import MagicTheGatheringScanIdentifier
+from .pokemon_japanese_scan_identifier import PokemonJapaneseScanIdentifier
 from .pokemon_scan_identifier import PokemonScanIdentifier
 from .scan_identification_message_handler import (
     RequestContext,
@@ -50,6 +51,7 @@ class LambdaRuntime:
         identifier_type = {
             MagicTheGatheringScanIdentifier.game: MagicTheGatheringScanIdentifier,
             PokemonScanIdentifier.game: PokemonScanIdentifier,
+            PokemonJapaneseScanIdentifier.game: PokemonJapaneseScanIdentifier,
         }.get(game)
         if identifier_type is None:
             raise ValueError(f"no recognition integration configured for game: {game}")

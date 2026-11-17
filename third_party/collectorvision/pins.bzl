@@ -66,6 +66,36 @@ CATALOGS = {
             ),
         },
     ),
+    "tcgplayer/pokemon-japan": struct(
+        public_name = "tcgplayer-pokemon-japan",
+        version = 20,
+        rows = 27638,
+        source_updated_at = "2026-10-22T20:06:32Z",
+        descriptor = {
+            "game": "pokemon-japan",
+            "source": "tcgplayer",
+            "profile": "printings",
+            "description": "Japanese TCGplayer marketplace printing catalog.",
+            "result_identifier": "tcgplayer_product",
+            "recommended": True,
+        },
+        assets = {
+            "records": struct(
+                filename = "records.jsonl.gz",
+                repository = "collectorvision_pokemon_japan_records",
+                url = "https://hanclinto.github.io/CollectorVisionCatalog/catalog-v2/tcgplayer-pokemon-japan/version/20/base/records.jsonl.gz",
+                size = 401650,
+                sha256 = "7da886358e3be5443937933b731247e87c4348a3c2d2dbf448d352eb703ca36e",
+            ),
+            "embeddings": struct(
+                filename = "embeddings.f16.gz",
+                repository = "collectorvision_pokemon_japan_embeddings",
+                url = "https://hanclinto.github.io/CollectorVisionCatalog/catalog-v2/tcgplayer-pokemon-japan/version/20/base/embeddings.f16.gz",
+                size = 6518790,
+                sha256 = "c6e83b67ae06642f68509fd96655c13ac4e5040cccca63c29e9665f2b15e274d",
+            ),
+        },
+    ),
 }
 
 MILO_URL = "https://raw.githubusercontent.com/HanClinto/CollectorVision/{}/collector_vision/weights/milo.onnx".format(COLLECTORVISION_COMMIT)
