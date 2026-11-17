@@ -271,6 +271,128 @@ class AppraisalResolverTest {
             new AppraisalResult(AppraisalResult.Decision.REVIEW, "unmapped set", null, null));
   }
 
+  @Test
+  void pokemonJpResolverShouldUseTheFullCatalogNameAndSelectedFinish() throws Exception {
+    // arrange
+    record Printing(String name, String finish, String productId, String cardId) {}
+    var printings =
+        List.of(
+            new Printing("Snorlax - 143/165", "normal", "566488", "snorlax-normal"),
+            new Printing("Snorlax (181/165)", "holofoil", "577145", "snorlax-art-rare"),
+            new Printing("Snorlax (Poké Ball Pattern)", "holofoil", "566685", "snorlax-pbp"),
+            new Printing("Snorlax (Master Ball Pattern)", "holofoil", "566838", "snorlax-mbp"),
+            new Printing(
+                "Abomasnow - 008/184 (MIrror Holofoil)", "holofoil", "578358", "abomasnow-mh"),
+            new Printing(
+                "Budew (Mirror Foil) - 001/187",
+                "holofoil",
+                "602320",
+                "pkjp_SV8a-001:187_C_MF_foil"),
+            new Printing("Pikachu (GYM) - 291/SV-P", "normal", "shared", "pikachu-normal"),
+            new Printing("Pikachu (GYM) - 291/SV-P", "holofoil", "shared", "pikachu-foil"));
+    var fetchTcgService = new FakeFetchTcgService();
+    fetchTcgService.seedSets("pkjp", "TEST", List.of(new CardSet(3413, "Set")));
+    for (var printing : printings) {
+      var finish = "normal".equals(printing.finish()) ? "normal" : "foil";
+      fetchTcgService.seedSearchResult(
+          "pkjp", 3413, printing.name(), finish, List.of(new CardSearchResult(printing.cardId())));
+      fetchTcgService.seedCard(
+          printing.cardId(),
+          new GetCardResponse(
+              printing.cardId(), printing.name(), null, Map.of("tcgId", printing.productId())));
+    }
+    var resolver =
+        new PokemonJpAppraisalResolver(fetchTcgService, new FetchTcgCardMatcher(fetchTcgService));
+
+    for (var printing : printings) {
+      var row = row(printing.name(), printing.finish(), printing.productId());
+      row.setSetCode("TEST");
+
+      // act
+      var result = resolver.resolve(CTX, row);
+
+      // assert
+      assertThat(result)
+          .isEqualTo(
+              new AppraisalResult(
+                  AppraisalResult.Decision.RESOLVED, null, printing.cardId(), 3413));
+      assertThat(row.getName()).isEqualTo(printing.name());
+    }
+  }
+
+  @Test
+  void pokemonJpResolverShouldFindLaterPageMatchAndDeduplicateAcrossMappedSets() throws Exception {
+    // arrange
+    var fetchTcgService = new FakeFetchTcgService();
+    fetchTcgService.seedSets(
+        "pkjp", "BW8", List.of(new CardSet(42, "First Set"), new CardSet(43, "Second Set")));
+    var candidates = new ArrayList<CardSearchResult>();
+    for (var i = 0; i < 100; i++) {
+      candidates.add(new CardSearchResult("unrelated-" + i));
+    }
+    var match = new CardSearchResult("pkjp_opaque-008:184_R_foil");
+    candidates.add(match);
+    var name = "Pikachu (Poke Ball Pattern)";
+    fetchTcgService.seedSearchResult("pkjp", 42, name, "foil", candidates);
+    fetchTcgService.seedSearchResult("pkjp", 43, name, "foil", List.of(match));
+    fetchTcgService.seedCard(
+        match.id(), new GetCardResponse(match.id(), "Pikachu", null, Map.of("tcgId", "25")));
+    var row = row(name, "holofoil", "25");
+    row.setSetCode("BW8");
+    var resolver =
+        new PokemonJpAppraisalResolver(fetchTcgService, new FetchTcgCardMatcher(fetchTcgService));
+
+    // act
+    var result = resolver.resolve(CTX, row);
+
+    // assert
+    assertThat(result)
+        .isEqualTo(new AppraisalResult(AppraisalResult.Decision.RESOLVED, null, match.id(), 42));
+  }
+
+  @Test
+  void pokemonJpResolverShouldReturnReviewWhenAnExactPrintingCannotBeDetermined() throws Exception {
+    // arrange
+    var fetchTcgService = new FakeFetchTcgService();
+    fetchTcgService.seedSets("pkjp", "SV2a", List.of(new CardSet(3413, "151")));
+    fetchTcgService.seedSearchResult(
+        "pkjp",
+        3413,
+        "Snorlax",
+        "foil",
+        List.of(
+            new CardSearchResult("first"),
+            new CardSearchResult("second"),
+            new CardSearchResult("missing")));
+    for (var id : List.of("first", "second")) {
+      fetchTcgService.seedCard(
+          id, new GetCardResponse(id, "Snorlax", null, Map.of("tcgId", "566838")));
+    }
+    var unmapped = row("Snorlax", "holofoil", "566838");
+    var missing = row("Snorlax", "holofoil", "566685");
+    missing.setSetCode("SV2a");
+    var ambiguous = row("Snorlax", "holofoil", "566838");
+    ambiguous.setSetCode("SV2a");
+    var resolver =
+        new PokemonJpAppraisalResolver(fetchTcgService, new FetchTcgCardMatcher(fetchTcgService));
+
+    // act
+    var unmappedResult = resolver.resolve(CTX, unmapped);
+    var missingResult = resolver.resolve(CTX, missing);
+    var ambiguousResult = resolver.resolve(CTX, ambiguous);
+
+    // assert
+    assertThat(unmappedResult)
+        .isEqualTo(
+            new AppraisalResult(AppraisalResult.Decision.REVIEW, "unmapped set", null, null));
+    assertThat(missingResult)
+        .isEqualTo(
+            new AppraisalResult(AppraisalResult.Decision.REVIEW, "unresolvable", null, null));
+    assertThat(ambiguousResult)
+        .isEqualTo(
+            new AppraisalResult(AppraisalResult.Decision.REVIEW, "ambiguous match", null, null));
+  }
+
   private static PokemonAppraisalResolver pokemonResolver(FakeFetchTcgService fetchTcgService) {
     return new PokemonAppraisalResolver(fetchTcgService, new FetchTcgCardMatcher(fetchTcgService));
   }

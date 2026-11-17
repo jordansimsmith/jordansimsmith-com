@@ -168,7 +168,9 @@ public class ImportsModule {
     var cardMatcher = new FetchTcgCardMatcher(fetchTcgService);
     var magicResolver = new MagicTheGatheringAppraisalResolver(fetchTcgService, cardMatcher);
     var pokemonResolver = new PokemonAppraisalResolver(fetchTcgService, cardMatcher);
-    var resolverFactory = new AppraisalResolverFactory(magicResolver, pokemonResolver);
+    var pokemonJpResolver = new PokemonJpAppraisalResolver(fetchTcgService, cardMatcher);
+    var resolverFactory =
+        new AppraisalResolverFactory(magicResolver, pokemonResolver, pokemonJpResolver);
     return new AppraisalMessageHandler(
         importReadRepository,
         importMutationRepository,

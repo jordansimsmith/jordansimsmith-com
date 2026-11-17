@@ -20,6 +20,7 @@ import com.jordansimsmith.tcginventory.fetchtcg.client.CardSearchResult;
 import com.jordansimsmith.tcginventory.fetchtcg.client.CardSet;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FakeFetchTcgService;
 import com.jordansimsmith.tcginventory.fetchtcg.client.GetCardResponse;
+import com.jordansimsmith.tcginventory.imports.client.GetImportRequest;
 import com.jordansimsmith.tcginventory.inventory.client.Condition;
 import com.jordansimsmith.tcginventory.pricing.client.FakePricingService;
 import com.jordansimsmith.tcginventory.pricing.client.GetPriceRequest;
@@ -213,7 +214,8 @@ class AppraisalProcessingIntegrationTest {
             importMutationRepository,
             new AppraisalResolverFactory(
                 new MagicTheGatheringAppraisalResolver(fetchTcgService, matcher),
-                new PokemonAppraisalResolver(fetchTcgService, matcher)),
+                new PokemonAppraisalResolver(fetchTcgService, matcher),
+                new PokemonJpAppraisalResolver(fetchTcgService, matcher)),
             pricingSpy,
             appraisalPolicy,
             queue,
@@ -234,6 +236,97 @@ class AppraisalProcessingIntegrationTest {
       assertThat(row.getFetchtcgSetId()).isEqualTo(printing.setId());
       assertThat(row.getSuggestedPrice()).isEqualTo(printing.marketPrice());
     }
+  }
+
+  @Test
+  void appraisalShouldPriceJapanesePrintingsAndRequirePhotosForTheExactQuote() throws Exception {
+    // arrange
+    record Printing(String name, String productId, String cardId, GetPriceResponse quote) {}
+    var printings =
+        List.of(
+            new Printing(
+                "Snorlax (Poke Ball Pattern)",
+                "566685",
+                "pkjp_pbp:foil",
+                new GetPriceResponse(new BigDecimal("4.00"), new BigDecimal("5.00"))),
+            new Printing(
+                "Snorlax (Master Ball Pattern)",
+                "566838",
+                "pkjp_mbp:foil",
+                new GetPriceResponse(new BigDecimal("21.00"), new BigDecimal("22.00"))),
+            new Printing(
+                "Snorlax - 181/165",
+                "577145",
+                "pkjp_standard:foil",
+                new GetPriceResponse(null, null)));
+    var fetchTcgService = new FakeFetchTcgService();
+    fetchTcgService.seedSets("pkjp", "SV2a", List.of(new CardSet(3413, "151")));
+    var candidates =
+        printings.stream().map(printing -> new CardSearchResult(printing.cardId())).toList();
+    var importItem = parent(printings.size(), 0);
+    importItem.setGame("pokemon_jp");
+    importTable.putItem(importItem);
+    var rows = rows(printings.size());
+    for (var index = 0; index < printings.size(); index++) {
+      var printing = printings.get(index);
+      fetchTcgService.seedSearchResult("pkjp", 3413, printing.name(), "foil", candidates);
+      var row = rows.get(index);
+      row.setName(printing.name());
+      row.setExternalId(printing.productId());
+      row.setSetCode("SV2a");
+      row.setFinish("holofoil");
+      importRowTable.putItem(row);
+      fetchTcgService.seedCard(
+          printing.cardId(),
+          new GetCardResponse(
+              printing.cardId(),
+              printing.name(),
+              printing.quote().marketPrice(),
+              Map.of("tcgId", printing.productId())));
+      pricingService.seedPrice(USER, printing.cardId(), Condition.NM, printing.quote());
+    }
+    var pricingSpy = spy(pricingService);
+    var handler =
+        new ImportsModule()
+            .appraisalMessageHandler(
+                importReadRepository,
+                importMutationRepository,
+                fetchTcgService,
+                pricingSpy,
+                queue,
+                clock);
+    var ctx = new RequestContext(USER);
+
+    // act
+    handler.handleMessage(ctx, message());
+    var response =
+        new GetImportService(importReadRepository).getImport(ctx, new GetImportRequest(IMPORT_ID));
+
+    // assert
+    for (var printing : printings) {
+      verify(pricingSpy).getPrice(ctx, new GetPriceRequest(printing.cardId(), Condition.NM));
+    }
+    for (var index = 0; index < 2; index++) {
+      var printing = printings.get(index);
+      var row = importReadRepository.getRow(USER, IMPORT_ID, index + 1);
+      assertThat(row.getDecision()).isEqualTo("keep");
+      assertThat(row.getFetchtcgCardId()).isEqualTo(printing.cardId());
+      assertThat(row.getFetchtcgSetId()).isEqualTo(3413);
+      assertThat(row.getMarketPrice()).isEqualTo(printing.quote().marketPrice().toPlainString());
+      assertThat(row.getSuggestedPrice())
+          .isEqualTo(printing.quote().suggestedPrice().toPlainString());
+      assertThat(response.rows().get(index).name()).isEqualTo(printing.name());
+    }
+    assertThat(response.rows())
+        .extracting(row -> row.needsPhotos())
+        .containsExactly(false, true, false);
+    var missing = importReadRepository.getRow(USER, IMPORT_ID, 3);
+    assertThat(missing.getDecision()).isEqualTo("review");
+    assertThat(missing.getDecisionReason()).isEqualTo("market price unavailable");
+    assertThat(missing.getFetchtcgCardId()).isNull();
+    assertThat(missing.getFetchtcgSetId()).isNull();
+    assertThat(missing.getMarketPrice()).isNull();
+    assertThat(missing.getSuggestedPrice()).isNull();
   }
 
   @Test
@@ -407,7 +500,7 @@ class AppraisalProcessingIntegrationTest {
     return new AppraisalMessageHandler(
         importReadRepository,
         importMutationRepository,
-        new AppraisalResolverFactory(resolver, resolver),
+        new AppraisalResolverFactory(resolver, resolver, resolver),
         priceService,
         appraisalPolicy,
         importsQueue,
