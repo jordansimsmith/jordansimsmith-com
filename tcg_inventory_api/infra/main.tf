@@ -716,6 +716,36 @@ resource "aws_scheduler_schedule" "catalog_refresh_pokemon" {
   }
 }
 
+resource "aws_scheduler_schedule" "catalog_refresh_pokemon_jp" {
+  name                         = "${local.application_id}_refresh_pokemon_jp_catalog"
+  description                  = "Queues the daily Japanese Pokémon catalog refresh"
+  schedule_expression          = "cron(30 22 * * ? *)"
+  schedule_expression_timezone = "UTC"
+  depends_on                   = [aws_iam_role_policy_attachment.catalog_scheduler_sqs]
+
+  flexible_time_window {
+    mode = "OFF"
+  }
+
+  target {
+    arn      = "arn:aws:scheduler:::aws-sdk:sqs:sendMessage"
+    role_arn = aws_iam_role.catalog_scheduler.arn
+    input    = <<-JSON
+      {
+        "QueueUrl": "${module.sqs_queue["catalog"].queue_url}",
+        "MessageBody": "{\"game\":\"pokemon_jp\",\"scheduled_at\":\"<aws.scheduler.scheduled-time>\"}",
+        "MessageGroupId": "pokemon_jp",
+        "MessageDeduplicationId": "pokemon_jp#<aws.scheduler.scheduled-time>"
+      }
+    JSON
+
+    retry_policy {
+      maximum_event_age_in_seconds = 3600
+      maximum_retry_attempts       = 5
+    }
+  }
+}
+
 data "aws_iam_policy_document" "lambda_secretsmanager" {
   statement {
     effect = "Allow"
