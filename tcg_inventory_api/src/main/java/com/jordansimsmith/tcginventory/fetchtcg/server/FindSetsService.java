@@ -15,7 +15,9 @@ public class FindSetsService {
     if (request.externalSetId() == null || request.externalSetId().isBlank()) {
       throw new BadRequestException("external_set_id is required");
     }
-    if (!"mtg".equals(request.gameId()) && !"poke".equals(request.gameId())) {
+    if (!"mtg".equals(request.gameId())
+        && !"poke".equals(request.gameId())
+        && !"pkjp".equals(request.gameId())) {
       throw new BadRequestException("game_id is not supported for set mapping");
     }
     var sets =

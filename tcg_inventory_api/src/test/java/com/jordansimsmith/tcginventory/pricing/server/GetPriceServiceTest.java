@@ -97,6 +97,8 @@ class GetPriceServiceTest {
     var pricingRepository = mock(PricingRepository.class);
     var fetchTcgService = mock(FetchTcgService.class);
     var expected = new NotFoundException("account is not configured");
+    when(fetchTcgService.getCard(ctx, new GetCardRequest("card-1")))
+        .thenReturn(new GetCardResponse("card-1", "Card", new BigDecimal("5.00"), Map.of()));
     when(fetchTcgService.getAccount(ctx, new GetAccountRequest())).thenThrow(expected);
 
     // act & assert

@@ -31,6 +31,7 @@ filegroup(
 FETCHTCG_SET_MAPPING_RESOURCES = [
     "src/main/resources/com/jordansimsmith/tcginventory/fetchtcg/server/fetchtcg_magic_the_gathering_set_mapping.json",
     "src/main/resources/com/jordansimsmith/tcginventory/fetchtcg/server/fetchtcg_pokemon_set_mapping.json",
+    "src/main/resources/com/jordansimsmith/tcginventory/fetchtcg/server/fetchtcg_pokemon_jp_set_mapping.json",
 ]
 
 filegroup(

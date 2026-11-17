@@ -1,0 +1,1388 @@
+{
+  "20th": [
+    {
+      "set_id": 4045,
+      "set_name": "BREAK Starter Pack"
+    }
+  ],
+  "b": [
+    {
+      "set_id": 4115,
+      "set_name": "Battle Starter Deck (Blastoise)"
+    },
+    {
+      "set_id": 4116,
+      "set_name": "Battle Starter Deck (Magmortar)"
+    },
+    {
+      "set_id": 4117,
+      "set_name": "Battle Starter Deck (Raichu)"
+    }
+  ],
+  "bgs": [
+    {
+      "set_id": 4031,
+      "set_name": "Battle Gift Set: Thundurus vs Tornadus"
+    }
+  ],
+  "bk": [
+    {
+      "set_id": 4038,
+      "set_name": "BK: Cobalion Battle Strength Deck"
+    }
+  ],
+  "bkb": [
+    {
+      "set_id": 4033,
+      "set_name": "BKB: Black Kyurem-EX Battle Strength Deck"
+    }
+  ],
+  "bkr": [
+    {
+      "set_id": 4022,
+      "set_name": "BKR: Reshiram-EX Battle Strength Deck"
+    }
+  ],
+  "bkw": [
+    {
+      "set_id": 4034,
+      "set_name": "BKW: White Kyurem-EX Battle Strength Deck"
+    }
+  ],
+  "bkz": [
+    {
+      "set_id": 4023,
+      "set_name": "BKZ: Zekrom-EX Battle Strength Deck"
+    }
+  ],
+  "btv": [
+    {
+      "set_id": 4021,
+      "set_name": "Battle Theme Deck: Victini"
+    }
+  ],
+  "bw-p": [
+    {
+      "set_id": 4796,
+      "set_name": "BW-P Promotional cards"
+    }
+  ],
+  "clf": [
+    {
+      "set_id": 3932,
+      "set_name": "Pokemon TCG Classic: Venusaur"
+    }
+  ],
+  "cll": [
+    {
+      "set_id": 3931,
+      "set_name": "Pokemon TCG Classic: Charizard"
+    }
+  ],
+  "clv": [
+    {
+      "set_id": 3930,
+      "set_name": "Pokemon TCG Classic: Blastoise"
+    }
+  ],
+  "cp4": [
+    {
+      "set_id": 4053,
+      "set_name": "CP4: Premium Champion Pack"
+    }
+  ],
+  "cs1": [
+    {
+      "set_id": 4020,
+      "set_name": "CS1: Journey Partners Collection Sheet"
+    }
+  ],
+  "dpt": [
+    {
+      "set_id": 4095,
+      "set_name": "DPt Gift Box (Chimchar)"
+    },
+    {
+      "set_id": 4096,
+      "set_name": "DPt Gift Box (Pikachu)"
+    },
+    {
+      "set_id": 4097,
+      "set_name": "DPt Gift Box (Piplup)"
+    },
+    {
+      "set_id": 4098,
+      "set_name": "DPt Gift Box (Turtwig)"
+    }
+  ],
+  "e": [
+    {
+      "set_id": 4089,
+      "set_name": "Leafeon vs Metagross Expert Deck (Leafeon)"
+    },
+    {
+      "set_id": 4090,
+      "set_name": "Leafeon vs Metagross Expert Deck (Metagross)"
+    }
+  ],
+  "gbr": [
+    {
+      "set_id": 4029,
+      "set_name": "Garchomp Half Deck"
+    }
+  ],
+  "hxy": [
+    {
+      "set_id": 4064,
+      "set_name": "XY Beginning Set"
+    }
+  ],
+  "k+k": [
+    {
+      "set_id": 4025,
+      "set_name": "Blastoise + Kyurem-EX Combo Deck"
+    }
+  ],
+  "kld": [
+    {
+      "set_id": 4028,
+      "set_name": "Keldeo Battle Strength Deck"
+    }
+  ],
+  "l-p": [
+    {
+      "set_id": 4084,
+      "set_name": "L-P: Legends Promos"
+    }
+  ],
+  "ll": [
+    {
+      "set_id": 4083,
+      "set_name": "LL: Lost Link"
+    }
+  ],
+  "m-p": [
+    {
+      "set_id": 4437,
+      "set_name": "M-P Promotional Cards"
+    }
+  ],
+  "m1l": [
+    {
+      "set_id": 4438,
+      "set_name": "m1L: Mega Brave"
+    }
+  ],
+  "m1s": [
+    {
+      "set_id": 4439,
+      "set_name": "m1S: Mega Symphonia"
+    }
+  ],
+  "m2": [
+    {
+      "set_id": 4389,
+      "set_name": "M2 Inferno X"
+    }
+  ],
+  "m2a": [
+    {
+      "set_id": 4434,
+      "set_name": "M2a: High Class Pack: MEGA Dream ex"
+    }
+  ],
+  "m3": [
+    {
+      "set_id": 4448,
+      "set_name": "M3: Nihil Zero"
+    }
+  ],
+  "m4": [
+    {
+      "set_id": 4482,
+      "set_name": "M4: Ninja Spinner"
+    }
+  ],
+  "m5": [
+    {
+      "set_id": 4661,
+      "set_name": "M5: Abyss Eye"
+    }
+  ],
+  "m6": [
+    {
+      "set_id": 4701,
+      "set_name": "Storm Emeralda"
+    }
+  ],
+  "m6a": [
+    {
+      "set_id": 4784,
+      "set_name": "M6a: MEGA Expansion 30th Celebration"
+    }
+  ],
+  "mbd": [
+    {
+      "set_id": 4436,
+      "set_name": "MBD: MEGA Starter Set Mega Diancie ex"
+    }
+  ],
+  "mbg": [
+    {
+      "set_id": 4435,
+      "set_name": "MBG: MEGA Starter Set Mega Gengar ex"
+    }
+  ],
+  "mc": [
+    {
+      "set_id": 4432,
+      "set_name": "Start Deck 100 Battle Collection"
+    }
+  ],
+  "mdb": [
+    {
+      "set_id": 4027,
+      "set_name": "Master Deck Build Box EX"
+    }
+  ],
+  "mee": [
+    {
+      "set_id": 4786,
+      "set_name": "MEE: Starter Set ex Eevee ex"
+    }
+  ],
+  "mez": [
+    {
+      "set_id": 4788,
+      "set_name": "MEZ: Starter Set ex Zoroark ex"
+    }
+  ],
+  "mf": [
+    {
+      "set_id": 5300,
+      "set_name": "MF: 30th CELEBRATION Premium Deck Set Espeon & Umbreon"
+    }
+  ],
+  "mg": [
+    {
+      "set_id": 4024,
+      "set_name": "Mewtwo vs Genesect Deck Kit (Mewtwo)"
+    },
+    {
+      "set_id": 4039,
+      "set_name": "Mewtwo vs Genesect Deck Kit (Genesect)"
+    }
+  ],
+  "mmb": [
+    {
+      "set_id": 4065,
+      "set_name": "M Master Deck Build Box Power Style"
+    }
+  ],
+  "mp1": [
+    {
+      "set_id": 4789,
+      "set_name": "MP1: Start Deck 100 Battle Collection CoroCiao Version"
+    }
+  ],
+  "pbg": [
+    {
+      "set_id": 4035,
+      "set_name": "Team Plasma Battle Gift Set"
+    }
+  ],
+  "ppd": [
+    {
+      "set_id": 4032,
+      "set_name": "Team Plasma's Powered Half Deck"
+    }
+  ],
+  "ptm": [
+    {
+      "set_id": 4075,
+      "set_name": "PtM: Mewtwo LV.X Collection Pack"
+    }
+  ],
+  "ptr": [
+    {
+      "set_id": 4076,
+      "set_name": "PtR: Regigigas LV.X Collection Pack"
+    }
+  ],
+  "pts": [
+    {
+      "set_id": 4077,
+      "set_name": "PtS: Shaymin LV.X Collection Pack"
+    }
+  ],
+  "s-p": [
+    {
+      "set_id": 3974,
+      "set_name": "S-P: Sword & Shield Promos"
+    }
+  ],
+  "s0": [
+    {
+      "set_id": 3937,
+      "set_name": "s0: Charizard VSTAR vs Rayquaza VMAX Special Deck Set"
+    }
+  ],
+  "s10a": [
+    {
+      "set_id": 3852,
+      "set_name": "S10a: Dark Phantasma"
+    }
+  ],
+  "s10b": [
+    {
+      "set_id": 3853,
+      "set_name": "S10b: Pokemon GO"
+    }
+  ],
+  "s10d": [
+    {
+      "set_id": 3841,
+      "set_name": "S10D: Time Gazer"
+    }
+  ],
+  "s10p": [
+    {
+      "set_id": 3842,
+      "set_name": "S10P: Space Juggler"
+    }
+  ],
+  "s11": [
+    {
+      "set_id": 3843,
+      "set_name": "S11: Lost Abyss"
+    }
+  ],
+  "s11a": [
+    {
+      "set_id": 3854,
+      "set_name": "S11a: Incandescent Arcana"
+    }
+  ],
+  "s12": [
+    {
+      "set_id": 3844,
+      "set_name": "S12: Paradigm Trigger"
+    }
+  ],
+  "s12a": [
+    {
+      "set_id": 3857,
+      "set_name": "S12a: VSTAR Universe"
+    }
+  ],
+  "s1a": [
+    {
+      "set_id": 3845,
+      "set_name": "S1a: VMAX Rising"
+    }
+  ],
+  "s1h": [
+    {
+      "set_id": 3829,
+      "set_name": "S1H: Shield"
+    }
+  ],
+  "s1w": [
+    {
+      "set_id": 3828,
+      "set_name": "S1W: Sword"
+    }
+  ],
+  "s2": [
+    {
+      "set_id": 3830,
+      "set_name": "S2: Rebellion Crash"
+    }
+  ],
+  "s2a": [
+    {
+      "set_id": 3846,
+      "set_name": "S2a: Explosive Walker"
+    }
+  ],
+  "s3": [
+    {
+      "set_id": 3831,
+      "set_name": "S3: Infinity Zone"
+    }
+  ],
+  "s3a": [
+    {
+      "set_id": 3847,
+      "set_name": "S3a: Legendary Heartbeat"
+    }
+  ],
+  "s4": [
+    {
+      "set_id": 3832,
+      "set_name": "S4: Amazing Volt Tackle"
+    }
+  ],
+  "s4a": [
+    {
+      "set_id": 3855,
+      "set_name": "S4a: Shiny Star V"
+    }
+  ],
+  "s5a": [
+    {
+      "set_id": 3848,
+      "set_name": "S5a: Peerless Fighters"
+    }
+  ],
+  "s5i": [
+    {
+      "set_id": 3833,
+      "set_name": "S5I: Single Strike Master"
+    }
+  ],
+  "s5r": [
+    {
+      "set_id": 3834,
+      "set_name": "S5R: Rapid Strike Master"
+    }
+  ],
+  "s6a": [
+    {
+      "set_id": 3849,
+      "set_name": "S6a: Eevee Heroes"
+    }
+  ],
+  "s6h": [
+    {
+      "set_id": 3835,
+      "set_name": "S6H: Silver Lance"
+    }
+  ],
+  "s6k": [
+    {
+      "set_id": 3836,
+      "set_name": "S6K: Jet-Black Spirit"
+    }
+  ],
+  "s7d": [
+    {
+      "set_id": 3837,
+      "set_name": "S7D: Skyscraping Perfection"
+    }
+  ],
+  "s7r": [
+    {
+      "set_id": 3838,
+      "set_name": "S7R: Blue Sky Stream"
+    }
+  ],
+  "s8": [
+    {
+      "set_id": 3839,
+      "set_name": "S8: Fusion Arts"
+    }
+  ],
+  "s8a": [
+    {
+      "set_id": 3850,
+      "set_name": "S8a: 25th Anniversary Collection"
+    }
+  ],
+  "s8a-g": [
+    {
+      "set_id": 3944,
+      "set_name": "s8a-G: 25th Anniversary Golden Box"
+    }
+  ],
+  "s8a-p": [
+    {
+      "set_id": 3951,
+      "set_name": "s8a-P: Promo Card Pack 25th Anniversary Edition"
+    }
+  ],
+  "s8b": [
+    {
+      "set_id": 3856,
+      "set_name": "S8b: VMAX Climax"
+    }
+  ],
+  "s9": [
+    {
+      "set_id": 3840,
+      "set_name": "S9: Star Birth"
+    }
+  ],
+  "s9a": [
+    {
+      "set_id": 3851,
+      "set_name": "S9a: Battle Region"
+    }
+  ],
+  "sa": [
+    {
+      "set_id": 3957,
+      "set_name": "sA: Fighting Starter Set V"
+    },
+    {
+      "set_id": 3958,
+      "set_name": "sA: Fire Starter Set V"
+    },
+    {
+      "set_id": 3960,
+      "set_name": "sA: Grass Starter Set V"
+    },
+    {
+      "set_id": 3961,
+      "set_name": "sA: Lightning Starter Set V"
+    },
+    {
+      "set_id": 3962,
+      "set_name": "sA: Water Starter Set V"
+    }
+  ],
+  "sb": [
+    {
+      "set_id": 3963,
+      "set_name": "sB: Sword & Shield Premium Trainer Box"
+    }
+  ],
+  "sc": [
+    {
+      "set_id": 3954,
+      "set_name": "sC: Charizard Starter Set VMAX"
+    },
+    {
+      "set_id": 3955,
+      "set_name": "sC: Grimmsnarl Starter Set VMAX"
+    }
+  ],
+  "sc2": [
+    {
+      "set_id": 3949,
+      "set_name": "sC2: Charizard Starter Set VMAX 2"
+    }
+  ],
+  "sd": [
+    {
+      "set_id": 3953,
+      "set_name": "sD: V Starter Decks"
+    }
+  ],
+  "sef": [
+    {
+      "set_id": 3950,
+      "set_name": "sEF: Venusaur Starter Set VMAX"
+    }
+  ],
+  "sek": [
+    {
+      "set_id": 3948,
+      "set_name": "sEK: Blastoise Starter Set VMAX"
+    }
+  ],
+  "sf": [
+    {
+      "set_id": 3964,
+      "set_name": "sF: Single Strike & Rapid Strike Premium Trainer Boxes"
+    }
+  ],
+  "sgg": [
+    {
+      "set_id": 3934,
+      "set_name": "SS: Gengar VMAX High-Class Deck"
+    }
+  ],
+  "sgi": [
+    {
+      "set_id": 3935,
+      "set_name": "SS: Inteleon VMAX High-Class Deck"
+    }
+  ],
+  "sh": [
+    {
+      "set_id": 3965,
+      "set_name": "sH: Sword & Shield Family Pokemon Card Game"
+    }
+  ],
+  "si": [
+    {
+      "set_id": 3959,
+      "set_name": "SI: Start Deck 100"
+    }
+  ],
+  "sj": [
+    {
+      "set_id": 3945,
+      "set_name": "sJ: Zacian & Zamazenta vs Eternatus Special Deck Set"
+    }
+  ],
+  "sk": [
+    {
+      "set_id": 3943,
+      "set_name": "sK: VSTAR Premium Trainer Box"
+    }
+  ],
+  "sld": [
+    {
+      "set_id": 3966,
+      "set_name": "sLD: Darkrai Starter Set VSTAR"
+    }
+  ],
+  "sll": [
+    {
+      "set_id": 3942,
+      "set_name": "sLL: Lucario Starter Set VSTAR"
+    }
+  ],
+  "sm-p": [
+    {
+      "set_id": 3979,
+      "set_name": "SM-P: Sun & Moon Promos"
+    }
+  ],
+  "sm0": [
+    {
+      "set_id": 3858,
+      "set_name": "SM0: Pikachu's New Friends"
+    }
+  ],
+  "sm1+": [
+    {
+      "set_id": 3876,
+      "set_name": "SM1+: Sun & Moon"
+    },
+    {
+      "set_id": 3978,
+      "set_name": "sm1+: Enhanced Expansion Pack Sun & Moon"
+    }
+  ],
+  "sm10": [
+    {
+      "set_id": 3873,
+      "set_name": "SM10: Double Blaze"
+    }
+  ],
+  "sm10a": [
+    {
+      "set_id": 3887,
+      "set_name": "SM10a: GG End"
+    }
+  ],
+  "sm10b": [
+    {
+      "set_id": 3888,
+      "set_name": "SM10b: Sky Legend"
+    }
+  ],
+  "sm11": [
+    {
+      "set_id": 3874,
+      "set_name": "SM11: Miracle Twin"
+    }
+  ],
+  "sm11a": [
+    {
+      "set_id": 3889,
+      "set_name": "SM11a: Remix Bout"
+    }
+  ],
+  "sm11b": [
+    {
+      "set_id": 3890,
+      "set_name": "SM11b: Dream League"
+    }
+  ],
+  "sm12": [
+    {
+      "set_id": 3875,
+      "set_name": "SM12: Alter Genesis"
+    }
+  ],
+  "sm12a": [
+    {
+      "set_id": 3893,
+      "set_name": "SM12a: TAG TEAM GX: Tag All Stars"
+    }
+  ],
+  "sm1m": [
+    {
+      "set_id": 3860,
+      "set_name": "SM1M: Collection Moon"
+    }
+  ],
+  "sm1s": [
+    {
+      "set_id": 3859,
+      "set_name": "SM1S: Collection Sun"
+    }
+  ],
+  "sm2+": [
+    {
+      "set_id": 3877,
+      "set_name": "SM2+: Facing a New Trial"
+    }
+  ],
+  "sm2k": [
+    {
+      "set_id": 3861,
+      "set_name": "SM2K: Islands Await You"
+    }
+  ],
+  "sm2l": [
+    {
+      "set_id": 3862,
+      "set_name": "SM2L: Alolan Moonlight"
+    }
+  ],
+  "sm3+": [
+    {
+      "set_id": 3878,
+      "set_name": "SM3+: Shining Legends"
+    }
+  ],
+  "sm3h": [
+    {
+      "set_id": 3863,
+      "set_name": "SM3H: To Have Seen the Battle Rainbow"
+    }
+  ],
+  "sm3n": [
+    {
+      "set_id": 3864,
+      "set_name": "SM3N: Darkness that Consumes Light"
+    }
+  ],
+  "sm4+": [
+    {
+      "set_id": 3891,
+      "set_name": "SM4+: GX Battle Boost"
+    }
+  ],
+  "sm4a": [
+    {
+      "set_id": 3866,
+      "set_name": "SM4A: Ultradimensional Beasts"
+    }
+  ],
+  "sm4s": [
+    {
+      "set_id": 3865,
+      "set_name": "SM4S: Awakened Heroes"
+    }
+  ],
+  "sm5+": [
+    {
+      "set_id": 3879,
+      "set_name": "SM5+: Ultra Force"
+    }
+  ],
+  "sm5m": [
+    {
+      "set_id": 3868,
+      "set_name": "SM5M: Ultra Moon"
+    }
+  ],
+  "sm5s": [
+    {
+      "set_id": 3867,
+      "set_name": "SM5S: Ultra Sun"
+    }
+  ],
+  "sm6": [
+    {
+      "set_id": 3869,
+      "set_name": "SM6: Forbidden Light"
+    }
+  ],
+  "sm6a": [
+    {
+      "set_id": 3880,
+      "set_name": "SM6a: Dragon Storm"
+    }
+  ],
+  "sm6b": [
+    {
+      "set_id": 3881,
+      "set_name": "SM6b: Champion Road"
+    }
+  ],
+  "sm7": [
+    {
+      "set_id": 3870,
+      "set_name": "SM7: Sky-Splitting Charisma"
+    }
+  ],
+  "sm7a": [
+    {
+      "set_id": 3882,
+      "set_name": "SM7a: Thunderclap Spark"
+    }
+  ],
+  "sm7b": [
+    {
+      "set_id": 3883,
+      "set_name": "SM7b: Fairy Rise"
+    }
+  ],
+  "sm8": [
+    {
+      "set_id": 3871,
+      "set_name": "SM8: Super-Burst Impact"
+    }
+  ],
+  "sm8a": [
+    {
+      "set_id": 3884,
+      "set_name": "SM8a: Dark Order"
+    }
+  ],
+  "sm8b": [
+    {
+      "set_id": 3892,
+      "set_name": "SM8b: GX Ultra Shiny"
+    }
+  ],
+  "sm9": [
+    {
+      "set_id": 3872,
+      "set_name": "SM9: Tag Bolt"
+    }
+  ],
+  "sm9a": [
+    {
+      "set_id": 3885,
+      "set_name": "SM9a: Night Unison"
+    }
+  ],
+  "sm9b": [
+    {
+      "set_id": 3886,
+      "set_name": "SM9b: Full Metal Wall"
+    }
+  ],
+  "sma": [
+    {
+      "set_id": 3977,
+      "set_name": "smA: Sun & Moon Starter Set"
+    }
+  ],
+  "smb": [
+    {
+      "set_id": 3976,
+      "set_name": "smB: Premium Trainer Box"
+    }
+  ],
+  "smc": [
+    {
+      "set_id": 3980,
+      "set_name": "smC: Tapu Bulu-GX Enhanced Starter Set"
+    }
+  ],
+  "smd": [
+    {
+      "set_id": 3981,
+      "set_name": "smD: Ash vs Team Rocket Deck Kit"
+    }
+  ],
+  "sme": [
+    {
+      "set_id": 3982,
+      "set_name": "smE: Solgaleo-GX & Lunala-GX Legendary Starter Set"
+    }
+  ],
+  "smf": [
+    {
+      "set_id": 3983,
+      "set_name": "smF: Ultra Sun & Ultra Moon Premium Trainer Box"
+    }
+  ],
+  "smg": [
+    {
+      "set_id": 3984,
+      "set_name": "smG: Ultra Sun & Ultra Moon Deck Build Boxes"
+    }
+  ],
+  "smh": [
+    {
+      "set_id": 3986,
+      "set_name": "smH: GX Starter Decks"
+    }
+  ],
+  "smi": [
+    {
+      "set_id": 3973,
+      "set_name": "smI: Flareon-GX, Vaporeon-GX & Jolteon-GX Starter Sets"
+    }
+  ],
+  "smj": [
+    {
+      "set_id": 3972,
+      "set_name": "smJ: Tag Team GX Premium Trainer Box"
+    }
+  ],
+  "smk": [
+    {
+      "set_id": 3971,
+      "set_name": "smK: Trainer Battle Decks"
+    }
+  ],
+  "sml": [
+    {
+      "set_id": 3969,
+      "set_name": "smL: Sun & Moon Family Pokemon Card Game"
+    }
+  ],
+  "smm": [
+    {
+      "set_id": 3967,
+      "set_name": "smM: Tag Team GX Starter Sets"
+    }
+  ],
+  "smn": [
+    {
+      "set_id": 3970,
+      "set_name": "smN: Tag Team GX Deck Build Box"
+    }
+  ],
+  "smp1": [
+    {
+      "set_id": 3975,
+      "set_name": "smP1: Rockruff Full Power Deck"
+    }
+  ],
+  "smp2": [
+    {
+      "set_id": 3968,
+      "set_name": "smP2: Great Detective Pikachu"
+    }
+  ],
+  "snp": [
+    {
+      "set_id": 4067,
+      "set_name": "SNP: Noivern BREAK Evolution Pack"
+    },
+    {
+      "set_id": 4068,
+      "set_name": "SNP: Raichu BREAK Evolution Pack"
+    }
+  ],
+  "sp1": [
+    {
+      "set_id": 3956,
+      "set_name": "sp1: Zacian + Zamazenta Box"
+    }
+  ],
+  "sp2": [
+    {
+      "set_id": 3952,
+      "set_name": "sp2: VMAX Special Set"
+    }
+  ],
+  "sp3": [
+    {
+      "set_id": 3936,
+      "set_name": "SS: Silver Lance & Jet-Black Spirit Jumbo Pack Set"
+    }
+  ],
+  "sp4": [
+    {
+      "set_id": 3947,
+      "set_name": "sp4: Eevee Heroes VMAX Special Set"
+    }
+  ],
+  "sp5": [
+    {
+      "set_id": 3946,
+      "set_name": "sp5: V-UNION Special Card Sets"
+    }
+  ],
+  "sp6": [
+    {
+      "set_id": 3938,
+      "set_name": "sp6: VSTAR Special Set"
+    }
+  ],
+  "spd": [
+    {
+      "set_id": 3939,
+      "set_name": "sPD: Deoxys VSTAR & VMAX High-Class Deck"
+    }
+  ],
+  "spz": [
+    {
+      "set_id": 3940,
+      "set_name": "sPZ: Zeraora VSTAR & VMAX High-Class Deck"
+    }
+  ],
+  "sv-p": [
+    {
+      "set_id": 3431,
+      "set_name": "SV-P: Promotional Cards"
+    }
+  ],
+  "sv10": [
+    {
+      "set_id": 3436,
+      "set_name": "SV10: The Glory of Team Rocket"
+    }
+  ],
+  "sv11b": [
+    {
+      "set_id": 4237,
+      "set_name": "SV11B: Black Bolt"
+    }
+  ],
+  "sv11w": [
+    {
+      "set_id": 4230,
+      "set_name": "SV11W: White Flare"
+    }
+  ],
+  "sv1a": [
+    {
+      "set_id": 3412,
+      "set_name": "SV1a: Triplet Beat"
+    }
+  ],
+  "sv1s": [
+    {
+      "set_id": 3419,
+      "set_name": "SV1S: Scarlet ex"
+    }
+  ],
+  "sv1v": [
+    {
+      "set_id": 3420,
+      "set_name": "SV1V: Violet ex"
+    }
+  ],
+  "sv2a": [
+    {
+      "set_id": 3413,
+      "set_name": "SV2a: Pokemon Card 151"
+    }
+  ],
+  "sv2d": [
+    {
+      "set_id": 3422,
+      "set_name": "SV2D: Clay Burst"
+    }
+  ],
+  "sv2p": [
+    {
+      "set_id": 3421,
+      "set_name": "SV2P: Snow Hazard"
+    }
+  ],
+  "sv3": [
+    {
+      "set_id": 3423,
+      "set_name": "SV3: Ruler of the Black Flame"
+    }
+  ],
+  "sv3a": [
+    {
+      "set_id": 3414,
+      "set_name": "SV3a: Raging Surf"
+    }
+  ],
+  "sv4a": [
+    {
+      "set_id": 3415,
+      "set_name": "SV4a: Shiny Treasure ex"
+    }
+  ],
+  "sv4k": [
+    {
+      "set_id": 3424,
+      "set_name": "SV4K: Ancient Roar"
+    }
+  ],
+  "sv4m": [
+    {
+      "set_id": 3425,
+      "set_name": "SV4M: Future Flash"
+    }
+  ],
+  "sv5a": [
+    {
+      "set_id": 3416,
+      "set_name": "SV5a: Crimson Haze"
+    }
+  ],
+  "sv5k": [
+    {
+      "set_id": 3426,
+      "set_name": "SV5K: Wild Force"
+    }
+  ],
+  "sv5m": [
+    {
+      "set_id": 3427,
+      "set_name": "SV5M: Cyber Judge"
+    }
+  ],
+  "sv6": [
+    {
+      "set_id": 3428,
+      "set_name": "SV6: Transformation Mask"
+    }
+  ],
+  "sv6a": [
+    {
+      "set_id": 3417,
+      "set_name": "SV6a: Night Wanderer"
+    }
+  ],
+  "sv7": [
+    {
+      "set_id": 3429,
+      "set_name": "SV7: Stellar Miracle"
+    }
+  ],
+  "sv7a": [
+    {
+      "set_id": 3418,
+      "set_name": "SV7a: Paradise Dragona"
+    }
+  ],
+  "sv8": [
+    {
+      "set_id": 3430,
+      "set_name": "SV8: Super Electric Breaker"
+    }
+  ],
+  "sv8a": [
+    {
+      "set_id": 3432,
+      "set_name": "SV8a: Terastal Fest ex"
+    }
+  ],
+  "sv9": [
+    {
+      "set_id": 3433,
+      "set_name": "SV9: Battle Partners"
+    }
+  ],
+  "sv9a": [
+    {
+      "set_id": 3435,
+      "set_name": "SV9a: Heat Wave Arena"
+    }
+  ],
+  "svam": [
+    {
+      "set_id": 3924,
+      "set_name": "SV: ex Starter Set Sprigatito & Lucario ex"
+    },
+    {
+      "set_id": 3925,
+      "set_name": "SV: ex Starter Set Quaxly & Mimikyu ex"
+    }
+  ],
+  "svaw": [
+    {
+      "set_id": 3926,
+      "set_name": "SV: ex Starter Set Fuecoco & Ampharos ex"
+    }
+  ],
+  "svb": [
+    {
+      "set_id": 3923,
+      "set_name": "SV: Premium Trainer Box ex"
+    }
+  ],
+  "svc": [
+    {
+      "set_id": 3922,
+      "set_name": "SV: ex Starter Set Pikachu ex & Pawmot"
+    }
+  ],
+  "svd": [
+    {
+      "set_id": 3920,
+      "set_name": "SV: ex Start Decks"
+    }
+  ],
+  "svel": [
+    {
+      "set_id": 3917,
+      "set_name": "SV: Skeledirge ex Terastal Starter Set"
+    }
+  ],
+  "svem": [
+    {
+      "set_id": 3916,
+      "set_name": "SV: Mewtwo ex Terastal Starter Set"
+    }
+  ],
+  "svf": [
+    {
+      "set_id": 3918,
+      "set_name": "SV: Ruler of the Black Flame Deck Build Box"
+    }
+  ],
+  "svg": [
+    {
+      "set_id": 3929,
+      "set_name": "SV: Venusaur, Charizard & Blastoise Special Deck Set"
+    }
+  ],
+  "svhk": [
+    {
+      "set_id": 3927,
+      "set_name": "SV: Ancient Koraidon ex Starter Deck & Build Set"
+    }
+  ],
+  "svhm": [
+    {
+      "set_id": 3928,
+      "set_name": "SV: Future Miraidon ex Starter Deck & Build Set"
+    }
+  ],
+  "svi": [
+    {
+      "set_id": 3933,
+      "set_name": "Battle Academy"
+    }
+  ],
+  "svjl": [
+    {
+      "set_id": 3913,
+      "set_name": "SV: Terastal Charizard ex Battle Master Deck"
+    }
+  ],
+  "svjp": [
+    {
+      "set_id": 3912,
+      "set_name": "SV: Chien-Pao ex Battle Master Deck"
+    }
+  ],
+  "svk": [
+    {
+      "set_id": 3911,
+      "set_name": "SV: Stellar Miracle Deck Build Box"
+    }
+  ],
+  "svl": [
+    {
+      "set_id": 3910,
+      "set_name": "SV: Ceruledge ex Stellar Tera Type Starter Set"
+    }
+  ],
+  "svln": [
+    {
+      "set_id": 3915,
+      "set_name": "SV: Sylveon ex Stellar Tera Type Starter Set"
+    }
+  ],
+  "svn": [
+    {
+      "set_id": 4441,
+      "set_name": "SVN: Battle Partners Deck Build Box"
+    }
+  ],
+  "svod": [
+    {
+      "set_id": 4220,
+      "set_name": "SV: ex Starter Set Steven's Beldum & Metagross ex"
+    }
+  ],
+  "svom": [
+    {
+      "set_id": 4221,
+      "set_name": "SV: ex Starter Set Marnie's Morpeko & Grimmsnarl ex"
+    }
+  ],
+  "svp1": [
+    {
+      "set_id": 3921,
+      "set_name": "SV: ex Special Set"
+    }
+  ],
+  "szd": [
+    {
+      "set_id": 4030,
+      "set_name": "Hydreigon Half Deck"
+    }
+  ],
+  "wak": [
+    {
+      "set_id": 4026,
+      "set_name": "Everyone's Exciting Battle"
+    }
+  ],
+  "wcs23": [
+    {
+      "set_id": 4442,
+      "set_name": "WCS23: 2023 World Championships Yokohama Deck: Pikachu"
+    }
+  ],
+  "x30": [
+    {
+      "set_id": 4061,
+      "set_name": "Xerneas Half Deck"
+    }
+  ],
+  "xy": [
+    {
+      "set_id": 3985,
+      "set_name": "SM: The Best of XY"
+    }
+  ],
+  "xy-p": [
+    {
+      "set_id": 4001,
+      "set_name": "XY-P: XY Promos"
+    }
+  ],
+  "xya": [
+    {
+      "set_id": 4040,
+      "set_name": "XYA: M Charizard-EX Mega Battle Deck"
+    }
+  ],
+  "xyb": [
+    {
+      "set_id": 4041,
+      "set_name": "XYB: Dialga-EX + Aegislash-EX Hyper Metal Chain Deck"
+    }
+  ],
+  "xyc": [
+    {
+      "set_id": 4042,
+      "set_name": "XYC: Super Legend Set: Xerneas-EX & Yveltal-EX"
+    }
+  ],
+  "xyd": [
+    {
+      "set_id": 4043,
+      "set_name": "XYD: M Rayquaza-EX Mega Battle Deck"
+    }
+  ],
+  "xye": [
+    {
+      "set_id": 4044,
+      "set_name": "XYE: Emboar-EX vs Togekiss-EX Deck Kit"
+    }
+  ],
+  "xyf": [
+    {
+      "set_id": 4047,
+      "set_name": "XYF: Golduck BREAK + Palkia-EX Combo Deck"
+    }
+  ],
+  "xyg": [
+    {
+      "set_id": 4049,
+      "set_name": "XYG: Zygarde-EX Perfect Battle Deck"
+    }
+  ],
+  "y30": [
+    {
+      "set_id": 4052,
+      "set_name": "Yveltal Half Deck"
+    }
+  ]
+}

@@ -56,6 +56,37 @@ public class FindSetsServiceTest {
   }
 
   @Test
+  void findSetsShouldFindJapanesePokemonSetsWhenCodeHasMixedCase() throws BadRequestException {
+    // act
+    var sv2a = service.findSets(ctx, new FindSetsRequest("pkjp", "sV2A")).sets();
+    var s8b = service.findSets(ctx, new FindSetsRequest("pkjp", "S8B")).sets();
+
+    // assert
+    assertThat(sv2a).contains(new CardSet(3413, "SV2a: Pokemon Card 151"));
+    assertThat(s8b).contains(new CardSet(3856, "S8b: VMAX Climax"));
+  }
+
+  @Test
+  void findSetsShouldKeepJapanesePokemonMappingsSeparateFromEnglish() throws BadRequestException {
+    // act
+    var japaneseOnly = service.findSets(ctx, new FindSetsRequest("pkjp", "sv2a")).sets();
+    var englishOnly = service.findSets(ctx, new FindSetsRequest("poke", "sv2a")).sets();
+
+    // assert
+    assertThat(japaneseOnly).contains(new CardSet(3413, "SV2a: Pokemon Card 151"));
+    assertThat(englishOnly).isEmpty();
+  }
+
+  @Test
+  void findSetsShouldReturnEmptyWhenJapanesePokemonCodeIsUnmapped() throws BadRequestException {
+    // act
+    var sets = service.findSets(ctx, new FindSetsRequest("pkjp", "zzz_nonexistent_set")).sets();
+
+    // assert
+    assertThat(sets).isEmpty();
+  }
+
+  @Test
   void findSetsShouldRejectUnsupportedGame() {
     // act & assert
     assertThatThrownBy(() -> service.findSets(ctx, new FindSetsRequest("unsupported", "a25")))

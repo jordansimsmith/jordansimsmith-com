@@ -17,10 +17,14 @@ public class FetchTcgSetMapping {
   private static final Map<String, Map<String, List<FetchTcgSetEntry>>> MAPPINGS =
       Map.of(
           "mtg", loadMapping("fetchtcg_magic_the_gathering_set_mapping.json"),
-          "poke", loadMapping("fetchtcg_pokemon_set_mapping.json"));
+          "poke", loadMapping("fetchtcg_pokemon_set_mapping.json"),
+          "pkjp", loadMapping("fetchtcg_pokemon_jp_set_mapping.json"));
 
   public static List<FetchTcgSetEntry> get(String gameId, String externalSetId) {
-    var code = "poke".equals(gameId) ? externalSetId.toLowerCase(Locale.ROOT) : externalSetId;
+    var code =
+        "poke".equals(gameId) || "pkjp".equals(gameId)
+            ? externalSetId.toLowerCase(Locale.ROOT)
+            : externalSetId;
     return MAPPINGS.get(gameId).getOrDefault(code, List.of());
   }
 
