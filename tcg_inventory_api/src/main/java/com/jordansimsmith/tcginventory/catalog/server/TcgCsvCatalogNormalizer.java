@@ -129,6 +129,9 @@ public class TcgCsvCatalogNormalizer {
     for (var validatedGroup : validatedGroups) {
       var group = validatedGroup.group();
       for (var product : validatedGroup.products()) {
+        if (product.extendedData() == null) {
+          continue;
+        }
         var fields = new HashMap<String, String>();
         for (var field : product.extendedData()) {
           fields.put(field.name(), field.value());

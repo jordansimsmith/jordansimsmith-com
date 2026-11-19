@@ -144,6 +144,32 @@ public class HttpTcgCsvClientTest {
   }
 
   @Test
+  void findProductsShouldAcceptMissingNullAndEmptyExtendedData()
+      throws IOException, InterruptedException {
+    // arrange
+    var productsResponse =
+        response(
+            200,
+            """
+            {"success":true,"errors":[],"totalItems":3,"results":[
+              {"productId":10,"categoryId":3,"groupId":3170,"name":"Booster Box"},
+              {"productId":11,"categoryId":3,"groupId":3170,"name":"Sleeves","extendedData":null},
+              {"productId":12,"categoryId":3,"groupId":3170,"name":"Token","extendedData":[]}]}
+            """);
+    when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
+        .thenReturn(productsResponse);
+
+    // act
+    var products = client.findProducts(3, 3170);
+
+    // assert
+    assertThat(products).hasSize(3);
+    assertThat(products.get(0).extendedData()).isNull();
+    assertThat(products.get(1).extendedData()).isNull();
+    assertThat(products.get(2).extendedData()).isEmpty();
+  }
+
+  @Test
   void collectionShouldRejectInvalidResponses() throws IOException, InterruptedException {
     // arrange
     var unsuccessful =

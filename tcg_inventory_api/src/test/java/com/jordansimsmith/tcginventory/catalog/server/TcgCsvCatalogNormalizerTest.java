@@ -195,19 +195,29 @@ public class TcgCsvCatalogNormalizerTest {
   }
 
   @Test
-  void normalizeShouldRejectMalformedExtendedDataAfterExcludingAnUnnumberedProduct() {
+  void normalizeShouldExcludeProductsWithNullExtendedDataAndRetainCards() {
     // arrange
     var group = group(3170, "SWSH12", "Silver Tempest");
-    var malformed = new TcgCsvClient.Product(35, 3, 3170, "Later Product", null);
+    var withoutMetadata = new TcgCsvClient.Product(35, 3, 3170, "Silver Tempest Sleeves", null);
     var source =
         source(
             group,
-            List.of(product(34, 3170, "Pikachu", null, "Lightning"), malformed),
-            List.of(new TcgCsvClient.Price(34, "Normal"), new TcgCsvClient.Price(35, "Normal")));
+            List.of(
+                product(34, 3170, "Silver Tempest Booster Box", null, null),
+                withoutMetadata,
+                product(36, 3170, "Pikachu", "055/195", "Lightning")),
+            List.of(
+                new TcgCsvClient.Price(34, "Normal"),
+                new TcgCsvClient.Price(35, "Normal"),
+                new TcgCsvClient.Price(36, "Normal")));
 
-    // act / assert
-    assertThatThrownBy(() -> normalize(List.of(group), source))
-        .isInstanceOf(NullPointerException.class);
+    // act
+    var result = normalize(List.of(group), source);
+
+    // assert
+    assertThat(result.products())
+        .containsExactly(
+            new TcgCsvCatalogSnapshot.Product(36, "Pikachu", 3170, "055/195", List.of("normal")));
   }
 
   @Test
