@@ -127,7 +127,7 @@ public class FootballCalendarE2ETest {
     var summaries = events.stream().map(event -> event.getSummary().getValue()).toList();
     assertThat(summaries)
         .contains("Bucklands Beach AFC Dusties vs Ellerslie AFC Flamingos")
-        .contains("Lad FC vs Flamingoes")
+        .contains("Ladzio vs Flamingoes")
         .contains("Man I love football vs Hugh Jazz");
   }
 

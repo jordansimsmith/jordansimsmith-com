@@ -16,11 +16,11 @@ public class TeamsFactoryImpl implements TeamsFactory {
       new FootballFixTeam(
           "Flamingos Sevens",
           "flamingoes",
-          "13",
-          "131",
-          "93",
-          "6227",
-          "3/25 Normanby Road, Mount Eden, Auckland 1024");
+          "9",
+          "133",
+          "96",
+          "6562",
+          "46 Michaels Avenue, Ellerslie, Auckland");
 
   private static final SubfootballTeam SUBFOOTBALL_MAN_I_LOVE_FOOTBALL =
       new SubfootballTeam("Man I Love Football", "4517", "Park Road, Parnell, Auckland 1010");

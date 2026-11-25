@@ -13,13 +13,13 @@ public final class FootballFixStubServer {
         <body>
           <table class="FTable">
             <tr class="FHeader">
-              <td colspan="5">Thursday 23 Oct 2025</td>
+              <td colspan="5">Wednesday 25 Nov 2026</td>
             </tr>
             <tr class="FRow FBand">
-              <td class="FDate">8:40pm</td>
+              <td class="FDate">6:55pm</td>
               <td class="FPlayingArea">Field 2<br /></td>
-              <td class="FHomeTeam"><a href="#">Lad FC</a></td>
-              <td class="FScore"><div><nobr data-fixture-id="148617">vs</nobr></div></td>
+              <td class="FHomeTeam"><a href="#">Ladzio</a></td>
+              <td class="FScore"><div><nobr data-fixture-id="167155">vs</nobr></div></td>
               <td class="FAwayTeam"><a href="#">Flamingoes</a></td>
             </tr>
           </table>
@@ -35,7 +35,16 @@ public final class FootballFixStubServer {
         "/health", exchange -> respond(exchange, "text/plain; charset=utf-8", "ok"));
     server.createContext(
         "/Leagues/Fixtures",
-        exchange -> respond(exchange, "text/html; charset=utf-8", FIXTURES_HTML));
+        exchange -> {
+          if (!exchange
+              .getRequestURI()
+              .getQuery()
+              .equals("SportId=0&VenueId=9&LeagueId=133&SeasonId=96&DivisionId=6562")) {
+            exchange.sendResponseHeaders(404, -1);
+            return;
+          }
+          respond(exchange, "text/html; charset=utf-8", FIXTURES_HTML);
+        });
     server.start();
     Thread.currentThread().join();
   }
