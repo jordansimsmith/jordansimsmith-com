@@ -12,11 +12,11 @@ public final class SubfootballStubServer {
       BEGIN:VCALENDAR
       VERSION:2.0
       BEGIN:VEVENT
-      DESCRIPTION:Field: Black\\nRound: 1\\nMan I Love Football and Swede as Bro FC
-      DTSTART:20251028T045000Z
+      DESCRIPTION:Field: Yellow\\nRound: 1\\nMan I love football and Hugh Jazz
+      DTSTART:20261027T045000Z
       LOCATION:Auckland Domain\\, Auckland
-      SUMMARY:Round 1 - Man I Love Football vs Swede as Bro FC
-      UID:8c19b36f-0b5d-41f9-aa9c-2779b6fff277
+      SUMMARY:Round 1 - Man I love football vs Hugh Jazz
+      UID:summer-fixture-1
       END:VEVENT
       END:VCALENDAR
       """;
@@ -28,7 +28,7 @@ public final class SubfootballStubServer {
     server.createContext(
         "/health", exchange -> respond(exchange, "text/plain; charset=utf-8", "ok"));
     server.createContext(
-        "/teams/calendar/4497",
+        "/teams/calendar/4517",
         exchange -> respond(exchange, "text/calendar; charset=utf-8", FIXTURES_ICAL));
     server.start();
     Thread.currentThread().join();

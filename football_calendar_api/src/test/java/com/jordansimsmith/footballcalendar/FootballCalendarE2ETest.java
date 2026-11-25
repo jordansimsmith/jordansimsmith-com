@@ -128,7 +128,7 @@ public class FootballCalendarE2ETest {
     assertThat(summaries)
         .contains("Bucklands Beach AFC Dusties vs Ellerslie AFC Flamingos")
         .contains("Lad FC vs Flamingoes")
-        .contains("Man I Love Football vs Swede as Bro FC");
+        .contains("Man I love football vs Hugh Jazz");
   }
 
   @Test
